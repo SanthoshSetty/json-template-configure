@@ -87,7 +87,6 @@ const JsonTemplateBuilderRevert = () => {
         if (!newContent[itemIndex].nestedSpans) {
           newContent[itemIndex].nestedSpans = [];
         }
-        // Clear content and description when adding the first nested span
         if (newContent[itemIndex].nestedSpans.length === 0) {
           newContent[itemIndex].content = '';
           newContent[itemIndex].description = '';
@@ -121,11 +120,18 @@ const JsonTemplateBuilderRevert = () => {
     }));
   }, []);
 
-  const insertVariable = useCallback((id, idx = null) => {
+  const insertVariable = useCallback((id, idx = null, spanIdx = null) => {
     setElements(prev => prev.map(el => {
       if (el.id === id) {
-        if (Array.isArray(el.content) && idx !== null) el.content[idx].content += ' {{Variable Name}}';
-        else if (typeof el.content === 'string') el.content += ' {{Variable Name}}';
+        if (Array.isArray(el.content) && idx !== null) {
+          if (spanIdx !== null) {
+            el.content[idx].nestedSpans[spanIdx].content += ' {{Variable Name}}';
+          } else {
+            el.content[idx].content += ' {{Variable Name}}';
+          }
+        } else if (typeof el.content === 'string') {
+          el.content += ' {{Variable Name}}';
+        }
       }
       return el;
     }));
@@ -224,6 +230,10 @@ const JsonTemplateBuilderRevert = () => {
                         <button onClick={() => removeNestedSpan(element.id, idx, spanIdx)} className="text-red-500 hover:text-red-700 transition-colors duration-200">
                           Remove Span
                         </button>
+                        <button onClick={() => insertVariable(element.id, idx, spanIdx)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
+                          <VariableIcon className="h-5 w-5 inline mr-1" />
+                          Insert Variable
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -245,156 +255,157 @@ const JsonTemplateBuilderRevert = () => {
           ) : (
             <p className="text-sm text-gray-500 italic">Content won't be used since a description is provided.</p>
           )}
-        </>
-      )}
-      {element.hasDescription ? (
-        <>
-          <textarea value={element.description} onChange={e => updateElement(element.id, { description: e.target.value })} placeholder="Description/Instructions for AI" className="w-full p-2 mt-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          {!['ul', 'ol'].includes(element.type) && (
-            <button onClick={() => updateElement(element.id, { hasDescription: false, description: '' })} className="mt-2 text-blue-500 hover:text-blue-700 transition-colors duration-200">Remove Description</button>
+          {element.hasDescription ? (
+            <>
+              <textarea value={element.description} onChange={e => updateElement(element.id, { description: e.target.value })} placeholder="Description/Instructions for AI" className="w-full p-2 mt-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              {!['ul', 'ol'].includes(element.type) && (
+                <button onClick={() => updateElement(element.id, { hasDescription: false, description: '' })} className="mt-2 text-blue-500 hover:text-blue-700 transition-colors duration-200">Remove Description</button>
+              )}
+            </>
+          ) : (
+            <button onClick={() => updateElement(element.id, { hasDescription: true })} className="mt-2 text-blue-500 hover:text-blue-700 transition-colors duration-200">Add Description</button>
           )}
-        </>
-      ) : (
-        <button onClick={() => updateElement(element.id, { hasDescription: true })} className="mt-2 text-blue-500 hover:text-blue-700 transition-colors duration-200">Add Description</button>
-      )}
-      {!['ul', 'ol'].includes(element.type) && (
-        <div className="mt-4">
-          <button onClick={() => insertVariable(element.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
-            <VariableIcon className="h-5 w-5 inline mr-1" />
-            Insert Variable
-          </button>
-        </div>
-      )}
+          {!['ul', 'ol'].includes(element.type) && (
+            <div className="mt-4">
+            <button onClick={() => insertVariable(element.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
+              <VariableIcon className="h-5 w-5 inline mr-1" />
+              Insert Variable
+            </button>
+          </div>
+        )}
+      </>
+    )}
     </div>
   );
 
   const convertToJsonSchema = () => ({
-  schema: {
-    properties: {
-      tag: { enum: ['body'] },
-      children: elements.map(element => {
-        const baseProps = { tag: { enum: [element.type] } };
+    schema: {
+      properties: {
+        tag: { enum: ['body'] },
+        children: elements.map(element => {
+          const baseProps = { tag: { enum: [element.type] } };
 
-        if (['ul', 'ol'].includes(element.type)) {
-          if (element.isDynamic) {
-            return { 
-              description: element.description || '', 
-              properties: { 
-                ...baseProps, 
-                children: [{ 
-                  type: 'array', 
-                  description: element.listItemDescription || '', 
-                  items: { 
-                    properties: { 
-                      tag: { enum: ['li'] }, 
-                      children: null 
+          if (['ul', 'ol'].includes(element.type)) {
+            if (element.isDynamic) {
+              return { 
+                description: element.description || '', 
+                properties: { 
+                  ...baseProps, 
+                  children: [{ 
+                    type: 'array', 
+                    description: element.listItemDescription || '', 
+                    items: { 
+                      properties: { 
+                        tag: { enum: ['li'] }, 
+                        children: null 
+                      } 
                     } 
-                  } 
-                }] 
-              } 
-            };
-          } else {
-            const listItems = element.content.map(item => ({
-              ...(item.nestedSpans && item.nestedSpans.length > 0
-                ? {
-                    properties: {
-                      tag: { enum: ['li'] },
-                      children: item.nestedSpans.map(span => ({
-                        properties: {
-                          tag: { enum: ['span'] },
-                          ...(span.content ? { content: { enum: [span.content] } } : {}),
-                          ...(span.description ? { description: span.description } : {})
-                        }
-                      }))
+                  }] 
+                } 
+              };
+            } else {
+              const listItems = element.content.map(item => ({
+                ...(item.nestedSpans && item.nestedSpans.length > 0
+                  ? {
+                      properties: {
+                        tag: { enum: ['li'] },
+                        children: item.nestedSpans.map(span => ({
+                          properties: {
+                            tag: { enum: ['span'] },
+                            ...(span.content ? { content: { enum: [span.content] } } : {}),
+                            ...(span.description ? { description: span.description } : {})
+                          }
+                        }))
+                      }
                     }
-                  }
-                : {
-                    description: item.description || '',
-                    properties: {
-                      tag: { enum: ['li'] },
-                      ...(item.content ? { content: { enum: [item.content] } } : {}),
-                      children: null
-                    }
-                  })
-            }));
-            return { description: element.description || '', properties: { ...baseProps, children: listItems } };
+                  : {
+                      description: item.description || '',
+                      properties: {
+                        tag: { enum: ['li'] },
+                        ...(item.content ? { content: { enum: [item.content] } } : {}),
+                        children: null
+                      }
+                    })
+              }));
+              return { description: element.description || '', properties: { ...baseProps, children: listItems } };
+            }
           }
-        }
 
-        const elementProps = { 
-          ...baseProps, 
-          content: element.hasDescription ? undefined : { enum: [element.content] }, 
-          children: null 
-        };
-        return element.hasDescription 
-          ? { description: element.description, properties: elementProps } 
-          : { properties: elementProps };
-      }),
+          const elementProps = { 
+            ...baseProps, 
+            content: element.hasDescription ? undefined : { enum: [element.content] }, 
+            children: null 
+          };
+          return element.hasDescription 
+            ? { description: element.description, properties: elementProps } 
+            : { properties: elementProps };
+        }),
+      },
     },
-  },
-});
+  });
 
   const renderPreview = () => (
-  <div className="p-5 bg-gray-100 rounded mb-5 text-gray-800">
-    {elements.map((element, index) => {
-      if (element.isDynamic && ['ul', 'ol'].includes(element.type)) {
-        return (
-          <div key={index} className="mb-4 p-3 bg-yellow-100 rounded">
-            <p className="font-semibold">Dynamic {element.type === 'ul' ? 'Unordered' : 'Ordered'} List:</p>
-            <p className="italic">{element.description}</p>
-            <p className="italic">Items: {element.listItemDescription}</p>
-          </div>
-        );
-      }
-
-      if (element.hasDescription) {
-        return (
-          <div key={index} className="mb-4 p-3 bg-green-100 rounded">
-            <p className="font-semibold">{element.type.toUpperCase()}:</p>
-            <p className="italic">Generated content for: {element.description}</p>
-          </div>
-        );
-      }
-
-      switch (element.type) {
-        case 'ul':
-        case 'ol':
-          const ListComponent = element.type === 'ul' ? 'ul' : 'ol';
+    <div className="p-5 bg-gray-100 rounded mb-5 text-gray-800">
+      {elements.map((element, index) => {
+        if (element.isDynamic && ['ul', 'ol'].includes(element.type)) {
           return (
-            <ListComponent key={index} className={`mb-4 pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
-              {element.content.map((item, idx) => (
-                <li key={idx} className="mb-2">
-                  {item.nestedSpans && item.nestedSpans.length > 0 ? (
-                    item.nestedSpans.map((span, spanIdx) => (
-                      <React.Fragment key={spanIdx}>
-                        {span.content || (span.description && <span className="italic text-gray-600">Generated content for: {span.description}</span>)}
-                      </React.Fragment>
-                    ))
-                  ) : (
-                    item.content || (item.description && <span className="italic text-gray-600">Generated content for: {item.description}</span>)
-                  )}
-                </li>
-              ))}
-            </ListComponent>
+            <div key={index} className="mb-4 p-3 bg-yellow-100 rounded">
+              <p className="font-semibold">Dynamic {element.type === 'ul' ? 'Unordered' : 'Ordered'} List:</p>
+              <p className="italic">{element.description}</p>
+              <p className="italic">Items: {element.listItemDescription}</p>
+            </div>
           );
-        case 'div':
-          return <div key={index} className="h-8 bg-gray-300 mb-4 flex items-center justify-center text-sm">Spacer: {element.content}</div>;
-        case 'h1':
-          return <h1 key={index} className="text-4xl font-bold mb-4">{element.content}</h1>;
-        case 'h2':
-          return <h2 key={index} className="text-3xl font-semibold mb-3">{element.content}</h2>;
-        case 'h3':
-          return <h3 key={index} className="text-2xl font-medium mb-2">{element.content}</h3>;
-        case 'strong':
-          return <strong key={index} className="font-bold">{element.content}</strong>;
-        case 'span':
-          return <span key={index}>{element.content}</span>;
-        default:
-          return <p key={index} className="mb-4">{element.content}</p>;
-      }
-    })}
-  </div>
-);
+        }
+
+        if (element.hasDescription) {
+          return (
+            <div key={index} className="mb-4 p-3 bg-green-100 rounded">
+              <p className="font-semibold">{element.type.toUpperCase()}:</p>
+              <p className="italic">Generated content for: {element.description}</p>
+            </div>
+          );
+        }
+
+        switch (element.type) {
+          case 'ul':
+          case 'ol':
+            const ListComponent = element.type === 'ul' ? 'ul' : 'ol';
+            return (
+              <ListComponent key={index} className={`mb-4 pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
+                {element.content.map((item, idx) => (
+                  <li key={idx} className="mb-2">
+                    {item.nestedSpans && item.nestedSpans.length > 0 ? (
+                      item.nestedSpans.map((span, spanIdx) => (
+                        <React.Fragment key={spanIdx}>
+                          {span.content || (span.description && <span className="italic text-gray-600">Generated content for: {span.description}</span>)}
+                        </React.Fragment>
+                      ))
+                    ) : (
+                      item.content || (item.description && <span className="italic text-gray-600">Generated content for: {item.description}</span>)
+                    )}
+                  </li>
+                ))}
+              </ListComponent>
+            );
+          case 'div':
+            return <div key={index} className="h-8 bg-gray-300 mb-4 flex items-center justify-center text-sm">Spacer: {element.content}</div>;
+          case 'h1':
+            return <h1 key={index} className="text-4xl font-bold mb-4">{element.content}</h1>;
+          case 'h2':
+            return <h2 key={index} className="text-3xl font-semibold mb-3">{element.content}</h2>;
+          case 'h3':
+            return <h3 key={index} className="text-2xl font-medium mb-2">{element.content}</h3>;
+          case 'strong':
+            return <strong key={index} className="font-bold">{element.content}</strong>;
+          case 'span':
+            return <span key={index}>{element.content}</span>;
+          default:
+            return <p key={index} className="mb-4">{element.content}</p>;
+        }
+      })}
+    </div>
+  );
+
   return (
     <div className="font-sans p-8 bg-gray-100 min-h-screen">
       <div className="max-w-7xl mx-auto">
