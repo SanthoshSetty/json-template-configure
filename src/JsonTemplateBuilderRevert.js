@@ -1,349 +1,569 @@
+// JsonTemplateBuilderRevert.jsx
 import React, { useState, useCallback, useEffect } from 'react';
 import { PlusIcon, MinusIcon, TrashIcon, VariableIcon } from '@heroicons/react/solid';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { v4 as uuidv4 } from 'uuid';
 
-const ElementTypes = { HEADING1: 'h1', HEADING2: 'h2', HEADING3: 'h3', PARAGRAPH: 'p', UNORDERED_LIST: 'ul', ORDERED_LIST: 'ol', SPAN: 'span', STRONG: 'strong', SPACER: 'div' };
-const defaultContent = { ul: [{ content: 'List item 1', description: '' }], ol: [{ content: 'List item 1', description: '' }], div: '50px', strong: 'Insert dynamic product name', span: 'Insert span content' };
+// Define Element Types and Default Content
+const ElementTypes = {
+  HEADING1: 'h1',
+  HEADING2: 'h2',
+  HEADING3: 'h3',
+  PARAGRAPH: 'p',
+  UNORDERED_LIST: 'ul',
+  ORDERED_LIST: 'ol',
+  SPAN: 'span',
+  STRONG: 'strong',
+  SPACER: 'div'
+};
 
-const JsonTemplateBuilderRevert = () => {
-  const [elements, setElements] = useState([]);
-  const [draggingIndex, setDraggingIndex] = useState(null);
-  const [jsonSchema, setJsonSchema] = useState(JSON.stringify({ schema: { properties: { tag: { enum: ['body'] }, children: [] } } }, null, 2));
+const defaultContent = {
+  ul: [{ id: uuidv4(), content: 'List item 1', description: '', nestedSpans: [] }],
+  ol: [{ id: uuidv4(), content: 'List item 1', description: '', nestedSpans: [] }],
+  div: '50px',
+  strong: 'Insert dynamic product name',
+  span: 'Insert span content'
+};
 
-  useEffect(() => {
-    setJsonSchema(JSON.stringify(convertToJsonSchema(), null, 2));
-  }, [elements]);
+// Subcomponents
 
-  const updateElementsFromSchema = () => {
-    try {
-      const parsedSchema = JSON.parse(jsonSchema);
-      const newElements = parsedSchema.schema.properties.children.map((child, index) => {
-        const type = child.properties.tag.enum[0];
-        let content;
-        if (['ul', 'ol'].includes(type)) {
-          content = child.properties.children.map(item => ({
-            content: item.properties.content?.enum[0] || '',
-            description: item.description || '',
-            nestedSpans: item.properties.children?.map(span => ({
-              content: span.properties.content?.enum[0] || '',
-              description: span.description || ''
-            })) || []
-          }));
-        } else {
-          content = child.properties.content?.enum[0] || defaultContent[type] || '';
-        }
-        return {
-          id: Date.now() + index,
-          type,
-          content,
-          description: child.description || '',
-          isDynamic: child.properties.children?.[0]?.type === 'array',
-          hasDescription: !!child.description
-        };
-      });
-      setElements(newElements);
-    } catch (error) {
-      console.error('Error parsing JSON schema:', error);
-    }
-  };
+// AddElementSidebar Component
+const AddElementSidebar = ({ addElement }) => (
+  <div className="w-full md:w-64 bg-white shadow-md rounded-lg p-6">
+    <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Add Elements</h2>
+    {Object.entries(ElementTypes).map(([key, value]) => (
+      <button
+        key={key}
+        onClick={() => addElement(value)}
+        className="block w-full mb-2 text-left text-blue-500 hover:text-blue-700 transition-colors duration-200"
+      >
+        Add {key.replace(/_/g, ' ')}
+      </button>
+    ))}
+  </div>
+);
 
-  const addElement = useCallback(type => {
-    setElements(prev => [...prev, { id: Date.now(), type, content: defaultContent[type] || 'New element', description: '', isDynamic: false, listItemDescription: '', hasDescription: false }]);
-  }, []);
-
-  const updateElement = useCallback((id, updates) => {
-    setElements(prev => prev.map(el => {
-      if (el.id === id) {
-        const updatedElement = { ...el, ...updates };
-        if ('description' in updates && updates.description.trim() === '') updatedElement.hasDescription = false;
-        return updatedElement;
-      }
-      return el;
-    }));
-  }, []);
-
-  const modifyListItem = useCallback((id, index, action, field, value) => {
-    setElements(prev => prev.map(el => {
-      if (el.id === id) {
-        const newContent = [...el.content];
-        if (action === 'add') {
-          newContent.push({ content: '', description: '', nestedSpans: [] });
-        } else if (action === 'remove') {
-          newContent.splice(index, 1);
-        } else if (action === 'update') {
-          newContent[index][field] = value;
-        } else if (action === 'removeContent') {
-          newContent[index].content = '';
-        }
-        return { ...el, content: newContent };
-      }
-      return el;
-    }));
-  }, []);
-
-  const addNestedSpan = useCallback((id, itemIndex) => {
-    setElements(prev => prev.map(el => {
-      if (el.id === id) {
-        const newContent = [...el.content];
-        if (!newContent[itemIndex].nestedSpans) {
-          newContent[itemIndex].nestedSpans = [];
-        }
-        if (newContent[itemIndex].nestedSpans.length === 0) {
-          newContent[itemIndex].content = '';
-          newContent[itemIndex].description = '';
-        }
-        newContent[itemIndex].nestedSpans.push({ content: '', description: '' });
-        return { ...el, content: newContent };
-      }
-      return el;
-    }));
-  }, []);
-
-  const updateNestedSpan = useCallback((id, itemIndex, spanIndex, field, value) => {
-    setElements(prev => prev.map(el => {
-      if (el.id === id) {
-        const newContent = [...el.content];
-        newContent[itemIndex].nestedSpans[spanIndex][field] = value;
-        return { ...el, content: newContent };
-      }
-      return el;
-    }));
-  }, []);
-
-  const removeNestedSpan = useCallback((id, itemIndex, spanIndex) => {
-    setElements(prev => prev.map(el => {
-      if (el.id === id) {
-        const newContent = [...el.content];
-        newContent[itemIndex].nestedSpans.splice(spanIndex, 1);
-        return { ...el, content: newContent };
-      }
-      return el;
-    }));
-  }, []);
-
-  const insertVariable = useCallback((id, idx = null, spanIdx = null) => {
-    setElements(prev => prev.map(el => {
-      if (el.id === id) {
-        if (Array.isArray(el.content) && idx !== null) {
-          if (spanIdx !== null) {
-            el.content[idx].nestedSpans[spanIdx].content += ' {{Variable Name}}';
-          } else {
-            el.content[idx].content += ' {{Variable Name}}';
-          }
-        } else if (typeof el.content === 'string') {
-          el.content += ' {{Variable Name}}';
-        }
-      }
-      return el;
-    }));
-  }, []);
-
-  const handleDragStart = index => setDraggingIndex(index);
-  const handleDragOver = index => {
-    if (index !== draggingIndex) {
-      setElements(prev => {
-        const newElements = [...prev];
-        const [movedItem] = newElements.splice(draggingIndex, 1);
-        newElements.splice(index, 0, movedItem);
-        return newElements;
-      });
-      setDraggingIndex(index);
-    }
-  };
-  const handleDrop = () => setDraggingIndex(null);
-
-  const renderElement = (element, index) => (
-    <div key={element.id} className="mb-6 p-6 border rounded-lg bg-white shadow-sm transition-all duration-200 hover:shadow-md" draggable onDragStart={() => handleDragStart(index)} onDragOver={e => { e.preventDefault(); handleDragOver(index); }} onDrop={handleDrop}>
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold text-gray-700">{element.type.toUpperCase()}</h3>
-        <button onClick={() => setElements(prev => prev.filter(el => el.id !== element.id))} className="text-red-500 hover:text-red-700 transition-colors duration-200">
-          <TrashIcon className="h-5 w-5" />
-        </button>
+// ListItem Component
+const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addNestedSpan, updateNestedSpan, removeNestedSpan }) => (
+  <Draggable draggableId={item.id} index={index} key={item.id}>
+    {(provided) => (
+      <div
+        className="mb-4 p-4 bg-gray-50 rounded-md"
+        ref={provided.innerRef}
+        {...provided.draggableProps}
+        {...provided.dragHandleProps}
+      >
+        <div className="flex items-center mb-2">
+          <span className="mr-2 text-gray-500">{/* List marker is handled in the preview */}</span>
+          <input
+            value={item.content}
+            onChange={(e) => modifyListItem(elementId, item.id, 'content', e.target.value)}
+            className="flex-grow p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="List item content"
+          />
+        </div>
+        <input
+          value={item.description}
+          onChange={(e) => modifyListItem(elementId, item.id, 'description', e.target.value)}
+          className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+          placeholder="Item description"
+        />
+        <div className="mt-2 space-x-2">
+          <button onClick={() => modifyListItem(elementId, item.id, 'removeContent')} className="text-red-500 hover:text-red-700 transition-colors duration-200">
+            Remove Content
+          </button>
+          <button onClick={() => insertVariable(elementId, item.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
+            <VariableIcon className="h-5 w-5 inline mr-1" />
+            Insert Variable
+          </button>
+          <button onClick={() => addNestedSpan(elementId, item.id)} className="text-green-500 hover:text-green-700 transition-colors duration-200">
+            {item.nestedSpans.length > 0 ? 'Add Another Nested Span' : 'Add Nested Span'}
+          </button>
+        </div>
+        {item.nestedSpans.map((span, spanIdx) => (
+          <div key={span.id} className="mt-2 ml-4 p-2 bg-gray-100 rounded">
+            <input
+              value={span.content}
+              onChange={(e) => updateNestedSpan(elementId, item.id, span.id, 'content', e.target.value)}
+              className="p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-full mb-2"
+              placeholder="Nested span content"
+            />
+            <input
+              value={span.description}
+              onChange={(e) => updateNestedSpan(elementId, item.id, span.id, 'description', e.target.value)}
+              className="p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-full mb-2"
+              placeholder="Nested span description"
+            />
+            <div className="flex justify-between">
+              <button onClick={() => modifyListItem(elementId, item.id, 'removeSpan', span.id)} className="text-red-500 hover:text-red-700 transition-colors duration-200">
+                Remove Span
+              </button>
+              <button onClick={() => insertVariable(elementId, item.id, span.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
+                <VariableIcon className="h-5 w-5 inline mr-1" />
+                Insert Variable
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
-      {['ul', 'ol'].includes(element.type) ? (
-        <>
-          <label className="flex items-center mb-4 text-sm text-gray-600">
-            <input type="checkbox" checked={element.isDynamic} onChange={e => updateElement(element.id, { isDynamic: e.target.checked })} className="mr-2" />
-            <span>Dynamic List</span>
-          </label>
-          {element.isDynamic ? (
-            <>
-              <textarea value={element.description} onChange={e => updateElement(element.id, { description: e.target.value })} placeholder="List Description" className="w-full p-2 mb-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              <textarea value={element.listItemDescription} onChange={e => updateElement(element.id, { listItemDescription: e.target.value })} placeholder="Item Description" className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </>
-          ) : (
-            <>
-              {element.content.map((item, idx) => (
-                <div key={idx} className="mb-4 p-4 bg-gray-50 rounded-md">
-                  <div className="flex items-center mb-2">
-                    <span className="mr-2 text-gray-500">{element.type === 'ul' ? '•' : `${idx + 1}.`}</span>
-                    {(!item.nestedSpans || item.nestedSpans.length === 0) && (
-                      <input 
-                        value={item.content} 
-                        onChange={e => modifyListItem(element.id, idx, 'update', 'content', e.target.value)} 
-                        className="flex-grow p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                        placeholder="List item content"
+    )}
+  </Draggable>
+);
+
+// Element Component
+const Element = ({
+  element,
+  index,
+  updateElement,
+  removeElement,
+  modifyListItem,
+  insertVariable,
+  addNestedSpan,
+  updateNestedSpan,
+  removeNestedSpan
+}) => (
+  <Draggable draggableId={element.id} index={index} key={element.id}>
+    {(provided) => (
+      <div
+        className="mb-6 p-6 border rounded-lg bg-white shadow-sm transition-all duration-200 hover:shadow-md"
+        ref={provided.innerRef}
+        {...provided.draggableProps}
+      >
+        <div className="flex justify-between items-center mb-4" {...provided.dragHandleProps}>
+          <h3 className="text-lg font-semibold text-gray-700">{element.type.toUpperCase()}</h3>
+          <button onClick={() => removeElement(element.id)} className="text-red-500 hover:text-red-700 transition-colors duration-200">
+            <TrashIcon className="h-5 w-5" />
+          </button>
+        </div>
+        {['ul', 'ol'].includes(element.type) ? (
+          <>
+            <label className="flex items-center mb-4 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={element.isDynamic}
+                onChange={(e) => updateElement(element.id, { isDynamic: e.target.checked })}
+                className="mr-2"
+              />
+              <span>Dynamic List</span>
+            </label>
+            {element.isDynamic ? (
+              <>
+                <textarea
+                  value={element.description}
+                  onChange={(e) => updateElement(element.id, { description: e.target.value })}
+                  placeholder="List Description"
+                  className="w-full p-2 mb-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <textarea
+                  value={element.listItemDescription}
+                  onChange={(e) => updateElement(element.id, { listItemDescription: e.target.value })}
+                  placeholder="Item Description"
+                  className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </>
+            ) : (
+              <Droppable droppableId={element.id} type={`list-${element.id}`}>
+                {(provided) => (
+                  <div ref={provided.innerRef} {...provided.droppableProps}>
+                    {element.content.map((item, idx) => (
+                      <ListItem
+                        key={item.id}
+                        item={item}
+                        index={idx}
+                        elementId={element.id}
+                        modifyListItem={modifyListItem}
+                        insertVariable={insertVariable}
+                        addNestedSpan={addNestedSpan}
+                        updateNestedSpan={updateNestedSpan}
+                        removeNestedSpan={removeNestedSpan}
                       />
-                    )}
+                    ))}
+                    {provided.placeholder}
                   </div>
-                  {(!item.nestedSpans || item.nestedSpans.length === 0) && (
-                    <input 
-                      value={item.description} 
-                      onChange={e => modifyListItem(element.id, idx, 'update', 'description', e.target.value)} 
-                      className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                      placeholder="Item description" 
-                    />
-                  )}
-                  <div className="mt-2 space-x-2">
-                    {(!item.nestedSpans || item.nestedSpans.length === 0) && (
-                      <>
-                        <button onClick={() => modifyListItem(element.id, idx, 'removeContent')} className="text-red-500 hover:text-red-700 transition-colors duration-200">
-                          Remove Content
-                        </button>
-                        <button onClick={() => insertVariable(element.id, idx)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
-                          <VariableIcon className="h-5 w-5 inline mr-1" />
-                          Insert Variable
-                        </button>
-                      </>
-                    )}
-                    <button onClick={() => addNestedSpan(element.id, idx)} className="text-green-500 hover:text-green-700 transition-colors duration-200">
-                      {item.nestedSpans && item.nestedSpans.length > 0 ? 'Add Another Nested Span' : 'Add Nested Span'}
-                    </button>
-                  </div>
-                  {item.nestedSpans && item.nestedSpans.map((span, spanIdx) => (
-                    <div key={spanIdx} className="mt-2 ml-4 p-2 bg-gray-100 rounded">
-                      <input 
-                        value={span.content} 
-                        onChange={e => updateNestedSpan(element.id, idx, spanIdx, 'content', e.target.value)} 
-                        className="p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-full mb-2" 
-                        placeholder="Nested span content"
-                      />
-                      <input 
-                        value={span.description} 
-                        onChange={e => updateNestedSpan(element.id, idx, spanIdx, 'description', e.target.value)} 
-                        className="p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-full mb-2" 
-                        placeholder="Nested span description"
-                      />
-                      <div className="flex justify-between">
-                        <button onClick={() => updateNestedSpan(element.id, idx, spanIdx, 'content', '')} className="text-red-500 hover:text-red-700 transition-colors duration-200">
-                          Remove Content
-                        </button>
-                        <button onClick={() => removeNestedSpan(element.id, idx, spanIdx)} className="text-red-500 hover:text-red-700 transition-colors duration-200">
-                          Remove Span
-                        </button>
-                        <button onClick={() => insertVariable(element.id, idx, spanIdx)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
-                          <VariableIcon className="h-5 w-5 inline mr-1" />
-                          Insert Variable
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
+                )}
+              </Droppable>
+            )}
+            {!element.isDynamic && (
               <div className="mt-4">
-                <button onClick={() => modifyListItem(element.id, null, 'add')} className="text-green-500 hover:text-green-700 transition-colors duration-200">
+                <button
+                  onClick={() => modifyListItem(element.id, null, 'add')}
+                  className="text-green-500 hover:text-green-700 transition-colors duration-200"
+                >
                   <PlusIcon className="h-5 w-5 inline mr-1" />
                   Add Item
                 </button>
               </div>
-            </>
-          )}
-        </>
-      ) : (
-        <>
-          {!element.hasDescription ? (
-            <input value={element.content} onChange={e => updateElement(element.id, { content: e.target.value })} className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          ) : (
-            <p className="text-sm text-gray-500 italic">Content won't be used since a description is provided.</p>
-          )}
-          {element.hasDescription ? (
-            <>
-              <textarea value={element.description} onChange={e => updateElement(element.id, { description: e.target.value })} placeholder="Description/Instructions for AI" className="w-full p-2 mt-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              {!['ul', 'ol'].includes(element.type) && (
-                <button onClick={() => updateElement(element.id, { hasDescription: false, description: '' })} className="mt-2 text-blue-500 hover:text-blue-700 transition-colors duration-200">Remove Description</button>
-              )}
-            </>
-          ) : (
-            <button onClick={() => updateElement(element.id, { hasDescription: true })} className="mt-2 text-blue-500 hover:text-blue-700 transition-colors duration-200">Add Description</button>
-          )}
-          {!['ul', 'ol'].includes(element.type) && (
-            <div className="mt-4">
-            <button onClick={() => insertVariable(element.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
-              <VariableIcon className="h-5 w-5 inline mr-1" />
-              Insert Variable
-            </button>
-          </div>
+            )}
+          </>
+        ) : (
+          <>
+            {!element.hasDescription ? (
+              <input
+                value={element.content}
+                onChange={(e) => updateElement(element.id, { content: e.target.value })}
+                className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            ) : (
+              <p className="text-sm text-gray-500 italic">Content won't be used since a description is provided.</p>
+            )}
+            {element.hasDescription ? (
+              <>
+                <textarea
+                  value={element.description}
+                  onChange={(e) => updateElement(element.id, { description: e.target.value })}
+                  placeholder="Description/Instructions for AI"
+                  className="w-full p-2 mt-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {!['ul', 'ol'].includes(element.type) && (
+                  <button
+                    onClick={() => updateElement(element.id, { hasDescription: false, description: '' })}
+                    className="mt-2 text-blue-500 hover:text-blue-700 transition-colors duration-200"
+                  >
+                    Remove Description
+                  </button>
+                )}
+              </>
+            ) : (
+              <button
+                onClick={() => updateElement(element.id, { hasDescription: true })}
+                className="mt-2 text-blue-500 hover:text-blue-700 transition-colors duration-200"
+              >
+                Add Description
+              </button>
+            )}
+            {!['ul', 'ol'].includes(element.type) && (
+              <div className="mt-4">
+                <button onClick={() => insertVariable(element.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
+                  <VariableIcon className="h-5 w-5 inline mr-1" />
+                  Insert Variable
+                </button>
+              </div>
+            )}
+          </>
         )}
-      </>
+      </div>
     )}
-    </div>
-  );
+  </Draggable>
+);
 
+// Main Component
+const JsonTemplateBuilderRevert = () => {
+  const [elements, setElements] = useState([]);
+  const [jsonSchema, setJsonSchema] = useState(JSON.stringify({ schema: { properties: { tag: { enum: ['body'] }, children: [] } } }, null, 2));
+
+  // Update JSON Schema whenever elements change
+  useEffect(() => {
+    setJsonSchema(JSON.stringify(convertToJsonSchema(), null, 2));
+  }, [elements]);
+
+  // Add Element
+  const addElement = useCallback((type) => {
+    setElements((prev) => [
+      ...prev,
+      {
+        id: uuidv4(),
+        type,
+        content: defaultContent[type] || 'New element',
+        description: '',
+        isDynamic: false,
+        listItemDescription: '',
+        hasDescription: false
+      }
+    ]);
+  }, []);
+
+  // Remove Element
+  const removeElement = useCallback((id) => {
+    setElements((prev) => prev.filter((el) => el.id !== id));
+  }, []);
+
+  // Update Element
+  const updateElement = useCallback((id, updates) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === id) {
+          const updatedElement = { ...el, ...updates };
+          if ('description' in updates && updates.description.trim() === '') updatedElement.hasDescription = false;
+          return updatedElement;
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  // Modify List Item
+  const modifyListItem = useCallback((elementId, itemId, action, value = '') => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          let newContent = [...el.content];
+          if (action === 'add') {
+            newContent.push({ id: uuidv4(), content: '', description: '', nestedSpans: [] });
+          } else if (action === 'removeContent') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
+          } else if (action === 'update') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: value } : item));
+          } else if (action === 'description') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value } : item));
+          } else if (action === 'removeSpan') {
+            newContent = newContent.map((item) =>
+              item.id === itemId
+                ? { ...item, nestedSpans: item.nestedSpans.filter((span) => span.id !== value) }
+                : item
+            );
+          }
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  // Add Nested Span
+  const addNestedSpan = useCallback((elementId, itemId) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          const newContent = el.content.map((item) => {
+            if (item.id === itemId) {
+              return { ...item, nestedSpans: [...item.nestedSpans, { id: uuidv4(), content: '', description: '' }] };
+            }
+            return item;
+          });
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  // Update Nested Span
+  const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          const newContent = el.content.map((item) => {
+            if (item.id === itemId) {
+              const updatedSpans = item.nestedSpans.map((span) => (span.id === spanId ? { ...span, [field]: value } : span));
+              return { ...item, nestedSpans: updatedSpans };
+            }
+            return item;
+          });
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  // Remove Nested Span
+  const removeNestedSpan = useCallback((elementId, itemId, spanId) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          const newContent = el.content.map((item) => {
+            if (item.id === itemId) {
+              return { ...item, nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId) };
+            }
+            return item;
+          });
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  // Insert Variable
+  const insertVariable = useCallback((id, itemId = null, spanId = null) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === id) {
+          if (itemId && spanId) {
+            // Insert into nested span
+            const newContent = el.content.map((item) => {
+              if (item.id === itemId) {
+                const updatedSpans = item.nestedSpans.map((span) =>
+                  span.id === spanId ? { ...span, content: `${span.content} {{Variable Name}}` } : span
+                );
+                return { ...item, nestedSpans: updatedSpans };
+              }
+              return item;
+            });
+            return { ...el, content: newContent };
+          } else if (itemId) {
+            // Insert into list item
+            const newContent = el.content.map((item) =>
+              item.id === itemId ? { ...item, content: `${item.content} {{Variable Name}}` } : item
+            );
+            return { ...el, content: newContent };
+          } else {
+            // Insert into element content
+            return { ...el, content: `${el.content} {{Variable Name}}` };
+          }
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  // Handle Drag End
+  const handleDragEnd = (result) => {
+    const { destination, source, type } = result;
+
+    if (!destination) return;
+
+    // Reorder elements
+    if (type === 'ELEMENT') {
+      const reorderedElements = Array.from(elements);
+      const [movedElement] = reorderedElements.splice(source.index, 1);
+      reorderedElements.splice(destination.index, 0, movedElement);
+      setElements(reorderedElements);
+    }
+
+    // Reorder list items
+    if (type.startsWith('list-')) {
+      const elementId = type.split('-')[1];
+      const reorderedElements = Array.from(elements);
+      const elementIndex = reorderedElements.findIndex((el) => el.id === elementId);
+      if (elementIndex === -1) return;
+      const listItems = Array.from(reorderedElements[elementIndex].content);
+      const [movedItem] = listItems.splice(source.index, 1);
+      listItems.splice(destination.index, 0, movedItem);
+      reorderedElements[elementIndex].content = listItems;
+      setElements(reorderedElements);
+    }
+  };
+
+  // Convert to JSON Schema
   const convertToJsonSchema = () => ({
     schema: {
       properties: {
         tag: { enum: ['body'] },
-        children: elements.map(element => {
+        children: elements.map((element) => {
           const baseProps = { tag: { enum: [element.type] } };
 
           if (['ul', 'ol'].includes(element.type)) {
             if (element.isDynamic) {
-              return { 
-                description: element.description || '', 
-                properties: { 
-                  ...baseProps, 
-                  children: [{ 
-                    type: 'array', 
-                    description: element.listItemDescription || '', 
-                    items: { 
-                      properties: { 
-                        tag: { enum: ['li'] }, 
-                        children: null 
-                      } 
-                    } 
-                  }] 
-                } 
+              return {
+                description: element.description || '',
+                properties: {
+                  ...baseProps,
+                  children: [
+                    {
+                      type: 'array',
+                      description: element.listItemDescription || '',
+                      items: {
+                        properties: {
+                          tag: { enum: ['li'] },
+                          children: null
+                        }
+                      }
+                    }
+                  ]
+                }
               };
             } else {
-              const listItems = element.content.map(item => ({
-                ...(item.nestedSpans && item.nestedSpans.length > 0
-                  ? {
-                      properties: {
-                        tag: { enum: ['li'] },
-                        children: item.nestedSpans.map(span => ({
+              const listItems = element.content.map((item) => ({
+                description: item.description || '',
+                properties: {
+                  tag: { enum: ['li'] },
+                  ...(item.content ? { content: { enum: [item.content] } } : {}),
+                  children:
+                    item.nestedSpans.length > 0
+                      ? item.nestedSpans.map((span) => ({
                           properties: {
                             tag: { enum: ['span'] },
                             ...(span.content ? { content: { enum: [span.content] } } : {}),
                             ...(span.description ? { description: span.description } : {})
                           }
                         }))
-                      }
-                    }
-                  : {
-                      description: item.description || '',
-                      properties: {
-                        tag: { enum: ['li'] },
-                        ...(item.content ? { content: { enum: [item.content] } } : {}),
-                        children: null
-                      }
-                    })
+                      : null
+                }
               }));
               return { description: element.description || '', properties: { ...baseProps, children: listItems } };
             }
           }
 
-          const elementProps = { 
-            ...baseProps, 
-            content: element.hasDescription ? undefined : { enum: [element.content] }, 
-            children: null 
+          const elementProps = {
+            ...baseProps,
+            content: element.hasDescription ? undefined : { enum: [element.content] },
+            children: null
           };
-          return element.hasDescription 
-            ? { description: element.description, properties: elementProps } 
+          return element.hasDescription
+            ? { description: element.description, properties: elementProps }
             : { properties: elementProps };
-        }),
-      },
-    },
+        })
+      }
+    }
   });
 
+  // Update Elements from JSON Schema
+  const updateElementsFromSchema = () => {
+    try {
+      const parsedSchema = JSON.parse(jsonSchema);
+      const newElements = parsedSchema.schema.properties.children.map((child) => {
+        const type = child.properties.tag.enum[0];
+        let content;
+        if (['ul', 'ol'].includes(type)) {
+          if (child.properties.children && child.properties.children[0].type === 'array') {
+            // Dynamic List
+            const listItemDescription = child.properties.children[0].description || '';
+            content = defaultContent[type]; // Initialize with default list items
+            return {
+              id: uuidv4(),
+              type,
+              content,
+              description: child.description || '',
+              isDynamic: true,
+              listItemDescription,
+              hasDescription: !!child.description
+            };
+          } else {
+            // Static List
+            const listItems = child.properties.children.map((item) => {
+              if (item.properties.children) {
+                const nestedSpans = item.properties.children.map((span) => ({
+                  id: uuidv4(),
+                  content: span.properties.content?.enum[0] || '',
+                  description: span.description || ''
+                }));
+                return { id: uuidv4(), content: item.properties.content?.enum[0] || '', description: item.description || '', nestedSpans };
+              } else {
+                return { id: uuidv4(), content: item.properties.content?.enum[0] || '', description: item.description || '', nestedSpans: [] };
+              }
+            });
+            return {
+              id: uuidv4(),
+              type,
+              content: listItems,
+              description: child.description || '',
+              isDynamic: false,
+              listItemDescription: '',
+              hasDescription: !!child.description
+            };
+          }
+        }
+
+        // Other Element Types
+        return {
+          id: uuidv4(),
+          type,
+          content: child.properties.content?.enum[0] || defaultContent[type] || '',
+          description: child.description || '',
+          isDynamic: false,
+          listItemDescription: '',
+          hasDescription: !!child.description
+        };
+      });
+      setElements(newElements);
+    } catch (error) {
+      console.error('Error parsing JSON schema:', error);
+      alert('Invalid JSON schema. Please check your input.');
+    }
+  };
+
+  // Render Human-Readable Preview
   const renderPreview = () => (
     <div className="p-5 bg-gray-100 rounded mb-5 text-gray-800">
       {elements.map((element, index) => {
@@ -374,7 +594,7 @@ const JsonTemplateBuilderRevert = () => {
               <ListComponent key={index} className={`mb-4 pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
                 {element.content.map((item, idx) => (
                   <li key={idx} className="mb-2">
-                    {item.nestedSpans && item.nestedSpans.length > 0 ? (
+                    {item.nestedSpans.length > 0 ? (
                       item.nestedSpans.map((span, spanIdx) => (
                         <React.Fragment key={spanIdx}>
                           {span.content || (span.description && <span className="italic text-gray-600">Generated content for: {span.description}</span>)}
@@ -410,44 +630,55 @@ const JsonTemplateBuilderRevert = () => {
     <div className="font-sans p-8 bg-gray-100 min-h-screen">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-800 mb-8">JSON Template Builder</h1>
-        <div className="flex flex-col md:flex-row gap-8">
-          <div className="w-full md:w-64 bg-white shadow-md rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Add Elements</h2>
-            {Object.entries(ElementTypes).map(([key, value]) => (
-              <button 
-                key={key} 
-                onClick={() => addElement(value)} 
-                className="block w-full mb-2 text-left text-blue-500 hover:text-blue-700 transition-colors duration-200"
-              >
-                Add {key.replace(/_/g, ' ')}
-              </button>
-            ))}
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="flex flex-col md:flex-row gap-8">
+            <AddElementSidebar addElement={addElement} />
+            <div className="flex-1">
+              <div className="bg-white shadow-md rounded-lg p-6 mb-8">
+                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Template Builder</h2>
+                <Droppable droppableId="elements" type="ELEMENT">
+                  {(provided) => (
+                    <div ref={provided.innerRef} {...provided.droppableProps}>
+                      {elements.map((element, index) => (
+                        <Element
+                          key={element.id}
+                          element={element}
+                          index={index}
+                          updateElement={updateElement}
+                          removeElement={removeElement}
+                          modifyListItem={modifyListItem}
+                          insertVariable={insertVariable}
+                          addNestedSpan={addNestedSpan}
+                          updateNestedSpan={updateNestedSpan}
+                          removeNestedSpan={removeNestedSpan}
+                        />
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </div>
+              <div className="bg-white shadow-md rounded-lg p-6 mb-8">
+                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Human-Readable Preview</h2>
+                {renderPreview()}
+              </div>
+              <div className="bg-white shadow-md rounded-lg p-6">
+                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">JSON Schema</h2>
+                <textarea
+                  value={jsonSchema}
+                  onChange={(e) => setJsonSchema(e.target.value)}
+                  className="w-full h-[300px] p-2 font-mono text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={updateElementsFromSchema}
+                  className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors duration-200"
+                >
+                  Update Template
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="flex-1">
-            <div className="bg-white shadow-md rounded-lg p-6 mb-8">
-              <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Template Builder</h2>
-              {elements.map((element, index) => renderElement(element, index))}
-            </div>
-            <div className="bg-white shadow-md rounded-lg p-6 mb-8">
-              <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Human-Readable Preview</h2>
-              {renderPreview()}
-            </div>
-            <div className="bg-white shadow-md rounded-lg p-6">
-              <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">JSON Schema</h2>
-              <textarea 
-                value={jsonSchema} 
-                onChange={e => setJsonSchema(e.target.value)} 
-                className="w-full h-[300px] p-2 font-mono text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button 
-                onClick={updateElementsFromSchema} 
-                className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors duration-200"
-              >
-                Update Template
-              </button>
-            </div>
-          </div>
-        </div>
+        </DragDropContext>
       </div>
     </div>
   );
