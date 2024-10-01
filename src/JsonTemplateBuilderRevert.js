@@ -4,6 +4,25 @@ import { PlusIcon, MinusIcon, TrashIcon, VariableIcon } from '@heroicons/react/s
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { v4 as uuidv4 } from 'uuid';
 
+
+
+const getElementTypeName = (type) => {
+  const typeNames = {
+    h1: 'Heading 1',
+    h2: 'Heading 2',
+    h3: 'Heading 3',
+    p: 'Paragraph',
+    ul: 'Unordered List',
+    ol: 'Ordered List',
+    span: 'Span',
+    strong: 'Strong',
+    div: 'Spacer'
+  };
+  return typeNames[type] || type.toUpperCase();
+};
+
+
+
 // Define Element Types and Default Content
 const ElementTypes = {
   HEADING1: 'h1',
@@ -130,7 +149,7 @@ const Element = ({
         {...provided.draggableProps}
       >
         <div className="flex justify-between items-center mb-4" {...provided.dragHandleProps}>
-          <h3 className="text-lg font-semibold text-gray-700">{element.type.toUpperCase()}</h3>
+          <h3 className="text-lg font-semibold text-gray-700">{getElementTypeName(element.type)}</h3>
           <button onClick={() => removeElement(element.id)} className="text-red-500 hover:text-red-700 transition-colors duration-200">
             <TrashIcon className="h-5 w-5" />
           </button>
