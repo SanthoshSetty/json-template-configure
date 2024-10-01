@@ -1,7 +1,27 @@
+// JsonTemplateBuilderRevert.jsx
 import React, { useState, useCallback, useEffect } from 'react';
-import { PlusIcon, MinusIcon, TrashIcon, VariableIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/solid';
+import { PlusIcon, MinusIcon, TrashIcon, VariableIcon } from '@heroicons/react/solid';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { v4 as uuidv4 } from 'uuid';
+
+
+
+const getElementTypeName = (type) => {
+  const typeNames = {
+    h1: 'Heading 1',
+    h2: 'Heading 2',
+    h3: 'Heading 3',
+    p: 'Paragraph',
+    ul: 'Unordered List (Bullet Points)',
+    ol: 'Ordered List (Numbered list)',
+    span: 'Span (continuous text)',
+    strong: 'Strong (Bold text)',
+    br: 'Space'
+  };
+  return typeNames[type] || type.toUpperCase();
+};
+
+
 
 // Define Element Types and Default Content
 const ElementTypes = {
@@ -13,15 +33,13 @@ const ElementTypes = {
   ORDERED_LIST: 'ol',
   SPAN: 'span',
   STRONG: 'strong',
-  BREAK: 'br',
-  SPACER: 'div'
+  BREAK: 'br'
 };
 
 const defaultContent = {
   ul: [{ id: uuidv4(), content: 'List item 1', description: '', nestedSpans: [] }],
   ol: [{ id: uuidv4(), content: 'List item 1', description: '', nestedSpans: [] }],
-  br: '',
-  div: '20px',
+  br: '', 
   h1: 'Heading 1',
   h2: 'Heading 2',
   h3: 'Heading 3',
@@ -30,21 +48,7 @@ const defaultContent = {
   span: 'Span text'
 };
 
-const getElementTypeName = (type) => {
-  const typeNames = {
-    h1: 'Heading 1',
-    h2: 'Heading 2',
-    h3: 'Heading 3',
-    p: 'Paragraph',
-    ul: 'Unordered List',
-    ol: 'Ordered List',
-    span: 'Span',
-    strong: 'Strong',
-    br: 'Line Break',
-    div: 'Spacer'
-  };
-  return typeNames[type] || type.toUpperCase();
-};
+// Subcomponents
 
 // AddElementSidebar Component
 const AddElementSidebar = ({ addElement }) => (
@@ -129,7 +133,6 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addN
   </Draggable>
 );
 
-// Element Component
 const Element = ({
   element,
   index,
@@ -139,8 +142,7 @@ const Element = ({
   insertVariable,
   addNestedSpan,
   updateNestedSpan,
-  removeNestedSpan,
-  addSpacing
+  removeNestedSpan
 }) => (
   <Draggable draggableId={element.id} index={index} key={element.id}>
     {(provided) => (
@@ -151,35 +153,12 @@ const Element = ({
       >
         <div className="flex justify-between items-center mb-4" {...provided.dragHandleProps}>
           <h3 className="text-lg font-semibold text-gray-700">{getElementTypeName(element.type)}</h3>
-          <div>
-            <button 
-              onClick={() => addSpacing(element.id, 'above')} 
-              className="mr-2 text-blue-500 hover:text-blue-700 transition-colors duration-200"
-              title="Add space above"
-            >
-              <ArrowUpIcon className="h-5 w-5" />
-            </button>
-            <button 
-              onClick={() => addSpacing(element.id, 'below')} 
-              className="mr-2 text-blue-500 hover:text-blue-700 transition-colors duration-200"
-              title="Add space below"
-            >
-              <ArrowDownIcon className="h-5 w-5" />
-            </button>
-            <button onClick={() => removeElement(element.id)} className="text-red-500 hover:text-red-700 transition-colors duration-200">
-              <TrashIcon className="h-5 w-5" />
-            </button>
-          </div>
+          <button onClick={() => removeElement(element.id)} className="text-red-500 hover:text-red-700 transition-colors duration-200">
+            <TrashIcon className="h-5 w-5" />
+          </button>
         </div>
         {element.type === 'br' ? (
           <p className="text-sm text-gray-500 italic">Line Break (No content)</p>
-        ) : element.type === 'div' ? (
-          <input
-            value={element.content}
-            onChange={(e) => updateElement(element.id, { content: e.target.value })}
-            className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Spacer height (e.g., 20px)"
-          />
         ) : ['ul', 'ol'].includes(element.type) ? (
           <>
             <label className="flex items-center mb-4 text-sm text-gray-600">
@@ -291,6 +270,8 @@ const Element = ({
   </Draggable>
 );
 
+
+
 // Main Component
 const JsonTemplateBuilderRevert = () => {
   const [elements, setElements] = useState([]);
@@ -323,210 +304,173 @@ const JsonTemplateBuilderRevert = () => {
   }, []);
 
   // Update Element
- const updateElement = useCallback((id, updates) => {
-  setElements((prev) =>
-    prev.map((el) => {
-      if (el.id === id) {
-        const updatedElement = { ...el, ...updates };
-        if ('description' in updates && updates.description.trim() === '') updatedElement.hasDescription = false;
-        return updatedElement;
-      }
-      return el;
-    })
-  );
-}, []);
-
-// Modify List Item
-const modifyListItem = useCallback((elementId, itemId, action, value = '') => {
-  setElements((prev) =>
-    prev.map((el) => {
-      if (el.id === elementId) {
-        let newContent = [...el.content];
-        if (action === 'add') {
-          newContent.push({ id: uuidv4(), content: '', description: '', nestedSpans: [] });
-        } else if (action === 'removeContent') {
-          newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
-        } else if (action === 'update') {
-          newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: value } : item));
-        } else if (action === 'description') {
-          newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value } : item));
-        } else if (action === 'removeSpan') {
-          newContent = newContent.map((item) =>
-            item.id === itemId
-              ? { ...item, nestedSpans: item.nestedSpans.filter((span) => span.id !== value) }
-              : item
-          );
+  const updateElement = useCallback((id, updates) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === id) {
+          const updatedElement = { ...el, ...updates };
+          if ('description' in updates && updates.description.trim() === '') updatedElement.hasDescription = false;
+          return updatedElement;
         }
-        return { ...el, content: newContent };
-      }
-      return el;
-    })
-  );
-}, []);
+        return el;
+      })
+    );
+  }, []);
 
-// Add Nested Span
-const addNestedSpan = useCallback((elementId, itemId) => {
-  setElements((prev) =>
-    prev.map((el) => {
-      if (el.id === elementId) {
-        const newContent = el.content.map((item) => {
-          if (item.id === itemId) {
-            return { ...item, nestedSpans: [...item.nestedSpans, { id: uuidv4(), content: '', description: '' }] };
+  // Modify List Item
+  const modifyListItem = useCallback((elementId, itemId, action, value = '') => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          let newContent = [...el.content];
+          if (action === 'add') {
+            newContent.push({ id: uuidv4(), content: '', description: '', nestedSpans: [] });
+          } else if (action === 'removeContent') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
+          } else if (action === 'update') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: value } : item));
+          } else if (action === 'description') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value } : item));
+          } else if (action === 'removeSpan') {
+            newContent = newContent.map((item) =>
+              item.id === itemId
+                ? { ...item, nestedSpans: item.nestedSpans.filter((span) => span.id !== value) }
+                : item
+            );
           }
-          return item;
-        });
-        return { ...el, content: newContent };
-      }
-      return el;
-    })
-  );
-}, []);
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
 
-// Update Nested Span
-const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) => {
-  setElements((prev) =>
-    prev.map((el) => {
-      if (el.id === elementId) {
-        const newContent = el.content.map((item) => {
-          if (item.id === itemId) {
-            const updatedSpans = item.nestedSpans.map((span) => (span.id === spanId ? { ...span, [field]: value } : span));
-            return { ...item, nestedSpans: updatedSpans };
-          }
-          return item;
-        });
-        return { ...el, content: newContent };
-      }
-      return el;
-    })
-  );
-}, []);
-
-// Remove Nested Span
-const removeNestedSpan = useCallback((elementId, itemId, spanId) => {
-  setElements((prev) =>
-    prev.map((el) => {
-      if (el.id === elementId) {
-        const newContent = el.content.map((item) => {
-          if (item.id === itemId) {
-            return { ...item, nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId) };
-          }
-          return item;
-        });
-        return { ...el, content: newContent };
-      }
-      return el;
-    })
-  );
-}, []);
-
-// Insert Variable
-const insertVariable = useCallback((id, itemId = null, spanId = null) => {
-  setElements((prev) =>
-    prev.map((el) => {
-      if (el.id === id) {
-        if (itemId && spanId) {
-          // Insert into nested span
+  // Add Nested Span
+  const addNestedSpan = useCallback((elementId, itemId) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
           const newContent = el.content.map((item) => {
             if (item.id === itemId) {
-              const updatedSpans = item.nestedSpans.map((span) =>
-                span.id === spanId ? { ...span, content: `${span.content} {{Group//Variable Name}}` } : span
-              );
+              return { ...item, nestedSpans: [...item.nestedSpans, { id: uuidv4(), content: '', description: '' }] };
+            }
+            return item;
+          });
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  // Update Nested Span
+  const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          const newContent = el.content.map((item) => {
+            if (item.id === itemId) {
+              const updatedSpans = item.nestedSpans.map((span) => (span.id === spanId ? { ...span, [field]: value } : span));
               return { ...item, nestedSpans: updatedSpans };
             }
             return item;
           });
           return { ...el, content: newContent };
-        } else if (itemId) {
-          // Insert into list item
-          const newContent = el.content.map((item) =>
-            item.id === itemId ? { ...item, content: `${item.content} {{Group//Variable Name}}` } : item
-          );
-          return { ...el, content: newContent };
-        } else {
-          // Insert into element content
-          return { ...el, content: `${el.content} {{Group//Variable Name}}` };
         }
-      }
-      return el;
-    })
-  );
-}, []);
+        return el;
+      })
+    );
+  }, []);
 
-// Add Spacing
-const addSpacing = useCallback((elementId, position) => {
-  setElements((prevElements) => {
-    const elementIndex = prevElements.findIndex((el) => el.id === elementId);
-    if (elementIndex === -1) return prevElements;
+  // Remove Nested Span
+  const removeNestedSpan = useCallback((elementId, itemId, spanId) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          const newContent = el.content.map((item) => {
+            if (item.id === itemId) {
+              return { ...item, nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId) };
+            }
+            return item;
+          });
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
 
-    const newElements = [...prevElements];
-    const spacer = {
-      id: uuidv4(),
-      type: 'div',
-      content: '20px', // Default spacing
-      description: '',
-      isDynamic: false,
-      listItemDescription: '',
-      hasDescription: false
-    };
+  // Insert Variable
+  const insertVariable = useCallback((id, itemId = null, spanId = null) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === id) {
+          if (itemId && spanId) {
+            // Insert into nested span
+            const newContent = el.content.map((item) => {
+              if (item.id === itemId) {
+                const updatedSpans = item.nestedSpans.map((span) =>
+                  span.id === spanId ? { ...span, content: `${span.content} {{Group//Variable Name}}` } : span
+                );
+                return { ...item, nestedSpans: updatedSpans };
+              }
+              return item;
+            });
+            return { ...el, content: newContent };
+          } else if (itemId) {
+            // Insert into list item
+            const newContent = el.content.map((item) =>
+              item.id === itemId ? { ...item, content: `${item.content} {{Group//Variable Name}}` } : item
+            );
+            return { ...el, content: newContent };
+          } else {
+            // Insert into element content
+            return { ...el, content: `${el.content} {{Group//Variable Name}}` };
+          }
+        }
+        return el;
+      })
+    );
+  }, []);
 
-    if (position === 'above') {
-      newElements.splice(elementIndex, 0, spacer);
-    } else if (position === 'below') {
-      newElements.splice(elementIndex + 1, 0, spacer);
+  // Handle Drag End
+  const handleDragEnd = (result) => {
+    const { destination, source, type } = result;
+
+    if (!destination) return;
+
+    // Reorder elements
+    if (type === 'ELEMENT') {
+      const reorderedElements = Array.from(elements);
+      const [movedElement] = reorderedElements.splice(source.index, 1);
+      reorderedElements.splice(destination.index, 0, movedElement);
+      setElements(reorderedElements);
     }
 
-    return newElements;
-  });
-}, []);
+    // Reorder list items
+    if (type.startsWith('list-')) {
+      const elementId = type.split('-')[1];
+      const reorderedElements = Array.from(elements);
+      const elementIndex = reorderedElements.findIndex((el) => el.id === elementId);
+      if (elementIndex === -1) return;
+      const listItems = Array.from(reorderedElements[elementIndex].content);
+      const [movedItem] = listItems.splice(source.index, 1);
+      listItems.splice(destination.index, 0, movedItem);
+      reorderedElements[elementIndex].content = listItems;
+      setElements(reorderedElements);
+    }
+  };
 
-// Handle Drag End
-const handleDragEnd = (result) => {
-  const { destination, source, type } = result;
-
-  if (!destination) return;
-
-  // Reorder elements
-  if (type === 'ELEMENT') {
-    const reorderedElements = Array.from(elements);
-    const [movedElement] = reorderedElements.splice(source.index, 1);
-    reorderedElements.splice(destination.index, 0, movedElement);
-    setElements(reorderedElements);
-  }
-
-  // Reorder list items
-  if (type.startsWith('list-')) {
-    const elementId = type.split('-')[1];
-    const reorderedElements = Array.from(elements);
-    const elementIndex = reorderedElements.findIndex((el) => el.id === elementId);
-    if (elementIndex === -1) return;
-    const listItems = Array.from(reorderedElements[elementIndex].content);
-    const [movedItem] = listItems.splice(source.index, 1);
-    listItems.splice(destination.index, 0, movedItem);
-    reorderedElements[elementIndex].content = listItems;
-    setElements(reorderedElements);
-  }
-};
-
-// Convert to JSON Schema
-const convertToJsonSchema = () => ({
+  // Convert to JSON Schema
+  const convertToJsonSchema = () => ({
   schema: {
     properties: {
       tag: { enum: ['body'] },
       children: elements.map((element) => {
         const baseProps = { tag: { enum: [element.type] } };
 
-        if (element.type === 'div') {
-          // This is a spacing div
-          return {
-            properties: {
-              ...baseProps,
-              style: { 
-                properties: { 
-                  height: { enum: [element.content] } 
-                } 
-              }
-            }
-          };
+        if (element.type === 'br') {
+          return { properties: baseProps };
         }
 
         if (['ul', 'ol'].includes(element.type)) {
@@ -584,19 +528,18 @@ const convertToJsonSchema = () => ({
   }
 });
 
-// Update Elements from JSON Schema
-const updateElementsFromSchema = () => {
+  // Update Elements from JSON Schema
+  const updateElementsFromSchema = () => {
   try {
     const parsedSchema = JSON.parse(jsonSchema);
     const newElements = parsedSchema.schema.properties.children.map((child) => {
       const type = child.properties.tag.enum[0];
       
-      if (type === 'div' && child.properties.style?.properties?.height) {
-        // This is a spacing div
+      if (type === 'br') {
         return {
           id: uuidv4(),
           type,
-          content: child.properties.style.properties.height.enum[0],
+          content: '',
           description: '',
           isDynamic: false,
           listItemDescription: '',
@@ -620,16 +563,19 @@ const updateElementsFromSchema = () => {
         } else {
           // Static List
           const listItems = child.properties.children.map((item) => {
-            if (item.properties.children) {
-              const nestedSpans = item.properties.children.map((span) => ({
-                id: uuidv4(),
-                content: span.properties.content?.enum[0] || '',
-                description: span.description || ''
-              }));
-              return { id: uuidv4(), content: item.properties.content?.enum[0] || '', description: item.description || '', nestedSpans };
-            } else {
-              return { id: uuidv4(), content: item.properties.content?.enum[0] || '', description: item.description || '', nestedSpans: [] };
-            }
+            const nestedSpans = item.properties.children
+              ? item.properties.children.map((span) => ({
+                  id: uuidv4(),
+                  content: span.properties.content?.enum[0] || '',
+                  description: span.description || ''
+                }))
+              : [];
+            return {
+              id: uuidv4(),
+              content: item.properties.content?.enum[0] || '',
+              description: item.description || '',
+              nestedSpans
+            };
           });
           return {
             id: uuidv4(),
@@ -661,59 +607,125 @@ const updateElementsFromSchema = () => {
   }
 };
 
-return (
-  <div className="font-sans p-8 bg-gray-100 min-h-screen">
-    <div className="max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold text-gray-800 mb-8">JSON Template Builder</h1>
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="flex flex-col md:flex-row gap-8">
-          <AddElementSidebar addElement={addElement} />
-          <div className="flex-1">
-            <div className="bg-white shadow-md rounded-lg p-6 mb-8">
-              <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Template Builder</h2>
-              <Droppable droppableId="elements" type="ELEMENT">
-                {(provided) => (
-                  <div ref={provided.innerRef} {...provided.droppableProps}>
-                    {elements.map((element, index) => (
-                      <Element
-                        key={element.id}
-                        element={element}
-                        index={index}
-                        updateElement={updateElement}
-                        removeElement={removeElement}
-                        modifyListItem={modifyListItem}
-                        insertVariable={insertVariable}
-                        addNestedSpan={addNestedSpan}
-                        updateNestedSpan={updateNestedSpan}
-                        removeNestedSpan={removeNestedSpan}
-                        addSpacing={addSpacing}
-                      />
-                    ))}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            </div>
-            <div className="bg-white shadow-md rounded-lg p-6">
-              <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">JSON Schema</h2>
-              <textarea
-                value={jsonSchema}
-                onChange={(e) => setJsonSchema(e.target.value)}
-                className="w-full h-[300px] p-2 font-mono text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                onClick={updateElementsFromSchema}
-                className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors duration-200"
-              >
-                Update Template
-              </button>
-            </div>
+  // Render Human-Readable Preview
+  const renderPreview = () => (
+  <div className="p-5 bg-gray-100 rounded mb-5 text-gray-800">
+    {elements.map((element, index) => {
+      if (element.isDynamic && ['ul', 'ol'].includes(element.type)) {
+        return (
+          <div key={index} className="mb-4 p-3 bg-yellow-100 rounded">
+            <p className="font-semibold">Dynamic {getElementTypeName(element.type)}:</p>
+            <p className="italic">{element.description}</p>
+            <p className="italic">Items: {element.listItemDescription}</p>
           </div>
-        </div>
-      </DragDropContext>
-    </div>
+        );
+      }
+
+      if (element.hasDescription) {
+        return (
+          <div key={index} className="mb-4 p-3 bg-green-100 rounded">
+            <p className="font-semibold">{getElementTypeName(element.type)}:</p>
+            <p className="italic">Generated content for: {element.description}</p>
+          </div>
+        );
+      }
+
+      switch (element.type) {
+        case 'ul':
+        case 'ol':
+          const ListComponent = element.type === 'ul' ? 'ul' : 'ol';
+          return (
+            <ListComponent key={index} className={`mb-4 pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
+              {element.content.map((item, idx) => (
+                <li key={idx} className="mb-2">
+                  {item.nestedSpans.length > 0 ? (
+                    item.nestedSpans.map((span, spanIdx) => (
+                      <React.Fragment key={spanIdx}>
+                        {span.content || (span.description && <span className="italic text-gray-600">Generated content for: {span.description}</span>)}
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    item.content || (item.description && <span className="italic text-gray-600">Generated content for: {item.description}</span>)
+                  )}
+                </li>
+              ))}
+            </ListComponent>
+          );
+        case 'br':
+          return <hr key={index} className="my-4 border-t border-gray-300" />;
+        case 'h1':
+          return <h1 key={index} className="text-4xl font-bold mb-4">{element.content}</h1>;
+        case 'h2':
+          return <h2 key={index} className="text-3xl font-semibold mb-3">{element.content}</h2>;
+        case 'h3':
+          return <h3 key={index} className="text-2xl font-medium mb-2">{element.content}</h3>;
+        case 'strong':
+          return <strong key={index} className="font-bold">{element.content}</strong>;
+        case 'span':
+          return <span key={index}>{element.content}</span>;
+        default:
+          return <p key={index} className="mb-4">{element.content}</p>;
+      }
+    })}
   </div>
 );
+
+  return (
+    <div className="font-sans p-8 bg-gray-100 min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-3xl font-bold text-gray-800 mb-8">JSON Template Builder</h1>
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="flex flex-col md:flex-row gap-8">
+            <AddElementSidebar addElement={addElement} />
+            <div className="flex-1">
+              <div className="bg-white shadow-md rounded-lg p-6 mb-8">
+                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Template Builder</h2>
+                <Droppable droppableId="elements" type="ELEMENT">
+                  {(provided) => (
+                    <div ref={provided.innerRef} {...provided.droppableProps}>
+                      {elements.map((element, index) => (
+                        <Element
+                          key={element.id}
+                          element={element}
+                          index={index}
+                          updateElement={updateElement}
+                          removeElement={removeElement}
+                          modifyListItem={modifyListItem}
+                          insertVariable={insertVariable}
+                          addNestedSpan={addNestedSpan}
+                          updateNestedSpan={updateNestedSpan}
+                          removeNestedSpan={removeNestedSpan}
+                        />
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </div>
+              <div className="bg-white shadow-md rounded-lg p-6 mb-8">
+                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Human-Readable Preview</h2>
+                {renderPreview()}
+              </div>
+              <div className="bg-white shadow-md rounded-lg p-6">
+                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">JSON Schema</h2>
+                <textarea
+                  value={jsonSchema}
+                  onChange={(e) => setJsonSchema(e.target.value)}
+                  className="w-full h-[300px] p-2 font-mono text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={updateElementsFromSchema}
+                  className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors duration-200"
+                >
+                  Update Template
+                </button>
+              </div>
+            </div>
+          </div>
+        </DragDropContext>
+      </div>
+    </div>
+  );
 };
 
 export default JsonTemplateBuilderRevert;
