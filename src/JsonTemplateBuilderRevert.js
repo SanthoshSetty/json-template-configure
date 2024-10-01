@@ -12,11 +12,11 @@ const getElementTypeName = (type) => {
     h2: 'Heading 2',
     h3: 'Heading 3',
     p: 'Paragraph',
-    ul: 'Unordered List',
-    ol: 'Ordered List',
-    span: 'Span',
-    strong: 'Strong',
-    div: 'Spacer'
+    ul: 'Unordered List (Bullet Points)',
+    ol: 'Ordered List (Numbered list)',
+    span: 'Span (continuous text)',
+    strong: 'Strong (Bold text)',
+    br: 'Space'
   };
   return typeNames[type] || type.toUpperCase();
 };
@@ -33,15 +33,19 @@ const ElementTypes = {
   ORDERED_LIST: 'ol',
   SPAN: 'span',
   STRONG: 'strong',
-  SPACER: 'div'
+  BREAK: 'br'
 };
 
 const defaultContent = {
   ul: [{ id: uuidv4(), content: 'List item 1', description: '', nestedSpans: [] }],
   ol: [{ id: uuidv4(), content: 'List item 1', description: '', nestedSpans: [] }],
-  div: '50px',
-  strong: 'Insert dynamic product name',
-  span: 'Insert span content'
+  br: '', 
+  h1: 'Heading 1',
+  h2: 'Heading 2',
+  h3: 'Heading 3',
+  p: 'Paragraph text',
+  strong: 'Bold text',
+  span: 'Span text'
 };
 
 // Subcomponents
@@ -129,7 +133,6 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addN
   </Draggable>
 );
 
-// Element Component
 const Element = ({
   element,
   index,
@@ -154,7 +157,9 @@ const Element = ({
             <TrashIcon className="h-5 w-5" />
           </button>
         </div>
-        {['ul', 'ol'].includes(element.type) ? (
+        {element.type === 'br' ? (
+          <p className="text-sm text-gray-500 italic">Line Break (No content)</p>
+        ) : ['ul', 'ol'].includes(element.type) ? (
           <>
             <label className="flex items-center mb-4 text-sm text-gray-600">
               <input
@@ -250,7 +255,7 @@ const Element = ({
                 Add Description
               </button>
             )}
-            {!['ul', 'ol'].includes(element.type) && (
+            {!['ul', 'ol', 'br'].includes(element.type) && (
               <div className="mt-4">
                 <button onClick={() => insertVariable(element.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
                   <VariableIcon className="h-5 w-5 inline mr-1" />
@@ -264,6 +269,8 @@ const Element = ({
     )}
   </Draggable>
 );
+
+export default Element;
 
 // Main Component
 const JsonTemplateBuilderRevert = () => {
@@ -456,194 +463,212 @@ const JsonTemplateBuilderRevert = () => {
 
   // Convert to JSON Schema
   const convertToJsonSchema = () => ({
-    schema: {
-      properties: {
-        tag: { enum: ['body'] },
-        children: elements.map((element) => {
-          const baseProps = { tag: { enum: [element.type] } };
+  schema: {
+    properties: {
+      tag: { enum: ['body'] },
+      children: elements.map((element) => {
+        const baseProps = { tag: { enum: [element.type] } };
 
-          if (['ul', 'ol'].includes(element.type)) {
-            if (element.isDynamic) {
-              return {
-                description: element.description || '',
-                properties: {
-                  ...baseProps,
-                  children: [
-                    {
-                      type: 'array',
-                      description: element.listItemDescription || '',
-                      items: {
-                        properties: {
-                          tag: { enum: ['li'] },
-                          children: null
-                        }
+        if (element.type === 'br') {
+          return { properties: baseProps };
+        }
+
+        if (['ul', 'ol'].includes(element.type)) {
+          if (element.isDynamic) {
+            return {
+              description: element.description || '',
+              properties: {
+                ...baseProps,
+                children: [
+                  {
+                    type: 'array',
+                    description: element.listItemDescription || '',
+                    items: {
+                      properties: {
+                        tag: { enum: ['li'] },
+                        children: null
                       }
                     }
-                  ]
-                }
-              };
-            } else {
-              const listItems = element.content.map((item) => ({
-                description: item.description || '',
-                properties: {
-                  tag: { enum: ['li'] },
-                  ...(item.content ? { content: { enum: [item.content] } } : {}),
-                  children:
-                    item.nestedSpans.length > 0
-                      ? item.nestedSpans.map((span) => ({
-                          properties: {
-                            tag: { enum: ['span'] },
-                            ...(span.content ? { content: { enum: [span.content] } } : {}),
-                            ...(span.description ? { description: span.description } : {})
-                          }
-                        }))
-                      : null
-                }
-              }));
-              return { description: element.description || '', properties: { ...baseProps, children: listItems } };
-            }
+                  }
+                ]
+              }
+            };
+          } else {
+            const listItems = element.content.map((item) => ({
+              description: item.description || '',
+              properties: {
+                tag: { enum: ['li'] },
+                ...(item.content ? { content: { enum: [item.content] } } : {}),
+                children:
+                  item.nestedSpans.length > 0
+                    ? item.nestedSpans.map((span) => ({
+                        properties: {
+                          tag: { enum: ['span'] },
+                          ...(span.content ? { content: { enum: [span.content] } } : {}),
+                          ...(span.description ? { description: span.description } : {})
+                        }
+                      }))
+                    : null
+              }
+            }));
+            return { description: element.description || '', properties: { ...baseProps, children: listItems } };
           }
+        }
 
-          const elementProps = {
-            ...baseProps,
-            content: element.hasDescription ? undefined : { enum: [element.content] },
-            children: null
-          };
-          return element.hasDescription
-            ? { description: element.description, properties: elementProps }
-            : { properties: elementProps };
-        })
-      }
+        const elementProps = {
+          ...baseProps,
+          content: element.hasDescription ? undefined : { enum: [element.content] },
+          children: null
+        };
+        return element.hasDescription
+          ? { description: element.description, properties: elementProps }
+          : { properties: elementProps };
+      })
     }
-  });
+  }
+});
 
   // Update Elements from JSON Schema
   const updateElementsFromSchema = () => {
-    try {
-      const parsedSchema = JSON.parse(jsonSchema);
-      const newElements = parsedSchema.schema.properties.children.map((child) => {
-        const type = child.properties.tag.enum[0];
-        let content;
-        if (['ul', 'ol'].includes(type)) {
-          if (child.properties.children && child.properties.children[0].type === 'array') {
-            // Dynamic List
-            const listItemDescription = child.properties.children[0].description || '';
-            content = defaultContent[type]; // Initialize with default list items
-            return {
-              id: uuidv4(),
-              type,
-              content,
-              description: child.description || '',
-              isDynamic: true,
-              listItemDescription,
-              hasDescription: !!child.description
-            };
-          } else {
-            // Static List
-            const listItems = child.properties.children.map((item) => {
-              if (item.properties.children) {
-                const nestedSpans = item.properties.children.map((span) => ({
-                  id: uuidv4(),
-                  content: span.properties.content?.enum[0] || '',
-                  description: span.description || ''
-                }));
-                return { id: uuidv4(), content: item.properties.content?.enum[0] || '', description: item.description || '', nestedSpans };
-              } else {
-                return { id: uuidv4(), content: item.properties.content?.enum[0] || '', description: item.description || '', nestedSpans: [] };
-              }
-            });
-            return {
-              id: uuidv4(),
-              type,
-              content: listItems,
-              description: child.description || '',
-              isDynamic: false,
-              listItemDescription: '',
-              hasDescription: !!child.description
-            };
-          }
-        }
-
-        // Other Element Types
+  try {
+    const parsedSchema = JSON.parse(jsonSchema);
+    const newElements = parsedSchema.schema.properties.children.map((child) => {
+      const type = child.properties.tag.enum[0];
+      
+      if (type === 'br') {
         return {
           id: uuidv4(),
           type,
-          content: child.properties.content?.enum[0] || defaultContent[type] || '',
-          description: child.description || '',
+          content: '',
+          description: '',
           isDynamic: false,
           listItemDescription: '',
-          hasDescription: !!child.description
+          hasDescription: false
         };
-      });
-      setElements(newElements);
-    } catch (error) {
-      console.error('Error parsing JSON schema:', error);
-      alert('Invalid JSON schema. Please check your input.');
-    }
-  };
+      }
+
+      if (['ul', 'ol'].includes(type)) {
+        if (child.properties.children && child.properties.children[0].type === 'array') {
+          // Dynamic List
+          const listItemDescription = child.properties.children[0].description || '';
+          return {
+            id: uuidv4(),
+            type,
+            content: [],
+            description: child.description || '',
+            isDynamic: true,
+            listItemDescription,
+            hasDescription: !!child.description
+          };
+        } else {
+          // Static List
+          const listItems = child.properties.children.map((item) => {
+            const nestedSpans = item.properties.children
+              ? item.properties.children.map((span) => ({
+                  id: uuidv4(),
+                  content: span.properties.content?.enum[0] || '',
+                  description: span.description || ''
+                }))
+              : [];
+            return {
+              id: uuidv4(),
+              content: item.properties.content?.enum[0] || '',
+              description: item.description || '',
+              nestedSpans
+            };
+          });
+          return {
+            id: uuidv4(),
+            type,
+            content: listItems,
+            description: child.description || '',
+            isDynamic: false,
+            listItemDescription: '',
+            hasDescription: !!child.description
+          };
+        }
+      }
+
+      // Other Element Types
+      return {
+        id: uuidv4(),
+        type,
+        content: child.properties.content?.enum[0] || '',
+        description: child.description || '',
+        isDynamic: false,
+        listItemDescription: '',
+        hasDescription: !!child.description
+      };
+    });
+    setElements(newElements);
+  } catch (error) {
+    console.error('Error parsing JSON schema:', error);
+    alert('Invalid JSON schema. Please check your input.');
+  }
+};
 
   // Render Human-Readable Preview
   const renderPreview = () => (
-    <div className="p-5 bg-gray-100 rounded mb-5 text-gray-800">
-      {elements.map((element, index) => {
-        if (element.isDynamic && ['ul', 'ol'].includes(element.type)) {
-          return (
-            <div key={index} className="mb-4 p-3 bg-yellow-100 rounded">
-              <p className="font-semibold">Dynamic {element.type === 'ul' ? 'Unordered' : 'Ordered'} List:</p>
-              <p className="italic">{element.description}</p>
-              <p className="italic">Items: {element.listItemDescription}</p>
-            </div>
-          );
-        }
+  <div className="p-5 bg-gray-100 rounded mb-5 text-gray-800">
+    {elements.map((element, index) => {
+      if (element.isDynamic && ['ul', 'ol'].includes(element.type)) {
+        return (
+          <div key={index} className="mb-4 p-3 bg-yellow-100 rounded">
+            <p className="font-semibold">Dynamic {getElementTypeName(element.type)}:</p>
+            <p className="italic">{element.description}</p>
+            <p className="italic">Items: {element.listItemDescription}</p>
+          </div>
+        );
+      }
 
-        if (element.hasDescription) {
-          return (
-            <div key={index} className="mb-4 p-3 bg-green-100 rounded">
-              <p className="font-semibold">{element.type.toUpperCase()}:</p>
-              <p className="italic">Generated content for: {element.description}</p>
-            </div>
-          );
-        }
+      if (element.hasDescription) {
+        return (
+          <div key={index} className="mb-4 p-3 bg-green-100 rounded">
+            <p className="font-semibold">{getElementTypeName(element.type)}:</p>
+            <p className="italic">Generated content for: {element.description}</p>
+          </div>
+        );
+      }
 
-        switch (element.type) {
-          case 'ul':
-          case 'ol':
-            const ListComponent = element.type === 'ul' ? 'ul' : 'ol';
-            return (
-              <ListComponent key={index} className={`mb-4 pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
-                {element.content.map((item, idx) => (
-                  <li key={idx} className="mb-2">
-                    {item.nestedSpans.length > 0 ? (
-                      item.nestedSpans.map((span, spanIdx) => (
-                        <React.Fragment key={spanIdx}>
-                          {span.content || (span.description && <span className="italic text-gray-600">Generated content for: {span.description}</span>)}
-                        </React.Fragment>
-                      ))
-                    ) : (
-                      item.content || (item.description && <span className="italic text-gray-600">Generated content for: {item.description}</span>)
-                    )}
-                  </li>
-                ))}
-              </ListComponent>
-            );
-          case 'div':
-            return <div key={index} className="h-8 bg-gray-300 mb-4 flex items-center justify-center text-sm">Spacer: {element.content}</div>;
-          case 'h1':
-            return <h1 key={index} className="text-4xl font-bold mb-4">{element.content}</h1>;
-          case 'h2':
-            return <h2 key={index} className="text-3xl font-semibold mb-3">{element.content}</h2>;
-          case 'h3':
-            return <h3 key={index} className="text-2xl font-medium mb-2">{element.content}</h3>;
-          case 'strong':
-            return <strong key={index} className="font-bold">{element.content}</strong>;
-          case 'span':
-            return <span key={index}>{element.content}</span>;
-          default:
-            return <p key={index} className="mb-4">{element.content}</p>;
-        }
-      })}
-    </div>
-  );
+      switch (element.type) {
+        case 'ul':
+        case 'ol':
+          const ListComponent = element.type === 'ul' ? 'ul' : 'ol';
+          return (
+            <ListComponent key={index} className={`mb-4 pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
+              {element.content.map((item, idx) => (
+                <li key={idx} className="mb-2">
+                  {item.nestedSpans.length > 0 ? (
+                    item.nestedSpans.map((span, spanIdx) => (
+                      <React.Fragment key={spanIdx}>
+                        {span.content || (span.description && <span className="italic text-gray-600">Generated content for: {span.description}</span>)}
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    item.content || (item.description && <span className="italic text-gray-600">Generated content for: {item.description}</span>)
+                  )}
+                </li>
+              ))}
+            </ListComponent>
+          );
+        case 'br':
+          return <hr key={index} className="my-4 border-t border-gray-300" />;
+        case 'h1':
+          return <h1 key={index} className="text-4xl font-bold mb-4">{element.content}</h1>;
+        case 'h2':
+          return <h2 key={index} className="text-3xl font-semibold mb-3">{element.content}</h2>;
+        case 'h3':
+          return <h3 key={index} className="text-2xl font-medium mb-2">{element.content}</h3>;
+        case 'strong':
+          return <strong key={index} className="font-bold">{element.content}</strong>;
+        case 'span':
+          return <span key={index}>{element.content}</span>;
+        default:
+          return <p key={index} className="mb-4">{element.content}</p>;
+      }
+    })}
+  </div>
+);
 
   return (
     <div className="font-sans p-8 bg-gray-100 min-h-screen">
