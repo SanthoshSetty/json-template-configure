@@ -1,10 +1,7 @@
-// JsonTemplateBuilderRevert.jsx
 import React, { useState, useCallback, useEffect } from 'react';
 import { PlusIcon, MinusIcon, TrashIcon, VariableIcon } from '@heroicons/react/solid';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { v4 as uuidv4 } from 'uuid';
-
-
 
 const getElementTypeName = (type) => {
   const typeNames = {
@@ -21,9 +18,6 @@ const getElementTypeName = (type) => {
   return typeNames[type] || type.toUpperCase();
 };
 
-
-
-// Define Element Types and Default Content
 const ElementTypes = {
   HEADING1: 'h1',
   HEADING2: 'h2',
@@ -48,9 +42,6 @@ const defaultContent = {
   span: 'Span text'
 };
 
-// Subcomponents
-
-// AddElementSidebar Component
 const AddElementSidebar = ({ addElement }) => (
   <div className="w-full md:w-64 bg-white shadow-md rounded-lg p-6">
     <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Add Elements</h2>
@@ -66,8 +57,7 @@ const AddElementSidebar = ({ addElement }) => (
   </div>
 );
 
-// ListItem Component
-const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addNestedSpan, updateNestedSpan, removeNestedSpan }) => (
+const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, insertBreak, addNestedSpan, updateNestedSpan, removeNestedSpan }) => (
   <Draggable draggableId={item.id} index={index} key={item.id}>
     {(provided) => (
       <div
@@ -99,6 +89,10 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addN
             <VariableIcon className="h-5 w-5 inline mr-1" />
             Insert Variable
           </button>
+          <button onClick={() => insertBreak(elementId, item.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
+            <VariableIcon className="h-5 w-5 inline mr-1" />
+            Add Break
+          </button>
           <button onClick={() => addNestedSpan(elementId, item.id)} className="text-green-500 hover:text-green-700 transition-colors duration-200">
             {item.nestedSpans.length > 0 ? 'Add Another Nested Span' : 'Add Nested Span'}
           </button>
@@ -125,6 +119,10 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addN
                 <VariableIcon className="h-5 w-5 inline mr-1" />
                 Insert Variable
               </button>
+              <button onClick={() => insertBreak(elementId, item.id, span.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
+                <VariableIcon className="h-5 w-5 inline mr-1" />
+                Add Break
+              </button>
             </div>
           </div>
         ))}
@@ -140,6 +138,7 @@ const Element = ({
   removeElement,
   modifyListItem,
   insertVariable,
+  insertBreak,
   addNestedSpan,
   updateNestedSpan,
   removeNestedSpan
@@ -197,6 +196,7 @@ const Element = ({
                         elementId={element.id}
                         modifyListItem={modifyListItem}
                         insertVariable={insertVariable}
+                        insertBreak={insertBreak}
                         addNestedSpan={addNestedSpan}
                         updateNestedSpan={updateNestedSpan}
                         removeNestedSpan={removeNestedSpan}
@@ -257,9 +257,13 @@ const Element = ({
             )}
             {!['ul', 'ol', 'br'].includes(element.type) && (
               <div className="mt-4">
-                <button onClick={() => insertVariable(element.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
+                <button onClick={() => insertVariable(element.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200 mr-2">
                   <VariableIcon className="h-5 w-5 inline mr-1" />
                   Insert Variable
+                </button>
+                <button onClick={() => insertBreak(element.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
+                  <VariableIcon className="h-5 w-5 inline mr-1" />
+                  Add Break
                 </button>
               </div>
             )}
@@ -270,19 +274,14 @@ const Element = ({
   </Draggable>
 );
 
-
-
-// Main Component
 const JsonTemplateBuilderRevert = () => {
   const [elements, setElements] = useState([]);
   const [jsonSchema, setJsonSchema] = useState(JSON.stringify({ schema: { properties: { tag: { enum: ['body'] }, children: [] } } }, null, 2));
 
-  // Update JSON Schema whenever elements change
   useEffect(() => {
     setJsonSchema(JSON.stringify(convertToJsonSchema(), null, 2));
   }, [elements]);
 
-  // Add Element
   const addElement = useCallback((type) => {
     setElements((prev) => [
       ...prev,
@@ -298,12 +297,10 @@ const JsonTemplateBuilderRevert = () => {
     ]);
   }, []);
 
-  // Remove Element
   const removeElement = useCallback((id) => {
     setElements((prev) => prev.filter((el) => el.id !== id));
   }, []);
 
-  // Update Element
   const updateElement = useCallback((id, updates) => {
     setElements((prev) =>
       prev.map((el) => {
@@ -317,152 +314,177 @@ const JsonTemplateBuilderRevert = () => {
     );
   }, []);
 
-  // Modify List Item
   const modifyListItem = useCallback((elementId, itemId, action, value = '') => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === elementId) {
-          let newContent = [...el.content];
-          if (action === 'add') {
-            newContent.push({ id: uuidv4(), content: '', description: '', nestedSpans: [] });
-          } else if (action === 'removeContent') {
-            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
-          } else if (action === 'update') {
-            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: value } : item));
-          } else if (action === 'description') {
-            newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value } : item));
-          } else if (action === 'removeSpan') {
-            newContent = newContent.map((item) =>
-              item.id === itemId
-                ? { ...item, nestedSpans: item.nestedSpans.filter((span) => span.id !== value) }
-                : item
-            );
+  setElements((prev) =>
+    prev.map((el) => {
+      if (el.id === elementId) {
+        let newContent = [...el.content];
+        if (action === 'add') {
+          newContent.push({ id: uuidv4(), content: '', description: '', nestedSpans: [] });
+        } else if (action === 'removeContent') {
+          newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
+        } else if (action === 'content') {
+          newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: value } : item));
+        } else if (action === 'description') {
+          newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value } : item));
+        } else if (action === 'removeSpan') {
+          newContent = newContent.map((item) =>
+            item.id === itemId
+              ? { ...item, nestedSpans: item.nestedSpans.filter((span) => span.id !== value) }
+              : item
+          );
+        }
+        return { ...el, content: newContent };
+      }
+      return el;
+    })
+  );
+}, []);
+
+const addNestedSpan = useCallback((elementId, itemId) => {
+  setElements((prev) =>
+    prev.map((el) => {
+      if (el.id === elementId) {
+        const newContent = el.content.map((item) => {
+          if (item.id === itemId) {
+            return { ...item, nestedSpans: [...item.nestedSpans, { id: uuidv4(), content: '', description: '' }] };
           }
-          return { ...el, content: newContent };
-        }
-        return el;
-      })
-    );
-  }, []);
+          return item;
+        });
+        return { ...el, content: newContent };
+      }
+      return el;
+    })
+  );
+}, []);
 
-  // Add Nested Span
-  const addNestedSpan = useCallback((elementId, itemId) => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === elementId) {
+const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) => {
+  setElements((prev) =>
+    prev.map((el) => {
+      if (el.id === elementId) {
+        const newContent = el.content.map((item) => {
+          if (item.id === itemId) {
+            const updatedSpans = item.nestedSpans.map((span) => (span.id === spanId ? { ...span, [field]: value } : span));
+            return { ...item, nestedSpans: updatedSpans };
+          }
+          return item;
+        });
+        return { ...el, content: newContent };
+      }
+      return el;
+    })
+  );
+}, []);
+
+const removeNestedSpan = useCallback((elementId, itemId, spanId) => {
+  setElements((prev) =>
+    prev.map((el) => {
+      if (el.id === elementId) {
+        const newContent = el.content.map((item) => {
+          if (item.id === itemId) {
+            return { ...item, nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId) };
+          }
+          return item;
+        });
+        return { ...el, content: newContent };
+      }
+      return el;
+    })
+  );
+}, []);
+
+const insertVariable = useCallback((id, itemId = null, spanId = null) => {
+  setElements((prev) =>
+    prev.map((el) => {
+      if (el.id === id) {
+        if (itemId && spanId) {
+          // Insert into nested span
           const newContent = el.content.map((item) => {
             if (item.id === itemId) {
-              return { ...item, nestedSpans: [...item.nestedSpans, { id: uuidv4(), content: '', description: '' }] };
-            }
-            return item;
-          });
-          return { ...el, content: newContent };
-        }
-        return el;
-      })
-    );
-  }, []);
-
-  // Update Nested Span
-  const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === elementId) {
-          const newContent = el.content.map((item) => {
-            if (item.id === itemId) {
-              const updatedSpans = item.nestedSpans.map((span) => (span.id === spanId ? { ...span, [field]: value } : span));
+              const updatedSpans = item.nestedSpans.map((span) =>
+                span.id === spanId ? { ...span, content: `${span.content} {{Group//Variable Name}}` } : span
+              );
               return { ...item, nestedSpans: updatedSpans };
             }
             return item;
           });
           return { ...el, content: newContent };
+        } else if (itemId) {
+          // Insert into list item
+          const newContent = el.content.map((item) =>
+            item.id === itemId ? { ...item, content: `${item.content} {{Group//Variable Name}}` } : item
+          );
+          return { ...el, content: newContent };
+        } else {
+          // Insert into element content
+          return { ...el, content: `${el.content} {{Group//Variable Name}}` };
         }
-        return el;
-      })
-    );
-  }, []);
+      }
+      return el;
+    })
+  );
+}, []);
 
-  // Remove Nested Span
-  const removeNestedSpan = useCallback((elementId, itemId, spanId) => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === elementId) {
+const insertBreak = useCallback((id, itemId = null, spanId = null) => {
+  setElements((prev) =>
+    prev.map((el) => {
+      if (el.id === id) {
+        if (itemId && spanId) {
+          // Insert into nested span
           const newContent = el.content.map((item) => {
             if (item.id === itemId) {
-              return { ...item, nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId) };
+              const updatedSpans = item.nestedSpans.map((span) =>
+                span.id === spanId ? { ...span, content: `${span.content}<br>` } : span
+              );
+              return { ...item, nestedSpans: updatedSpans };
             }
             return item;
           });
           return { ...el, content: newContent };
+        } else if (itemId) {
+          // Insert into list item
+          const newContent = el.content.map((item) =>
+            item.id === itemId ? { ...item, content: `${item.content}<br>` } : item
+          );
+          return { ...el, content: newContent };
+        } else {
+          // Insert into element content
+          return { ...el, content: `${el.content}<br>` };
         }
-        return el;
-      })
-    );
-  }, []);
+      }
+      return el;
+    })
+  );
+}, []);
 
-  // Insert Variable
-  const insertVariable = useCallback((id, itemId = null, spanId = null) => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === id) {
-          if (itemId && spanId) {
-            // Insert into nested span
-            const newContent = el.content.map((item) => {
-              if (item.id === itemId) {
-                const updatedSpans = item.nestedSpans.map((span) =>
-                  span.id === spanId ? { ...span, content: `${span.content} {{Group//Variable Name}}` } : span
-                );
-                return { ...item, nestedSpans: updatedSpans };
-              }
-              return item;
-            });
-            return { ...el, content: newContent };
-          } else if (itemId) {
-            // Insert into list item
-            const newContent = el.content.map((item) =>
-              item.id === itemId ? { ...item, content: `${item.content} {{Group//Variable Name}}` } : item
-            );
-            return { ...el, content: newContent };
-          } else {
-            // Insert into element content
-            return { ...el, content: `${el.content} {{Group//Variable Name}}` };
-          }
-        }
-        return el;
-      })
-    );
-  }, []);
+const handleDragEnd = (result) => {
+  const { destination, source, type } = result;
 
-  // Handle Drag End
-  const handleDragEnd = (result) => {
-    const { destination, source, type } = result;
+  if (!destination) return;
 
-    if (!destination) return;
+  // Reorder elements
+  if (type === 'ELEMENT') {
+    const reorderedElements = Array.from(elements);
+    const [movedElement] = reorderedElements.splice(source.index, 1);
+    reorderedElements.splice(destination.index, 0, movedElement);
+    setElements(reorderedElements);
+  }
 
-    // Reorder elements
-    if (type === 'ELEMENT') {
-      const reorderedElements = Array.from(elements);
-      const [movedElement] = reorderedElements.splice(source.index, 1);
-      reorderedElements.splice(destination.index, 0, movedElement);
-      setElements(reorderedElements);
-    }
+  // Reorder list items
+  if (type.startsWith('list-')) {
+    const elementId = type.split('-')[1];
+    const reorderedElements = Array.from(elements);
+    const elementIndex = reorderedElements.findIndex((el) => el.id === elementId);
+    if (elementIndex === -1) return;
+    const listItems = Array.from(reorderedElements[elementIndex].content);
+    const [movedItem] = listItems.splice(source.index, 1);
+    listItems.splice(destination.index, 0, movedItem);
+    reorderedElements[elementIndex].content = listItems;
+    setElements(reorderedElements);
+  }
+};
 
-    // Reorder list items
-    if (type.startsWith('list-')) {
-      const elementId = type.split('-')[1];
-      const reorderedElements = Array.from(elements);
-      const elementIndex = reorderedElements.findIndex((el) => el.id === elementId);
-      if (elementIndex === -1) return;
-      const listItems = Array.from(reorderedElements[elementIndex].content);
-      const [movedItem] = listItems.splice(source.index, 1);
-      listItems.splice(destination.index, 0, movedItem);
-      reorderedElements[elementIndex].content = listItems;
-      setElements(reorderedElements);
-    }
-  };
-
-  // Convert to JSON Schema
-  const convertToJsonSchema = () => ({
+const convertToJsonSchema = () => ({
   schema: {
     properties: {
       tag: { enum: ['body'] },
@@ -528,8 +550,7 @@ const JsonTemplateBuilderRevert = () => {
   }
 });
 
-  // Update Elements from JSON Schema
-  const updateElementsFromSchema = () => {
+const updateElementsFromSchema = () => {
   try {
     const parsedSchema = JSON.parse(jsonSchema);
     const newElements = parsedSchema.schema.properties.children.map((child) => {
@@ -607,8 +628,7 @@ const JsonTemplateBuilderRevert = () => {
   }
 };
 
-  // Render Human-Readable Preview
-  const renderPreview = () => (
+const renderPreview = () => (
   <div className="p-5 bg-gray-100 rounded mb-5 text-gray-800">
     {elements.map((element, index) => {
       if (element.isDynamic && ['ul', 'ol'].includes(element.type)) {
@@ -670,62 +690,63 @@ const JsonTemplateBuilderRevert = () => {
   </div>
 );
 
-  return (
-    <div className="font-sans p-8 bg-gray-100 min-h-screen">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-800 mb-8">JSON Template Builder</h1>
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="flex flex-col md:flex-row gap-8">
-            <AddElementSidebar addElement={addElement} />
-            <div className="flex-1">
-              <div className="bg-white shadow-md rounded-lg p-6 mb-8">
-                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Template Builder</h2>
-                <Droppable droppableId="elements" type="ELEMENT">
-                  {(provided) => (
-                    <div ref={provided.innerRef} {...provided.droppableProps}>
-                      {elements.map((element, index) => (
-                        <Element
-                          key={element.id}
-                          element={element}
-                          index={index}
-                          updateElement={updateElement}
-                          removeElement={removeElement}
-                          modifyListItem={modifyListItem}
-                          insertVariable={insertVariable}
-                          addNestedSpan={addNestedSpan}
-                          updateNestedSpan={updateNestedSpan}
-                          removeNestedSpan={removeNestedSpan}
-                        />
-                      ))}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              </div>
-              <div className="bg-white shadow-md rounded-lg p-6 mb-8">
-                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Human-Readable Preview</h2>
-                {renderPreview()}
-              </div>
-              <div className="bg-white shadow-md rounded-lg p-6">
-                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">JSON Schema</h2>
-                <textarea
-                  value={jsonSchema}
-                  onChange={(e) => setJsonSchema(e.target.value)}
-                  className="w-full h-[300px] p-2 font-mono text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  onClick={updateElementsFromSchema}
-                  className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors duration-200"
-                >
-                  Update Template
-                </button>
-              </div>
+return (
+  <div className="font-sans p-8 bg-gray-100 min-h-screen">
+    <div className="max-w-7xl mx-auto">
+      <h1 className="text-3xl font-bold text-gray-800 mb-8">JSON Template Builder</h1>
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <div className="flex flex-col md:flex-row gap-8">
+          <AddElementSidebar addElement={addElement} />
+          <div className="flex-1">
+            <div className="bg-white shadow-md rounded-lg p-6 mb-8">
+              <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Template Builder</h2>
+              <Droppable droppableId="elements" type="ELEMENT">
+                {(provided) => (
+                  <div ref={provided.innerRef} {...provided.droppableProps}>
+                    {elements.map((element, index) => (
+                      <Element
+                        key={element.id}
+                        element={element}
+                        index={index}
+                        updateElement={updateElement}
+                        removeElement={removeElement}
+                        modifyListItem={modifyListItem}
+                        insertVariable={insertVariable}
+                        insertBreak={insertBreak}
+                        addNestedSpan={addNestedSpan}
+                        updateNestedSpan={updateNestedSpan}
+                        removeNestedSpan={removeNestedSpan}
+                      />
+                    ))}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            </div>
+            <div className="bg-white shadow-md rounded-lg p-6 mb-8">
+              <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Human-Readable Preview</h2>
+              {renderPreview()}
+            </div>
+            <div className="bg-white shadow-md rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">JSON Schema</h2>
+              <textarea
+                value={jsonSchema}
+                onChange={(e) => setJsonSchema(e.target.value)}
+                className="w-full h-[300px] p-2 font-mono text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={updateElementsFromSchema}
+                className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors duration-200"
+              >
+                Update Template
+              </button>
             </div>
           </div>
-        </DragDropContext>
-      </div>
+        </div>
+      </DragDropContext>
     </div>
-  );
+  </div>
+);
 };
 
 export default JsonTemplateBuilderRevert;
