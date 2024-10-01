@@ -270,7 +270,7 @@ const Element = ({
   </Draggable>
 );
 
-export default Element;
+
 
 // Main Component
 const JsonTemplateBuilderRevert = () => {
