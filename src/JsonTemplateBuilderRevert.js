@@ -91,7 +91,7 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, inse
           </button>
           <button onClick={() => insertBreak(elementId, item.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
             <VariableIcon className="h-5 w-5 inline mr-1" />
-            Add Space
+            Add Break
           </button>
           <button onClick={() => addNestedSpan(elementId, item.id)} className="text-green-500 hover:text-green-700 transition-colors duration-200">
             {item.nestedSpans.length > 0 ? 'Add Another Nested Span' : 'Add Nested Span'}
@@ -121,7 +121,7 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, inse
               </button>
               <button onClick={() => insertBreak(elementId, item.id, span.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
                 <VariableIcon className="h-5 w-5 inline mr-1" />
-                Add Space
+                Add Break
               </button>
             </div>
           </div>
@@ -260,7 +260,7 @@ const Element = ({
                 </button>
                 <button onClick={() => insertBreak(element.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
                   <VariableIcon className="h-5 w-5 inline mr-1" />
-                  Add Space
+                  Add Break
                 </button>
               </div>
             )}
