@@ -121,7 +121,7 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, inse
               </button>
               <button onClick={() => insertBreak(elementId, item.id, span.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
                 <VariableIcon className="h-5 w-5 inline mr-1" />
-                Add Break
+                Add Space
               </button>
             </div>
           </div>
@@ -263,7 +263,7 @@ const Element = ({
                 </button>
                 <button onClick={() => insertBreak(element.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
                   <VariableIcon className="h-5 w-5 inline mr-1" />
-                  Add Break
+                  Add Space
                 </button>
               </div>
             )}
