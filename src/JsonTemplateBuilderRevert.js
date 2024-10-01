@@ -489,18 +489,22 @@ const convertToJsonSchema = () => ({
         const baseProps = { tag: { enum: [element.type] } };
 
         if (element.type === 'br') {
-          return { properties: baseProps };
+          return { 
+            description: "",  // Empty string description for br elements
+            properties: baseProps 
+          };
         }
 
         if (['ul', 'ol'].includes(element.type)) {
           if (element.isDynamic) {
             return {
+              description: element.description || "",
               properties: {
                 ...baseProps,
                 children: [
                   {
                     type: 'array',
-                    description: element.listItemDescription || '',
+                    description: element.listItemDescription || "",
                     items: {
                       properties: {
                         tag: { enum: ['li'] },
@@ -513,23 +517,26 @@ const convertToJsonSchema = () => ({
             };
           } else {
             const listItems = element.content.map((item) => ({
-              description: item.description || '',
+              description: item.description || "",
               properties: {
                 tag: { enum: ['li'] },
                 ...(item.content ? { content: { enum: [item.content] } } : {}),
                 children:
                   item.nestedSpans.length > 0
                     ? item.nestedSpans.map((span) => ({
+                        description: span.description || "",
                         properties: {
                           tag: { enum: ['span'] },
-                          ...(span.content ? { content: { enum: [span.content] } } : {}),
-                          ...(span.description ? { description: span.description } : {})
+                          ...(span.content ? { content: { enum: [span.content] } } : {})
                         }
                       }))
                     : null
               }
             }));
-            return { description: element.description || '', properties: { ...baseProps, children: listItems } };
+            return { 
+              description: element.description || "", 
+              properties: { ...baseProps, children: listItems } 
+            };
           }
         }
 
@@ -538,9 +545,10 @@ const convertToJsonSchema = () => ({
           content: element.hasDescription ? undefined : { enum: [element.content] },
           children: null
         };
-        return element.hasDescription
-          ? { description: element.description, properties: elementProps }
-          : { properties: elementProps };
+        return { 
+          description: element.description || "",  // Always include description, empty string if not set
+          properties: elementProps 
+        };
       })
     }
   }
