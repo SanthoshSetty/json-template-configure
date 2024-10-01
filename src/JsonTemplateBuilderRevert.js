@@ -384,7 +384,7 @@ const JsonTemplateBuilderRevert = () => {
             const newContent = el.content.map((item) => {
               if (item.id === itemId) {
                 const updatedSpans = item.nestedSpans.map((span) =>
-                  span.id === spanId ? { ...span, content: `${span.content} {{Variable Name}}` } : span
+                  span.id === spanId ? { ...span, content: `${span.content} {{Group.Variable Name}}` } : span
                 );
                 return { ...item, nestedSpans: updatedSpans };
               }
@@ -394,12 +394,12 @@ const JsonTemplateBuilderRevert = () => {
           } else if (itemId) {
             // Insert into list item
             const newContent = el.content.map((item) =>
-              item.id === itemId ? { ...item, content: `${item.content} {{Variable Name}}` } : item
+              item.id === itemId ? { ...item, content: `${item.content} {{Group.Variable Name}}` } : item
             );
             return { ...el, content: newContent };
           } else {
             // Insert into element content
-            return { ...el, content: `${el.content} {{Variable Name}}` };
+            return { ...el, content: `${el.content} {{Group.Variable Name}}` };
           }
         }
         return el;
