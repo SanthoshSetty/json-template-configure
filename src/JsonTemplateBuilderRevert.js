@@ -27,7 +27,7 @@ const ElementTypes = {
   ORDERED_LIST: 'ol',
   SPAN: 'span',
   STRONG: 'strong',
-  SPACE: 'br'  // Changed from BREAK to SPACE
+  BREAK: 'br'
 };
 
 const defaultContent = {
@@ -51,7 +51,7 @@ const AddElementSidebar = ({ addElement }) => (
         onClick={() => addElement(value)}
         className="block w-full mb-2 text-left text-blue-500 hover:text-blue-700 transition-colors duration-200"
       >
-        Add {key === 'BREAK' ? 'SPACE' : key.replace(/_/g, ' ')}
+        Add {key.replace(/_/g, ' ')}
       </button>
     ))}
   </div>
@@ -91,7 +91,7 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, inse
           </button>
           <button onClick={() => insertBreak(elementId, item.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
             <VariableIcon className="h-5 w-5 inline mr-1" />
-            Add Break
+            Add Space
           </button>
           <button onClick={() => addNestedSpan(elementId, item.id)} className="text-green-500 hover:text-green-700 transition-colors duration-200">
             {item.nestedSpans.length > 0 ? 'Add Another Nested Span' : 'Add Nested Span'}
@@ -121,7 +121,7 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, inse
               </button>
               <button onClick={() => insertBreak(elementId, item.id, span.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
                 <VariableIcon className="h-5 w-5 inline mr-1" />
-                Add Break
+                Add Space
               </button>
             </div>
           </div>
@@ -164,23 +164,26 @@ const Element = ({
               <input
                 type="checkbox"
                 checked={element.isDynamic}
-                onChange={(e) => {
-                  updateElement(element.id, { 
-                    isDynamic: e.target.checked,
-                    description: e.target.checked ? "" : element.description // Set description to empty string when checked
-                  });
-                }}
+                onChange={(e) => updateElement(element.id, { isDynamic: e.target.checked })}
                 className="mr-2"
               />
               <span>Dynamic List</span>
             </label>
             {element.isDynamic ? (
-              <textarea
-                value={element.listItemDescription}
-                onChange={(e) => updateElement(element.id, { listItemDescription: e.target.value })}
-                placeholder="Item Description"
-                className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <>
+                <textarea
+                  value={element.description}
+                  onChange={(e) => updateElement(element.id, { description: e.target.value })}
+                  placeholder="List Description"
+                  className="w-full p-2 mb-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <textarea
+                  value={element.listItemDescription}
+                  onChange={(e) => updateElement(element.id, { listItemDescription: e.target.value })}
+                  placeholder="Item Description"
+                  className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </>
             ) : (
               <Droppable droppableId={element.id} type={`list-${element.id}`}>
                 {(provided) => (
@@ -260,7 +263,7 @@ const Element = ({
                 </button>
                 <button onClick={() => insertBreak(element.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
                   <VariableIcon className="h-5 w-5 inline mr-1" />
-                  Add Break
+                  Add Space
                 </button>
               </div>
             )}
@@ -489,22 +492,19 @@ const convertToJsonSchema = () => ({
         const baseProps = { tag: { enum: [element.type] } };
 
         if (element.type === 'br') {
-          return { 
-            description: "",  // Empty string description for br elements
-            properties: baseProps 
-          };
+          return { properties: baseProps };
         }
 
         if (['ul', 'ol'].includes(element.type)) {
           if (element.isDynamic) {
             return {
-              description: element.description || "",
+              description: element.description || '',
               properties: {
                 ...baseProps,
                 children: [
                   {
                     type: 'array',
-                    description: element.listItemDescription || "",
+                    description: element.listItemDescription || '',
                     items: {
                       properties: {
                         tag: { enum: ['li'] },
@@ -517,26 +517,23 @@ const convertToJsonSchema = () => ({
             };
           } else {
             const listItems = element.content.map((item) => ({
-              description: item.description || "",
+              description: item.description || '',
               properties: {
                 tag: { enum: ['li'] },
                 ...(item.content ? { content: { enum: [item.content] } } : {}),
                 children:
                   item.nestedSpans.length > 0
                     ? item.nestedSpans.map((span) => ({
-                        description: span.description || "",
                         properties: {
                           tag: { enum: ['span'] },
-                          ...(span.content ? { content: { enum: [span.content] } } : {})
+                          ...(span.content ? { content: { enum: [span.content] } } : {}),
+                          ...(span.description ? { description: span.description } : {})
                         }
                       }))
                     : null
               }
             }));
-            return { 
-              description: element.description || "", 
-              properties: { ...baseProps, children: listItems } 
-            };
+            return { description: element.description || '', properties: { ...baseProps, children: listItems } };
           }
         }
 
@@ -545,10 +542,9 @@ const convertToJsonSchema = () => ({
           content: element.hasDescription ? undefined : { enum: [element.content] },
           children: null
         };
-        return { 
-          description: element.description || "",  // Always include description, empty string if not set
-          properties: elementProps 
-        };
+        return element.hasDescription
+          ? { description: element.description, properties: elementProps }
+          : { properties: elementProps };
       })
     }
   }
