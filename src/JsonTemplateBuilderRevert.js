@@ -194,12 +194,6 @@ const Element = ({
                 <textarea
                   value={element.description}
                   onChange={(e) => updateElement(element.id, { description: e.target.value })}
-                  placeholder="Outer element description"
-                  className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
-                />
-                <textarea
-                  value={element.listDescription}
-                  onChange={(e) => updateElement(element.id, { listDescription: e.target.value })}
                   placeholder="List description"
                   className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
                 />
@@ -308,7 +302,6 @@ const JsonTemplateBuilderRevert = () => {
         type,
         content: ['ul', 'ol'].includes(type) ? defaultContent[type] : defaultContent[type] || 'New element',
         description: '',
-        listDescription: '',
         isDynamic: false,
         listItemDescription: '',
         hasDescription: false
@@ -563,15 +556,7 @@ const JsonTemplateBuilderRevert = () => {
                 description: element.description || "",
                 properties: { 
                   ...baseProps, 
-                  children: [
-                    {
-                      description: element.listDescription || "",
-                      properties: {
-                        tag: { enum: ['li'] },
-                        children: listItems
-                      }
-                    }
-                  ] 
+                  children: listItems
                 } 
               };
             }
@@ -623,8 +608,7 @@ const JsonTemplateBuilderRevert = () => {
             };
           } else {
             // Static List
-            const listDescription = child.properties.children[0].description || '';
-            const listItems = child.properties.children[0].properties.children.map((item) => {
+            const listItems = child.properties.children.map((item) => {
               const nestedSpans = item.properties.children
                 ? item.properties.children.map((span) => ({
                     id: uuidv4(),
@@ -644,7 +628,6 @@ const JsonTemplateBuilderRevert = () => {
               type,
               content: listItems,
               description: child.description || '',
-              listDescription,
               isDynamic: false,
               hasDescription: !!child.description
             };
@@ -697,7 +680,7 @@ const JsonTemplateBuilderRevert = () => {
             const ListComponent = element.type === 'ul' ? 'ul' : 'ol';
             return (
               <div key={index}>
-                <p className="italic mb-2">List description: {element.listDescription}</p>
+                <p className="italic mb-2">List description: {element.description}</p>
                 <ListComponent className={`mb-4 pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
                   {element.content.map((item, idx) => (
                     <li key={idx} className="mb-2">
