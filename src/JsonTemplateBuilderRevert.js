@@ -45,7 +45,7 @@ const AddElementSidebar = ({ addElement }) => (
   </div>
 );
 
-const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, insertBreak, addNestedSpan, updateNestedSpan, removeNestedSpan, canRemove }) => (
+const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, insertBreak, canRemove }) => (
   <Draggable draggableId={item.id} index={index} key={item.id}>
     {(provided) => (
       <div
@@ -99,10 +99,7 @@ const Element = ({
   removeElement,
   modifyListItem,
   insertVariable,
-  insertBreak,
-  addNestedSpan,
-  updateNestedSpan,
-  removeNestedSpan
+  insertBreak
 }) => (
   <Draggable draggableId={element.id} index={index} key={element.id}>
     {(provided) => (
@@ -149,9 +146,6 @@ const Element = ({
                         modifyListItem={modifyListItem}
                         insertVariable={insertVariable}
                         insertBreak={insertBreak}
-                        addNestedSpan={addNestedSpan}
-                        updateNestedSpan={updateNestedSpan}
-                        removeNestedSpan={removeNestedSpan}
                         canRemove={element.children.length > 1}
                       />
                     ))
@@ -200,9 +194,6 @@ const Element = ({
                     modifyListItem={modifyListItem}
                     insertVariable={insertVariable}
                     insertBreak={insertBreak}
-                    addNestedSpan={addNestedSpan}
-                    updateNestedSpan={updateNestedSpan}
-                    removeNestedSpan={removeNestedSpan}
                   />
                 ))}
               </div>
@@ -339,7 +330,6 @@ const JsonTemplateBuilderRevert = () => {
       tag: { enum: ['body'] },
       children: elements.map((element) => {
         const baseProps = { tag: { enum: [element.type] } };
-
         if (element.type === 'br') {
           return { properties: baseProps };
         }
@@ -413,144 +403,141 @@ const updateElementsFromSchema = () => {
 };
 
 const convertSchemaToElement = (child) => {
-const type = child.properties.tag.enum[0];
-const baseElement = {
-id: uuidv4(),
-type,
-description: child.description || '',
-content: child.properties.content?.enum?.[0] ?? null,
-children: []
-};
+  const type = child.properties.tag.enum[0];
+  const baseElement = {
+    id: uuidv4(),
+    type,
+    description: child.description || '',
+    content: child.properties.content?.enum?.[0] ?? null,
+    children: []
+  };
 
-if (['ul', 'ol'].includes(type)) {
-if (child.properties.children[0].type === 'array') {
-  baseElement.children = [
-    {
-      type: 'array',
-      description: child.properties.children[0].description || ''
+  if (['ul', 'ol'].includes(type)) {
+    if (child.properties.children[0].type === 'array') {
+      baseElement.children = [
+        {
+          type: 'array',
+          description: child.properties.children[0].description || ''
+        }
+      ];
+    } else {
+      baseElement.children = child.properties.children.map(convertSchemaToElement);
     }
-  ];
-} else {
-  baseElement.children = child.properties.children.map(convertSchemaToElement);
-}
-} else if (child.properties.children) {
-baseElement.children = child.properties.children.map(convertSchemaToElement);
-}
+  } else if (child.properties.children) {
+    baseElement.children = child.properties.children.map(convertSchemaToElement);
+  }
 
-return baseElement;
+  return baseElement;
 };
 
 const renderPreview = () => (
-<div className="p-5 bg-gray-100 rounded mb-5 text-gray-800">
-{elements.map((element, index) => {
-if (['ul', 'ol'].includes(element.type)) {
-  const ListComponent = element.type === 'ul' ? 'ul' : 'ol';
-  return (
-    <div key={index}>
-      <p className="italic mb-2">List description: {element.description}</p>
-      <ListComponent className={`mb-4 pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
-        {element.children[0].type === 'array' ? (
-          <li className="italic text-gray-600">Dynamic list items: {element.children[0].description}</li>
-        ) : (
-          element.children.map((item, idx) => (
-            <li key={idx} className="mb-2">
-              {item.content || (item.description && <span className="italic text-gray-600">Generated content for: {item.description}</span>)}
-            </li>
-          ))
-        )}
-      </ListComponent>
-    </div>
-  );
-}
+  <div className="p-5 bg-gray-100 rounded mb-5 text-gray-800">
+    {elements.map((element, index) => {
+      if (['ul', 'ol'].includes(element.type)) {
+        const ListComponent = element.type === 'ul' ? 'ul' : 'ol';
+        return (
+          <div key={index}>
+            <p className="italic mb-2">List description: {element.description}</p>
+            <ListComponent className={`mb-4 pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
+              {element.children[0].type === 'array' ? (
+                <li className="italic text-gray-600">Dynamic list items: {element.children[0].description}</li>
+              ) : (
+                element.children.map((item, idx) => (
+                  <li key={idx} className="mb-2">
+                    {item.content || (item.description && <span className="italic text-gray-600">Generated content for: {item.description}</span>)}
+                  </li>
+                ))
+              )}
+            </ListComponent>
+          </div>
+        );
+      }
 
-switch (element.type) {
-  case 'br':
-    return <hr key={index} className="my-4 border-t border-gray-300" />;
-  case 'h1':
-    return <h1 key={index} className="text-4xl font-bold mb-4">{element.content}</h1>;
-  case 'h2':
-    return <h2 key={index} className="text-3xl font-semibold mb-3">{element.content}</h2>;
-  case 'h3':
-    return <h3 key={index} className="text-2xl font-medium mb-2">{element.content}</h3>;
-  case 'p':
-    return (
-      <p key={index} className="mb-4">
-        {element.content || (element.description && <span className="italic text-gray-600">Generated content for: {element.description}</span>)}
-        {element.children && element.children.map((child, childIndex) => {
-          switch (child.type) {
-            case 'span':
-              return <span key={childIndex}>{child.content || (child.description && <span className="italic text-gray-600">Generated content for: {child.description}</span>)}</span>;
-            case 'strong':
-              return <strong key={childIndex}>{child.content || (child.description && <span className="italic text-gray-600">Generated content for: {child.description}</span>)}</strong>;
-            default:
-              return null;
-          }
-        })}
-      </p>
-    );
-  default:
-    return <p key={index} className="mb-4">{element.content || element.description}</p>;
-}
-})}
-</div>
+      switch (element.type) {
+        case 'br':
+          return <hr key={index} className="my-4 border-t border-gray-300" />;
+        case 'h1':
+          return <h1 key={index} className="text-4xl font-bold mb-4">{element.content}</h1>;
+        case 'h2':
+          return <h2 key={index} className="text-3xl font-semibold mb-3">{element.content}</h2>;
+        case 'h3':
+          return <h3 key={index} className="text-2xl font-medium mb-2">{element.content}</h3>;
+        case 'p':
+          return (
+            <p key={index} className="mb-4">
+              {element.content || (element.description && <span className="italic text-gray-600">Generated content for: {element.description}</span>)}
+              {element.children && element.children.map((child, childIndex) => {
+                switch (child.type) {
+                  case 'span':
+                    return <span key={childIndex}>{child.content || (child.description && <span className="italic text-gray-600">Generated content for: {child.description}</span>)}</span>;
+                  case 'strong':
+                    return <strong key={childIndex}>{child.content || (child.description && <span className="italic text-gray-600">Generated content for: {child.description}</span>)}</strong>;
+                  default:
+                    return null;
+                }
+              })}
+            </p>
+          );
+        default:
+          return <p key={index} className="mb-4">{element.content || element.description}</p>;
+      }
+    })}
+  </div>
 );
 
 return (
-<div className="font-sans p-8 bg-gray-100 min-h-screen">
-<div className="max-w-7xl mx-auto">
-  <h1 className="text-3xl font-bold text-gray-800 mb-8">JSON Template Builder</h1>
-  <DragDropContext onDragEnd={handleDragEnd}>
-    <div className="flex flex-col md:flex-row gap-8">
-      <AddElementSidebar addElement={addElement} />
-      <div className="flex-1">
-        <div className="bg-white shadow-md rounded-lg p-6 mb-8">
-          <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Template Builder</h2>
-          <Droppable droppableId="elements" type="ELEMENT">
-            {(provided) => (
-              <div ref={provided.innerRef} {...provided.droppableProps}>
-                {elements.map((element, index) => (
-                  <Element
-                    key={element.id}
-                    element={element}
-                    index={index}
-                    updateElement={updateElement}
-                    removeElement={removeElement}
-                    modifyListItem={modifyListItem}
-                    insertVariable={insertVariable}
-                    insertBreak={insertBreak}
-                    addNestedSpan={addNestedSpan}
-                    updateNestedSpan={updateNestedSpan}
-                    removeNestedSpan={removeNestedSpan}
-                  />
-                ))}
-                {provided.placeholder}
-              </div>
-            )}
-          </Droppable>
+  <div className="font-sans p-8 bg-gray-100 min-h-screen">
+    <div className="max-w-7xl mx-auto">
+      <h1 className="text-3xl font-bold text-gray-800 mb-8">JSON Template Builder</h1>
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <div className="flex flex-col md:flex-row gap-8">
+          <AddElementSidebar addElement={addElement} />
+          <div className="flex-1">
+            <div className="bg-white shadow-md rounded-lg p-6 mb-8">
+              <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Template Builder</h2>
+              <Droppable droppableId="elements" type="ELEMENT">
+                {(provided) => (
+                  <div ref={provided.innerRef} {...provided.droppableProps}>
+                    {elements.map((element, index) => (
+                      <Element
+                        key={element.id}
+                        element={element}
+                        index={index}
+                        updateElement={updateElement}
+                        removeElement={removeElement}
+                        modifyListItem={modifyListItem}
+                        insertVariable={insertVariable}
+                        insertBreak={insertBreak}
+                      />
+                    ))}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            </div>
+            <div className="bg-white shadow-md rounded-lg p-6 mb-8">
+              <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Human-Readable Preview</h2>
+              {renderPreview()}
+            </div>
+            <div className="bg-white shadow-md rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">JSON Schema</h2>
+              <textarea
+                value={jsonSchema}
+                onChange={(e) => setJsonSchema(e.target.value)}
+                className="w-full h-[300px] p-2 font-mono text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={updateElementsFromSchema}
+                className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors duration-200"
+              >
+                Update Template
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="bg-white shadow-md rounded-lg p-6 mb-8">
-          <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Human-Readable Preview</h2>
-          {renderPreview()}
-        </div>
-        <div className="bg-white shadow-md rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">JSON Schema</h2>
-          <textarea
-            value={jsonSchema}
-            onChange={(e) => setJsonSchema(e.target.value)}
-            className="w-full h-[300px] p-2 font-mono text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            onClick={updateElementsFromSchema}
-            className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors duration-200"
-          >
-            Update Template
-          </button>
-        </div>
-      </div>
+      </DragDropContext>
     </div>
-  </DragDropContext>
-</div>
-</div>
+  </div>
 );
 };
 
