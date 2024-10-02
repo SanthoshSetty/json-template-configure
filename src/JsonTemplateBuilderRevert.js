@@ -31,16 +31,8 @@ const ElementTypes = {
 };
 
 const defaultContent = {
-  ul: [
-    { id: uuidv4(), content: 'List item 1', description: '', nestedSpans: [] },
-    { id: uuidv4(), content: 'List item 2', description: '', nestedSpans: [] },
-    { id: uuidv4(), content: 'List item 3', description: '', nestedSpans: [] }
-  ],
-  ol: [
-    { id: uuidv4(), content: 'List item 1', description: '', nestedSpans: [] },
-    { id: uuidv4(), content: 'List item 2', description: '', nestedSpans: [] },
-    { id: uuidv4(), content: 'List item 3', description: '', nestedSpans: [] }
-  ],
+  ul: [{ id: uuidv4(), content: 'List item 1', description: '', nestedSpans: [] }],
+  ol: [{ id: uuidv4(), content: 'List item 1', description: '', nestedSpans: [] }],
   br: '', 
   h1: 'Heading 1',
   h2: 'Heading 2',
@@ -65,7 +57,7 @@ const AddElementSidebar = ({ addElement }) => (
   </div>
 );
 
-const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, insertBreak, addNestedSpan, updateNestedSpan, removeNestedSpan }) => (
+const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, insertBreak, addNestedSpan, updateNestedSpan, removeNestedSpan, canRemove }) => (
   <Draggable draggableId={item.id} index={index} key={item.id}>
     {(provided) => (
       <div
@@ -82,6 +74,14 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, inse
             className="flex-grow p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="List item content"
           />
+          {canRemove && (
+            <button 
+              onClick={() => modifyListItem(elementId, item.id, 'remove')} 
+              className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200"
+            >
+              <TrashIcon className="h-5 w-5" />
+            </button>
+          )}
         </div>
         <textarea
           value={item.description}
@@ -218,6 +218,7 @@ const Element = ({
                           addNestedSpan={addNestedSpan}
                           updateNestedSpan={updateNestedSpan}
                           removeNestedSpan={removeNestedSpan}
+                          canRemove={element.content.length > 1}
                         />
                       ))}
                       {provided.placeholder}
@@ -339,6 +340,10 @@ const JsonTemplateBuilderRevert = () => {
           let newContent = [...el.content];
           if (action === 'add') {
             newContent.push({ id: uuidv4(), content: '', description: '', nestedSpans: [] });
+          } else if (action === 'remove') {
+            if (newContent.length > 1) {
+              newContent = newContent.filter((item) => item.id !== itemId);
+            }
           } else if (action === 'removeContent') {
             newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
           } else if (action === 'content') {
