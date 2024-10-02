@@ -334,81 +334,82 @@ const JsonTemplateBuilderRevert = () => {
   };
 
   const convertToJsonSchema = () => ({
-    schema: {
-      properties: {
-        tag: { enum: ['body'] },
-        children: elements.map((element) => {
-          const baseProps = { tag: { enum: [element.type] } };
+  schema: {
+    properties: {
+      tag: { enum: ['body'] },
+      children: elements.map((element) => {
+        const baseProps = { tag: { enum: [element.type] } };
 
-          if (element.type === 'br') {
-            return { properties: baseProps };
-          }
+        if (element.type === 'br') {
+          return { properties: baseProps };
+        }
 
         if (['ul', 'ol'].includes(element.type)) {
-  return {
-    ...(element.description ? { description: element.description } : {}),
-    properties: {
-      ...baseProps,
-      children: element.children[0].type === 'array'
-        ? [
-            {
-              type: 'array',
-              description: element.children[0].description || "",
-              items: {
-                properties: {
-                  tag: { enum: ['li'] },
-                  children: null
-                }
-              }
-            }
-          ]
-        : element.children.map(item => ({
-            ...(item.description ? { description: item.description } : {}),
+          return {
+            ...(element.description ? { description: element.description } : {}),
             properties: {
-              tag: { enum: ['li'] },
-              ...(item.content ? { content: { enum: [item.content] } } : {}),
-              children: item.children ? convertChildren(item.children) : null
+              ...baseProps,
+              children: element.children[0].type === 'array'
+                ? [
+                    {
+                      type: 'array',
+                      description: element.children[0].description || "",
+                      items: {
+                        properties: {
+                          tag: { enum: ['li'] },
+                          children: null
+                        }
+                      }
+                    }
+                  ]
+                : element.children.map(item => ({
+                    ...(item.description ? { description: item.description } : {}),
+                    properties: {
+                      tag: { enum: ['li'] },
+                      ...(item.content ? { content: { enum: [item.content] } } : {}),
+                      children: item.children ? convertChildren(item.children) : null
+                    }
+                  }))
             }
-          }))
+          };
+        }
+
+        const elementProps = {
+          ...baseProps,
+          ...(element.content !== null ? { content: { enum: [element.content] } } : { content: null }),
+          children: element.children ? convertChildren(element.children) : null
+        };
+
+        return { 
+          ...(element.description ? { description: element.description } : {}),
+          properties: elementProps 
+        };
+      })
     }
-  };
-}
-
-const elementProps = {
-  ...baseProps,
-  ...(element.content !== null ? { content: { enum: [element.content] } } : { content: null }),
-  children: element.children ? convertChildren(element.children) : null
-};
-
-return { 
-  ...(element.description ? { description: element.description } : {}),
-  properties: elementProps 
-};
-})
-}
+  }
 });
 
 const convertChildren = (children) => {
-if (!children || children.length === 0) return null;
-return children.map(child => ({
-...(child.description ? { description: child.description } : {}),
-properties: {
-  tag: { enum: [child.type] },
-  ...(child.content !== null ? { content: { enum: [child.content] } } : { content: null }),
-  children: child.children ? convertChildren(child.children) : null
-}
-}));
+  if (!children || children.length === 0) return null;
+  return children.map(child => ({
+    ...(child.description ? { description: child.description } : {}),
+    properties: {
+      tag: { enum: [child.type] },
+      ...(child.content !== null ? { content: { enum: [child.content] } } : { content: null }),
+      children: child.children ? convertChildren(child.children) : null
+    }
+  }));
 };
 
 const updateElementsFromSchema = () => {
-try {
-const parsedSchema = JSON.parse(jsonSchema);
-const newElements = parsedSchema.schema.properties.children.map(convertSchemaToElement);
-setElements(newElements);
-} catch (error) {
-console.error('Error parsing JSON schema:', error);
-alert('Invalid JSON schema. Please check your input.');
-}
+  try {
+    const parsedSchema = JSON.parse(jsonSchema);
+    const newElements = parsedSchema.schema.properties.children.map(convertSchemaToElement);
+    setElements(newElements);
+  } catch (error) {
+    console.error('Error parsing JSON schema:', error);
+    alert('Invalid JSON schema. Please check your input.');
+  }
 };
 
 const convertSchemaToElement = (child) => {
