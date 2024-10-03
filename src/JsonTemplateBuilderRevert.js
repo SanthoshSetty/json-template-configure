@@ -74,6 +74,12 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, inse
             className="flex-grow p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="List item content"
           />
+          <button
+            onClick={() => modifyListItem(elementId, item.id, 'remove')}
+            className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200"
+          >
+            <TrashIcon className="h-5 w-5" />
+          </button>
         </div>
         <input
           value={item.description}
@@ -319,6 +325,8 @@ const JsonTemplateBuilderRevert = () => {
         let newContent = [...el.content];
         if (action === 'add') {
           newContent.push({ id: uuidv4(), content: '', description: '', nestedSpans: [] });
+        } else if (action === 'remove') {
+          newContent = newContent.filter((item) => item.id !== itemId);
         } else if (action === 'removeContent') {
           newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
         } else if (action === 'content') {
@@ -333,122 +341,6 @@ const JsonTemplateBuilderRevert = () => {
           );
         }
         return { ...el, content: newContent };
-      }
-      return el;
-    })
-  );
-}, []);
-
-const addNestedSpan = useCallback((elementId, itemId) => {
-  setElements((prev) =>
-    prev.map((el) => {
-      if (el.id === elementId) {
-        const newContent = el.content.map((item) => {
-          if (item.id === itemId) {
-            return { ...item, nestedSpans: [...item.nestedSpans, { id: uuidv4(), content: '', description: '' }] };
-          }
-          return item;
-        });
-        return { ...el, content: newContent };
-      }
-      return el;
-    })
-  );
-}, []);
-
-const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) => {
-  setElements((prev) =>
-    prev.map((el) => {
-      if (el.id === elementId) {
-        const newContent = el.content.map((item) => {
-          if (item.id === itemId) {
-            const updatedSpans = item.nestedSpans.map((span) => (span.id === spanId ? { ...span, [field]: value } : span));
-            return { ...item, nestedSpans: updatedSpans };
-          }
-          return item;
-        });
-        return { ...el, content: newContent };
-      }
-      return el;
-    })
-  );
-}, []);
-
-const removeNestedSpan = useCallback((elementId, itemId, spanId) => {
-  setElements((prev) =>
-    prev.map((el) => {
-      if (el.id === elementId) {
-        const newContent = el.content.map((item) => {
-          if (item.id === itemId) {
-            return { ...item, nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId) };
-          }
-          return item;
-        });
-        return { ...el, content: newContent };
-      }
-      return el;
-    })
-  );
-}, []);
-
-const insertVariable = useCallback((id, itemId = null, spanId = null) => {
-  setElements((prev) =>
-    prev.map((el) => {
-      if (el.id === id) {
-        if (itemId && spanId) {
-          // Insert into nested span
-          const newContent = el.content.map((item) => {
-            if (item.id === itemId) {
-              const updatedSpans = item.nestedSpans.map((span) =>
-                span.id === spanId ? { ...span, content: `${span.content} {{Group//Variable Name}}` } : span
-              );
-              return { ...item, nestedSpans: updatedSpans };
-            }
-            return item;
-          });
-          return { ...el, content: newContent };
-        } else if (itemId) {
-          // Insert into list item
-          const newContent = el.content.map((item) =>
-            item.id === itemId ? { ...item, content: `${item.content} {{Group//Variable Name}}` } : item
-          );
-          return { ...el, content: newContent };
-        } else {
-          // Insert into element content
-          return { ...el, content: `${el.content} {{Group//Variable Name}}` };
-        }
-      }
-      return el;
-    })
-  );
-}, []);
-
-const insertBreak = useCallback((id, itemId = null, spanId = null) => {
-  setElements((prev) =>
-    prev.map((el) => {
-      if (el.id === id) {
-        if (itemId && spanId) {
-          // Insert into nested span
-          const newContent = el.content.map((item) => {
-            if (item.id === itemId) {
-              const updatedSpans = item.nestedSpans.map((span) =>
-                span.id === spanId ? { ...span, content: `${span.content}<br>` } : span
-              );
-              return { ...item, nestedSpans: updatedSpans };
-            }
-            return item;
-          });
-          return { ...el, content: newContent };
-        } else if (itemId) {
-          // Insert into list item
-          const newContent = el.content.map((item) =>
-            item.id === itemId ? { ...item, content: `${item.content}<br>` } : item
-          );
-          return { ...el, content: newContent };
-        } else {
-          // Insert into element content
-          return { ...el, content: `${el.content}<br>` };
-        }
       }
       return el;
     })
