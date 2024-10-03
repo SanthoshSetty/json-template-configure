@@ -169,21 +169,19 @@ const Element = ({
               />
               <span>Dynamic List</span>
             </label>
+            <textarea
+              value={element.description}
+              onChange={(e) => updateElement(element.id, { description: e.target.value })}
+              placeholder="List Description"
+              className="w-full p-2 mb-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
             {element.isDynamic ? (
-              <>
-                <textarea
-                  value={element.description}
-                  onChange={(e) => updateElement(element.id, { description: e.target.value })}
-                  placeholder="List Description"
-                  className="w-full p-2 mb-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <textarea
-                  value={element.listItemDescription}
-                  onChange={(e) => updateElement(element.id, { listItemDescription: e.target.value })}
-                  placeholder="Item Description"
-                  className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </>
+              <textarea
+                value={element.listItemDescription}
+                onChange={(e) => updateElement(element.id, { listItemDescription: e.target.value })}
+                placeholder="Item Description"
+                className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             ) : (
               <Droppable droppableId={element.id} type={`list-${element.id}`}>
                 {(provided) => (
