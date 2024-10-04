@@ -45,15 +45,20 @@ const defaultContent = {
 const AddElementSidebar = ({ addElement }) => (
   <div className="w-full md:w-64 bg-white shadow-md rounded-lg p-6">
     <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Add Elements</h2>
-    {Object.entries(ElementTypes).map(([key, value]) => (
-      <button
-        key={key}
-        onClick={() => addElement(value)}
-        className="block w-full mb-2 text-left text-blue-500 hover:text-blue-700 transition-colors duration-200"
-      >
-        Add {key.replace(/_/g, ' ')}
-      </button>
-    ))}
+    {Object.entries(ElementTypes).map(([key, value]) => {
+      // Skip rendering the button for STRONG element
+      if (key === 'STRONG') return null;
+      
+      return (
+        <button
+          key={key}
+          onClick={() => addElement(value)}
+          className="block w-full mb-2 text-left text-blue-500 hover:text-blue-700 transition-colors duration-200"
+        >
+          Add {key.replace(/_/g, ' ')}
+        </button>
+      );
+    })}
   </div>
 );
 
