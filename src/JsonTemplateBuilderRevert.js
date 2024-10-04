@@ -57,6 +57,17 @@ const AddElementSidebar = ({ addElement }) => (
   </div>
 );
 
+const FormattingButton = ({ onClick, label, active }) => (
+  <button
+    onClick={onClick}
+    className={`px-2 py-1 mr-2 text-sm font-semibold rounded ${
+      active ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
+    }`}
+  >
+    {label}
+  </button>
+);
+
 const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, insertBreak, addNestedSpan, updateNestedSpan, removeNestedSpan }) => (
   <Draggable draggableId={item.id} index={index} key={item.id}>
     {(provided) => (
@@ -148,135 +159,153 @@ const Element = ({
   addNestedSpan,
   updateNestedSpan,
   removeNestedSpan
-}) => (
-  <Draggable draggableId={element.id} index={index} key={element.id}>
-    {(provided) => (
-      <div
-        className="mb-6 p-6 border rounded-lg bg-white shadow-sm transition-all duration-200 hover:shadow-md"
-        ref={provided.innerRef}
-        {...provided.draggableProps}
-      >
-        <div className="flex justify-between items-center mb-4" {...provided.dragHandleProps}>
-          <h3 className="text-lg font-semibold text-gray-700">{getElementTypeName(element.type)}</h3>
-          <button onClick={() => removeElement(element.id)} className="text-red-500 hover:text-red-700 transition-colors duration-200">
-            <TrashIcon className="h-5 w-5" />
-          </button>
-        </div>
-        {element.type === 'br' ? (
-          <p className="text-sm text-gray-500 italic">Line Break (No content)</p>
-        ) : ['ul', 'ol'].includes(element.type) ? (
-          <>
-            <label className="flex items-center mb-4 text-sm text-gray-600">
-              <input
-                type="checkbox"
-                checked={element.isDynamic}
-                onChange={(e) => updateElement(element.id, { isDynamic: e.target.checked })}
-                className="mr-2"
-              />
-              <span>Dynamic List</span>
-            </label>
-            <textarea
-              value={element.description}
-              onChange={(e) => updateElement(element.id, { description: e.target.value })}
-              placeholder="List Description"
-              className="w-full p-2 mb-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            {element.isDynamic ? (
+}) => {
+  const [selectedText, setSelectedText] = useState('');
+
+  const applyFormatting = (tag) => {
+    const content = element.content;
+    const selectionStart = content.indexOf(selectedText);
+    const selectionEnd = selectionStart + selectedText.length;
+    
+    if (selectionStart !== -1) {
+      const newContent = 
+        content.slice(0, selectionStart) +
+        `<${tag}>${selectedText}</${tag}>` +
+        content.slice(selectionEnd);
+      updateElement(element.id, { content: newContent });
+    }
+  };
+
+  const insertLineBreak = () => {
+    const cursorPosition = document.activeElement.selectionStart;
+    const newContent = 
+      element.content.slice(0, cursorPosition) +
+      '<br>' +
+      element.content.slice(cursorPosition);
+    updateElement(element.id, { content: newContent });
+  };
+
+  return (
+    <Draggable draggableId={element.id} index={index} key={element.id}>
+      {(provided) => (
+        <div
+          className="mb-6 p-6 border rounded-lg bg-white shadow-sm transition-all duration-200 hover:shadow-md"
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+        >
+          <div className="flex justify-between items-center mb-4" {...provided.dragHandleProps}>
+            <h3 className="text-lg font-semibold text-gray-700">{getElementTypeName(element.type)}</h3>
+            <button onClick={() => removeElement(element.id)} className="text-red-500 hover:text-red-700 transition-colors duration-200">
+              <TrashIcon className="h-5 w-5" />
+            </button>
+          </div>
+          {element.type === 'br' ? (
+            <p className="text-sm text-gray-500 italic">Line Break (No content)</p>
+          ) : ['ul', 'ol'].includes(element.type) ? (
+            <>
+              <label className="flex items-center mb-4 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={element.isDynamic}
+                  onChange={(e) => updateElement(element.id, { isDynamic: e.target.checked })}
+                  className="mr-2"
+                />
+                <span>Dynamic List</span>
+              </label>
               <textarea
-                value={element.listItemDescription}
-                onChange={(e) => updateElement(element.id, { listItemDescription: e.target.value })}
-                placeholder="Item Description"
-                className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={element.description}
+                onChange={(e) => updateElement(element.id, { description: e.target.value })}
+                placeholder="List Description"
+                className="w-full p-2 mb-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-            ) : (
-              <Droppable droppableId={element.id} type={`list-${element.id}`}>
-                {(provided) => (
-                  <div ref={provided.innerRef} {...provided.droppableProps}>
-                    {element.content.map((item, idx) => (
-                      <ListItem
-                        key={item.id}
-                        item={item}
-                        index={idx}
-                        elementId={element.id}
-                        modifyListItem={modifyListItem}
-                        insertVariable={insertVariable}
-                        insertBreak={insertBreak}
-                        addNestedSpan={addNestedSpan}
-                        updateNestedSpan={updateNestedSpan}
-                        removeNestedSpan={removeNestedSpan}
-                      />
-                    ))}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            )}
-            {!element.isDynamic && (
-              <div className="mt-4">
-                <button
-                  onClick={() => modifyListItem(element.id, null, 'add')}
-                  className="text-green-500 hover:text-green-700 transition-colors duration-200"
-                >
-                  <PlusIcon className="h-5 w-5 inline mr-1" />
-                  Add Item
-                </button>
+              {element.isDynamic ? (
+                <textarea
+                  value={element.listItemDescription}
+                  onChange={(e) => updateElement(element.id, { listItemDescription: e.target.value })}
+                  placeholder="Item Description"
+                  className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              ) : (
+                <Droppable droppableId={element.id} type={`list-${element.id}`}>
+                  {(provided) => (
+                    <div ref={provided.innerRef} {...provided.droppableProps}>
+                      {element.content.map((item, idx) => (
+                        <ListItem
+                          key={item.id}
+                          item={item}
+                          index={idx}
+                          elementId={element.id}
+                          modifyListItem={modifyListItem}
+                          insertVariable={insertVariable}
+                          insertBreak={insertBreak}
+                          addNestedSpan={addNestedSpan}
+                          updateNestedSpan={updateNestedSpan}
+                          removeNestedSpan={removeNestedSpan}
+                        />
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              )}
+              {!element.isDynamic && (
+                <div className="mt-4">
+                  <button
+                    onClick={() => modifyListItem(element.id, null, 'add')}
+                    className="text-green-500 hover:text-green-700 transition-colors duration-200"
+                  >
+                    <PlusIcon className="h-5 w-5 inline mr-1" />
+                    Add Item
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="mb-2">
+                <FormattingButton onClick={() => applyFormatting('b')} label="B" />
+                <FormattingButton onClick={() => applyFormatting('i')} label="I" />
+                <FormattingButton onClick={insertLineBreak} label="BR" />
               </div>
-            )}
-          </>
-        ) : (
-          <>
-            {!element.hasDescription ? (
-              <input
+              <textarea
                 value={element.content}
                 onChange={(e) => updateElement(element.id, { content: e.target.value })}
+                onSelect={(e) => setSelectedText(e.target.value.substring(e.target.selectionStart, e.target.selectionEnd))}
                 className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={3}
               />
-            ) : (
-              <p className="text-sm text-gray-500 italic">Content won't be used since a description is provided.</p>
-            )}
-            {element.hasDescription ? (
-              <>
+              {element.hasDescription && (
                 <textarea
                   value={element.description}
                   onChange={(e) => updateElement(element.id, { description: e.target.value })}
                   placeholder="Description/Instructions for AI"
                   className="w-full p-2 mt-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                {!['ul', 'ol'].includes(element.type) && (
+              )}
+              <div className="mt-2">
+                {element.hasDescription ? (
                   <button
                     onClick={() => updateElement(element.id, { hasDescription: false, description: '' })}
-                    className="mt-2 text-blue-500 hover:text-blue-700 transition-colors duration-200"
+                    className="text-blue-500 hover:text-blue-700 transition-colors duration-200"
                   >
                     Remove Description
                   </button>
+                ) : (
+                  <button
+                    onClick={() => updateElement(element.id, { hasDescription: true })}
+                    className="text-blue-500 hover:text-blue-700 transition-colors duration-200"
+                  >
+                    Add Description
+                  </button>
                 )}
-              </>
-            ) : (
-              <button
-                onClick={() => updateElement(element.id, { hasDescription: true })}
-                className="mt-2 text-blue-500 hover:text-blue-700 transition-colors duration-200"
-              >
-                Add Description
-              </button>
-            )}
-            {!['ul', 'ol', 'br'].includes(element.type) && (
-              <div className="mt-4">
-                <button onClick={() => insertVariable(element.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200 mr-2">
-                  <VariableIcon className="h-5 w-5 inline mr-1" />
-                  Insert Variable
-                </button>
-                <button onClick={() => insertBreak(element.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
-                  <VariableIcon className="h-5 w-5 inline mr-1" />
-                  Add Break
-                </button>
               </div>
-            )}
-          </>
-        )}
-      </div>
-    )}
-  </Draggable>
-);
+            </>
+          )}
+        </div>
+      )}
+    </Draggable>
+  );
+};
 
 const JsonTemplateBuilderRevert = () => {
   const [elements, setElements] = useState([]);
@@ -287,38 +316,38 @@ const JsonTemplateBuilderRevert = () => {
   }, [elements]);
 
   const addElement = useCallback((type) => {
-    setElements((prev) => [
-      ...prev,
-      {
-        id: uuidv4(),
-        type,
-        content: defaultContent[type] || 'New element',
-        description: '',
-        isDynamic: false,
-        listItemDescription: '',
-        hasDescription: false
+  setElements((prev) => [
+    ...prev,
+    {
+      id: uuidv4(),
+      type,
+      content: defaultContent[type] || 'New element',
+      description: '',
+      isDynamic: false,
+      listItemDescription: '',
+      hasDescription: false
+    }
+  ]);
+}, []);
+
+const removeElement = useCallback((id) => {
+  setElements((prev) => prev.filter((el) => el.id !== id));
+}, []);
+
+const updateElement = useCallback((id, updates) => {
+  setElements((prev) =>
+    prev.map((el) => {
+      if (el.id === id) {
+        const updatedElement = { ...el, ...updates };
+        if ('description' in updates && updates.description.trim() === '') updatedElement.hasDescription = false;
+        return updatedElement;
       }
-    ]);
-  }, []);
+      return el;
+    })
+  );
+}, []);
 
-  const removeElement = useCallback((id) => {
-    setElements((prev) => prev.filter((el) => el.id !== id));
-  }, []);
-
-  const updateElement = useCallback((id, updates) => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === id) {
-          const updatedElement = { ...el, ...updates };
-          if ('description' in updates && updates.description.trim() === '') updatedElement.hasDescription = false;
-          return updatedElement;
-        }
-        return el;
-      })
-    );
-  }, []);
-
-  const modifyListItem = useCallback((elementId, itemId, action, value = '') => {
+const modifyListItem = useCallback((elementId, itemId, action, value = '') => {
   setElements((prev) =>
     prev.map((el) => {
       if (el.id === elementId) {
@@ -326,7 +355,7 @@ const JsonTemplateBuilderRevert = () => {
         if (action === 'add') {
           newContent.push({ id: uuidv4(), content: '', description: '', nestedSpans: [] });
         } else if (action === 'remove') {
-          newContent = newContent.filter(item => item.id !== itemId);
+          newContent = newContent.filter((item) => item.id !== itemId);
         } else if (action === 'removeContent') {
           newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
         } else if (action === 'content') {
@@ -657,101 +686,101 @@ const renderPreview = () => (
       }
 
       switch (element.type) {
-        case 'ul':
-        case 'ol':
-          const ListComponent = element.type === 'ul' ? 'ul' : 'ol';
-          return (
-            <ListComponent key={index} className={`mb-4 pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
-              {element.content.map((item, idx) => (
-                <li key={idx} className="mb-2">
-                  {item.nestedSpans.length > 0 ? (
-                    item.nestedSpans.map((span, spanIdx) => (
-                      <React.Fragment key={spanIdx}>
-                        {span.content || (span.description && <span className="italic text-gray-600">Generated content for: {span.description}</span>)}
-                      </React.Fragment>
-                    ))
-                  ) : (
-                    item.content || (item.description && <span className="italic text-gray-600">Generated content for: {item.description}</span>)
-                  )}
-                </li>
-              ))}
-            </ListComponent>
-          );
-        case 'br':
-          return <hr key={index} className="my-4 border-t border-gray-300" />;
-        case 'h1':
-          return <h1 key={index} className="text-4xl font-bold mb-4">{element.content}</h1>;
-        case 'h2':
-          return <h2 key={index} className="text-3xl font-semibold mb-3">{element.content}</h2>;
-        case 'h3':
-          return <h3 key={index} className="text-2xl font-medium mb-2">{element.content}</h3>;
-        case 'strong':
-          return <strong key={index} className="font-bold">{element.content}</strong>;
-        case 'span':
-          return <span key={index}>{element.content}</span>;
-        default:
-          return <p key={index} className="mb-4">{element.content}</p>;
-      }
-    })}
-  </div>
+  case 'ul':
+  case 'ol':
+    const ListComponent = element.type === 'ul' ? 'ul' : 'ol';
+    return (
+      <ListComponent key={index} className={`mb-4 pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
+        {element.content.map((item, idx) => (
+          <li key={idx} className="mb-2">
+            {item.nestedSpans.length > 0 ? (
+              item.nestedSpans.map((span, spanIdx) => (
+                <React.Fragment key={spanIdx}>
+                  {span.content || (span.description && <span className="italic text-gray-600">Generated content for: {span.description}</span>)}
+                </React.Fragment>
+              ))
+            ) : (
+              item.content || (item.description && <span className="italic text-gray-600">Generated content for: {item.description}</span>)
+            )}
+          </li>
+        ))}
+      </ListComponent>
+    );
+  case 'br':
+    return <hr key={index} className="my-4 border-t border-gray-300" />;
+  case 'h1':
+    return <h1 key={index} className="text-4xl font-bold mb-4" dangerouslySetInnerHTML={{ __html: element.content }} />;
+  case 'h2':
+    return <h2 key={index} className="text-3xl font-semibold mb-3" dangerouslySetInnerHTML={{ __html: element.content }} />;
+  case 'h3':
+    return <h3 key={index} className="text-2xl font-medium mb-2" dangerouslySetInnerHTML={{ __html: element.content }} />;
+  case 'strong':
+    return <strong key={index} className="font-bold" dangerouslySetInnerHTML={{ __html: element.content }} />;
+  case 'span':
+    return <span key={index} dangerouslySetInnerHTML={{ __html: element.content }} />;
+  default:
+    return <p key={index} className="mb-4" dangerouslySetInnerHTML={{ __html: element.content }} />;
+}
+})}
+</div>
 );
 
 return (
-  <div className="font-sans p-8 bg-gray-100 min-h-screen">
-    <div className="max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold text-gray-800 mb-8">JSON Template Builder</h1>
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="flex flex-col md:flex-row gap-8">
-          <AddElementSidebar addElement={addElement} />
-          <div className="flex-1">
-            <div className="bg-white shadow-md rounded-lg p-6 mb-8">
-              <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Template Builder</h2>
-              <Droppable droppableId="elements" type="ELEMENT">
-                {(provided) => (
-                  <div ref={provided.innerRef} {...provided.droppableProps}>
-                    {elements.map((element, index) => (
-                      <Element
-                        key={element.id}
-                        element={element}
-                        index={index}
-                        updateElement={updateElement}
-                        removeElement={removeElement}
-                        modifyListItem={modifyListItem}
-                        insertVariable={insertVariable}
-                        insertBreak={insertBreak}
-                        addNestedSpan={addNestedSpan}
-                        updateNestedSpan={updateNestedSpan}
-                        removeNestedSpan={removeNestedSpan}
-                      />
-                    ))}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            </div>
-            <div className="bg-white shadow-md rounded-lg p-6 mb-8">
-              <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Human-Readable Preview</h2>
-              {renderPreview()}
-            </div>
-            <div className="bg-white shadow-md rounded-lg p-6">
-              <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">JSON Schema</h2>
-              <textarea
-                value={jsonSchema}
-                onChange={(e) => setJsonSchema(e.target.value)}
-                className="w-full h-[300px] p-2 font-mono text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                onClick={updateElementsFromSchema}
-                className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors duration-200"
-              >
-                Update Template
-              </button>
-            </div>
+<div className="font-sans p-8 bg-gray-100 min-h-screen">
+  <div className="max-w-7xl mx-auto">
+    <h1 className="text-3xl font-bold text-gray-800 mb-8">JSON Template Builder</h1>
+    <DragDropContext onDragEnd={handleDragEnd}>
+      <div className="flex flex-col md:flex-row gap-8">
+        <AddElementSidebar addElement={addElement} />
+        <div className="flex-1">
+          <div className="bg-white shadow-md rounded-lg p-6 mb-8">
+            <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Template Builder</h2>
+            <Droppable droppableId="elements" type="ELEMENT">
+              {(provided) => (
+                <div ref={provided.innerRef} {...provided.droppableProps}>
+                  {elements.map((element, index) => (
+                    <Element
+                      key={element.id}
+                      element={element}
+                      index={index}
+                      updateElement={updateElement}
+                      removeElement={removeElement}
+                      modifyListItem={modifyListItem}
+                      insertVariable={insertVariable}
+                      insertBreak={insertBreak}
+                      addNestedSpan={addNestedSpan}
+                      updateNestedSpan={updateNestedSpan}
+                      removeNestedSpan={removeNestedSpan}
+                    />
+                  ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </div>
+          <div className="bg-white shadow-md rounded-lg p-6 mb-8">
+            <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Human-Readable Preview</h2>
+            {renderPreview()}
+          </div>
+          <div className="bg-white shadow-md rounded-lg p-6">
+            <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">JSON Schema</h2>
+            <textarea
+              value={jsonSchema}
+              onChange={(e) => setJsonSchema(e.target.value)}
+              className="w-full h-[300px] p-2 font-mono text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              onClick={updateElementsFromSchema}
+              className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors duration-200"
+            >
+              Update Template
+            </button>
           </div>
         </div>
-      </DragDropContext>
-    </div>
+      </div>
+    </DragDropContext>
   </div>
+</div>
 );
 };
 
