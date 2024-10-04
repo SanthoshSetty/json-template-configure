@@ -1,16 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import * as HeroIcons from '@heroicons/react/solid';
+import { PlusIcon, MinusIcon, TrashIcon, VariableIcon } from '@heroicons/react/solid';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { v4 as uuidv4 } from 'uuid';
-
-const {
-  PlusIcon,
-  MinusIcon,
-  TrashIcon,
-  VariableIcon,
-  BookmarkAltIcon: BoldIcon,
-  CursorClickIcon: ItalicIcon
-} = HeroIcons;
 
 const getElementTypeName = (type) => {
   const typeNames = {
@@ -83,6 +74,11 @@ const FormattedInput = ({ value, onChange, placeholder }) => {
     onChange(newValue);
   };
 
+  const insertBreak = () => {
+    const newValue = `${value}<br>`;
+    onChange(newValue);
+  };
+
   return (
     <div className="relative">
       <textarea
@@ -94,10 +90,16 @@ const FormattedInput = ({ value, onChange, placeholder }) => {
       />
       <div className="flex space-x-2 mb-2">
         <button onClick={() => insertTag('strong')} className="p-1 text-blue-500 hover:text-blue-700">
-          <BoldIcon className="h-5 w-5" />
+          <span className="font-bold">B</span>
         </button>
         <button onClick={() => insertTag('em')} className="p-1 text-blue-500 hover:text-blue-700">
-          <ItalicIcon className="h-5 w-5" />
+          <span className="italic">I</span>
+        </button>
+        <button onClick={insertBreak} className="p-1 text-blue-500 hover:text-blue-700">
+          <VariableIcon className="h-5 w-5" />
+        </button>
+        <button onClick={() => onChange(value + ' {{Group//Variable Name}}')} className="p-1 text-green-500 hover:text-green-700">
+          <VariableIcon className="h-5 w-5" />
         </button>
       </div>
     </div>
@@ -130,9 +132,6 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addN
           <button onClick={() => modifyListItem(elementId, item.id, 'removeContent')} className="p-1 text-red-500 hover:text-red-700">
             <TrashIcon className="h-5 w-5" />
           </button>
-          <button onClick={() => insertVariable(elementId, item.id)} className="p-1 text-green-500 hover:text-green-700">
-            <VariableIcon className="h-5 w-5" />
-          </button>
           <button onClick={() => addNestedSpan(elementId, item.id)} className="p-1 text-purple-500 hover:text-purple-700">
             <PlusIcon className="h-5 w-5" />
           </button>
@@ -159,9 +158,6 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addN
             <div className="flex flex-wrap gap-2 mt-2">
               <button onClick={() => removeNestedSpan(elementId, item.id, span.id)} className="p-1 text-red-500 hover:text-red-700">
                 <TrashIcon className="h-5 w-5" />
-              </button>
-              <button onClick={() => insertVariable(elementId, item.id, span.id)} className="p-1 text-green-500 hover:text-green-700">
-                <VariableIcon className="h-5 w-5" />
               </button>
             </div>
           </div>
@@ -290,13 +286,6 @@ const Element = ({
                 <PlusIcon className="h-5 w-5" />
               </button>
             )}
-            {!['ul', 'ol', 'br'].includes(element.type) && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button onClick={() => insertVariable(element.id)} className="p-1 text-green-500 hover:text-green-700">
-                  <VariableIcon className="h-5 w-5" />
-                </button>
-              </div>
-            )}
           </>
         )}
       </div>
@@ -345,346 +334,314 @@ const JsonTemplateBuilderRevert = () => {
   }, []);
 
   const modifyListItem = useCallback((elementId, itemId, action, value = '') => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === elementId) {
-          let newContent = [...el.content];
-          if (action === 'add') {
-            newContent.push({ id: uuidv4(), content: '', description: '', nestedSpans: [] });
-          } else if (action === 'remove') {
-            newContent = newContent.filter(item => item.id !== itemId);
-          } else if (action === 'removeContent') {
-            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
-          } else if (action === 'content') {
-            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: value } : item));
-          } else if (action === 'description') {
-            newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value } : item));
+  setElements((prev) =>
+    prev.map((el) => {
+      if (el.id === elementId) {
+        let newContent = [...el.content];
+        if (action === 'add') {
+          newContent.push({ id: uuidv4(), content: '', description: '', nestedSpans: [] });
+        } else if (action === 'remove') {
+          newContent = newContent.filter(item => item.id !== itemId);
+        } else if (action === 'removeContent') {
+          newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
+        } else if (action === 'content') {
+          newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: value } : item));
+        } else if (action === 'description') {
+          newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value } : item));
+        }
+        return { ...el, content: newContent };
+      }
+      return el;
+    })
+  );
+}, []);
+
+const addNestedSpan = useCallback((elementId, itemId) => {
+  setElements((prev) =>
+    prev.map((el) => {
+      if (el.id === elementId) {
+        const newContent = el.content.map((item) => {
+          if (item.id === itemId) {
+            return { ...item, nestedSpans: [...item.nestedSpans, { id: uuidv4(), content: '', description: '' }] };
           }
-          return { ...el, content: newContent };
-        }
-        return el;
-      })
-    );
-  }, []);
+          return item;
+        });
+        return { ...el, content: newContent };
+      }
+      return el;
+    })
+  );
+}, []);
 
-  const addNestedSpan = useCallback((elementId, itemId) => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === elementId) {
-          const newContent = el.content.map((item) => {
-            if (item.id === itemId) {
-              return { ...item, nestedSpans: [...item.nestedSpans, { id: uuidv4(), content: '', description: '' }] };
-            }
-            return item;
-          });
-          return { ...el, content: newContent };
-        }
-        return el;
-      })
-    );
-  }, []);
-
-  const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === elementId) {
-          const newContent = el.content.map((item) => {
-            if (item.id === itemId) {
-              const updatedSpans = item.nestedSpans.map((span) => (span.id === spanId ? { ...span, [field]: value } : span));
-              return { ...item, nestedSpans: updatedSpans };
-            }
-            return item;
-          });
-          return { ...el, content: newContent };
-        }
-        return el;
-      })
-    );
-  }, []);
-
-  const removeNestedSpan = useCallback((elementId, itemId, spanId) => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === elementId) {
-          const newContent = el.content.map((item) => {
-            if (item.id === itemId) {
-              return { ...item, nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId) };
-            }
-            return item;
-          });
-          return { ...el, content: newContent };
-        }
-        return el;
-      })
-    );
-  }, []);
-
-  const insertVariable = useCallback((id, itemId = null, spanId = null) => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === id) {
-          if (itemId && spanId) {
-            // Insert into nested span
-            const newContent = el.content.map((item) => {
-              if (item.id === itemId) {
-                const updatedSpans = item.nestedSpans.map((span) =>
-                  span.id === spanId ? { ...span, content: `${span.content} {{Group//Variable Name}}` } : span
-                );
-                return { ...item, nestedSpans: updatedSpans };
-              }
-              return item;
-            });
-            return { ...el, content: newContent };
-          } else if (itemId) {
-            // Insert into list item
-            const newContent = el.content.map((item) =>
-              item.id === itemId ? { ...item, content: `${item.content} {{Group//Variable Name}}` } : item
-            );
-            return { ...el, content: newContent };
-          } else {
-            // Insert into element content
-            return { ...el, content: `${el.content} {{Group//Variable Name}}` };
+const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) => {
+  setElements((prev) =>
+    prev.map((el) => {
+      if (el.id === elementId) {
+        const newContent = el.content.map((item) => {
+          if (item.id === itemId) {
+            const updatedSpans = item.nestedSpans.map((span) => (span.id === spanId ? { ...span, [field]: value } : span));
+            return { ...item, nestedSpans: updatedSpans };
           }
-        }
-        return el;
-      })
-    );
-  }, []);
+          return item;
+        });
+        return { ...el, content: newContent };
+      }
+      return el;
+    })
+  );
+}, []);
 
-  const handleDragEnd = (result) => {
-    const { destination, source, type } = result;
-
-    if (!destination) return;
-
-    // Reorder elements
-    if (type === 'ELEMENT') {
-      const reorderedElements = Array.from(elements);
-      const [movedElement] = reorderedElements.splice(source.index, 1);
-      reorderedElements.splice(destination.index, 0, movedElement);
-      setElements(reorderedElements);
-    }
-
-    // Reorder list items
-    if (type.startsWith('list-')) {
-      const elementId = type.split('-')[1];
-      const reorderedElements = Array.from(elements);
-      const elementIndex = reorderedElements.findIndex((el) => el.id === elementId);
-      if (elementIndex === -1) return;
-      const listItems = Array.from(reorderedElements[elementIndex].content);
-      const [movedItem] = listItems.splice(source.index, 1);
-      listItems.splice(destination.index, 0, movedItem);
-      reorderedElements[elementIndex].content = listItems;
-      setElements(reorderedElements);
-    }
-  };
-
-  const convertToJsonSchema = () => ({
-    schema: {
-      properties: {
-        tag: { enum: ['body'] },
-        children: elements.map((element) => {
-          const baseProps = { tag: { enum: [element.type] } };
-
-          if (element.type === 'br') {
-            return { properties: baseProps };
+const removeNestedSpan = useCallback((elementId, itemId, spanId) => {
+  setElements((prev) =>
+    prev.map((el) => {
+      if (el.id === elementId) {
+        const newContent = el.content.map((item) => {
+          if (item.id === itemId) {
+            return { ...item, nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId) };
           }
+          return item;
+        });
+        return { ...el, content: newContent };
+      }
+      return el;
+    })
+  );
+}, []);
 
-          if (['ul', 'ol'].includes(element.type)) {
-            if (element.isDynamic) {
-              return {
-                description: element.description || '',
-                properties: {
-                  ...baseProps,
-                  children: [
-                    {
-                      type: 'array',
-                      description: element.listItemDescription || '',
-                      items: {
-                        properties: {
-                          tag: { enum: ['li'] },
-                          children: null
-                        }
+const handleDragEnd = (result) => {
+  const { destination, source, type } = result;
+
+  if (!destination) return;
+
+  // Reorder elements
+  if (type === 'ELEMENT') {
+    const reorderedElements = Array.from(elements);
+    const [movedElement] = reorderedElements.splice(source.index, 1);
+    reorderedElements.splice(destination.index, 0, movedElement);
+    setElements(reorderedElements);
+  }
+
+  // Reorder list items
+  if (type.startsWith('list-')) {
+    const elementId = type.split('-')[1];
+    const reorderedElements = Array.from(elements);
+    const elementIndex = reorderedElements.findIndex((el) => el.id === elementId);
+    if (elementIndex === -1) return;
+    const listItems = Array.from(reorderedElements[elementIndex].content);
+    const [movedItem] = listItems.splice(source.index, 1);
+    listItems.splice(destination.index, 0, movedItem);
+    reorderedElements[elementIndex].content = listItems;
+    setElements(reorderedElements);
+  }
+};
+
+const convertToJsonSchema = () => ({
+  schema: {
+    properties: {
+      tag: { enum: ['body'] },
+      children: elements.map((element) => {
+        const baseProps = { tag: { enum: [element.type] } };
+
+        if (element.type === 'br') {
+          return { properties: baseProps };
+        }
+
+        if (['ul', 'ol'].includes(element.type)) {
+          if (element.isDynamic) {
+            return {
+              description: element.description || '',
+              properties: {
+                ...baseProps,
+                children: [
+                  {
+                    type: 'array',
+                    description: element.listItemDescription || '',
+                    items: {
+                      properties: {
+                        tag: { enum: ['li'] },
+                        children: null
                       }
                     }
-                  ]
-                }
-              };
-            } else {
-              const listItems = element.content.map((item) => ({
-                description: item.description || '',
-                properties: {
-                  tag: { enum: ['li'] },
-                  ...(item.content ? { content: { enum: [item.content] } } : {}),
-                  children:
-                    item.nestedSpans.length > 0
-                      ? item.nestedSpans.map((span) => ({
-                          properties: {
-                            tag: { enum: ['span'] },
-                            ...(span.content ? { content: { enum: [span.content] } } : {}),
-                            ...(span.description ? { description: span.description } : {})
-                          }
-                        }))
-                      : null
-                }
-              }));
-              return { description: element.description || '', properties: { ...baseProps, children: listItems } };
-            }
-          }
-
-          const elementProps = {
-            ...baseProps,
-            content: element.hasDescription ? undefined : { enum: [element.content] },
-            children: null
-          };
-          return element.hasDescription
-            ? { description: element.description, properties: elementProps }
-            : { properties: elementProps };
-        })
-      }
-    }
-  });
-
-  const updateElementsFromSchema = () => {
-    try {
-      const parsedSchema = JSON.parse(jsonSchema);
-      const newElements = parsedSchema.schema.properties.children.map((child) => {
-        const type = child.properties.tag.enum[0];
-        
-        if (type === 'br') {
-          return {
-            id: uuidv4(),
-            type,
-            content: '',
-            description: '',
-            isDynamic: false,
-            listItemDescription: '',
-            hasDescription: false
-          };
-        }
-
-        if (['ul', 'ol'].includes(type)) {
-          if (child.properties.children && child.properties.children[0].type === 'array') {
-            // Dynamic List
-            const listItemDescription = child.properties.children[0].description || '';
-            return {
-              id: uuidv4(),
-              type,
-              content: [],
-              description: child.description || '',
-              isDynamic: true,
-              listItemDescription,
-              hasDescription: !!child.description
+                  }
+                ]
+              }
             };
           } else {
-            // Static List
-            const listItems = child.properties.children.map((item) => {
-              const nestedSpans = item.properties.children
-                ? item.properties.children.map((span) => ({
-                    id: uuidv4(),
-                    content: span.properties.content?.enum[0] || '',
-                    description: span.description || ''
-                  }))
-                : [];
-              return {
-                id: uuidv4(),
-                content: item.properties.content?.enum[0] || '',
-                description: item.description || '',
-                nestedSpans
-              };
-            });
-            return {
-              id: uuidv4(),
-              type,
-              content: listItems,
-              description: child.description || '',
-              isDynamic: false,
-              listItemDescription: '',
-              hasDescription: !!child.description
-            };
+            const listItems = element.content.map((item) => ({
+              description: item.description || '',
+              properties: {
+                tag: { enum: ['li'] },
+                ...(item.content ? { content: { enum: [item.content] } } : {}),
+                children:
+                  item.nestedSpans.length > 0
+                    ? item.nestedSpans.map((span) => ({
+                        properties: {
+                          tag: { enum: ['span'] },
+                          ...(span.content ? { content: { enum: [span.content] } } : {}),
+                          ...(span.description ? { description: span.description } : {})
+                        }
+                      }))
+                    : null
+              }
+            }));
+            return { description: element.description || '', properties: { ...baseProps, children: listItems } };
           }
         }
 
-        // Other Element Types
+        const elementProps = {
+          ...baseProps,
+          content: element.hasDescription ? undefined : { enum: [element.content] },
+          children: null
+        };
+        return element.hasDescription
+          ? { description: element.description, properties: elementProps }
+          : { properties: elementProps };
+      })
+    }
+  }
+});
+
+const updateElementsFromSchema = () => {
+  try {
+    const parsedSchema = JSON.parse(jsonSchema);
+    const newElements = parsedSchema.schema.properties.children.map((child) => {
+      const type = child.properties.tag.enum[0];
+      
+      if (type === 'br') {
         return {
           id: uuidv4(),
           type,
-          content: child.properties.content?.enum[0] || '',
-          description: child.description || '',
+          content: '',
+          description: '',
           isDynamic: false,
           listItemDescription: '',
-          hasDescription: !!child.description
+          hasDescription: false
         };
-      });
-      setElements(newElements);
-    } catch (error) {
-      console.error('Error parsing JSON schema:', error);
-      alert('Invalid JSON schema. Please check your input.');
-    }
-  };
+      }
 
-  const renderPreview = () => (
-    <div className="p-5 bg-gray-100 rounded mb-5 text-gray-800">
-      {elements.map((element, index) => {
-        if (element.isDynamic && ['ul', 'ol'].includes(element.type)) {
+      if (['ul', 'ol'].includes(type)) {
+        if (child.properties.children && child.properties.children[0].type === 'array') {
+          // Dynamic List
+          const listItemDescription = child.properties.children[0].description || '';
+          return {
+            id: uuidv4(),
+            type,
+            content: [],
+            description: child.description || '',
+            isDynamic: true,
+            listItemDescription,
+            hasDescription: !!child.description
+          };
+        } else {
+          // Static List
+          const listItems = child.properties.children.map((item) => {
+            const nestedSpans = item.properties.children
+              ? item.properties.children.map((span) => ({
+                  id: uuidv4(),
+                  content: span.properties.content?.enum[0] || '',
+                  description: span.description || ''
+                }))
+              : [];
+            return {
+              id: uuidv4(),
+              content: item.properties.content?.enum[0] || '',
+              description: item.description || '',
+              nestedSpans
+            };
+          });
+          return {
+            id: uuidv4(),
+            type,
+            content: listItems,
+            description: child.description || '',
+            isDynamic: false,
+            listItemDescription: '',
+            hasDescription: !!child.description
+          };
+        }
+      }
+
+      // Other Element Types
+      return {
+        id: uuidv4(),
+        type,
+        content: child.properties.content?.enum[0] || '',
+        description: child.description || '',
+        isDynamic: false,
+        listItemDescription: '',
+        hasDescription: !!child.description
+      };
+    });
+    setElements(newElements);
+  } catch (error) {
+    console.error('Error parsing JSON schema:', error);
+    alert('Invalid JSON schema. Please check your input.');
+  }
+};
+
+const renderPreview = () => (
+  <div className="p-5 bg-gray-100 rounded mb-5 text-gray-800">
+    {elements.map((element, index) => {
+      if (element.isDynamic && ['ul', 'ol'].includes(element.type)) {
+        return (
+          <div key={index} className="mb-4 p-3 bg-yellow-100 rounded">
+            <p className="font-semibold">Dynamic {getElementTypeName(element.type)}:</p>
+            <p className="italic">{element.description}</p>
+            <p className="italic">Items: {element.listItemDescription}</p>
+          </div>
+        );
+      }
+
+      if (element.hasDescription) {
+        return (
+          <div key={index} className="mb-4 p-3 bg-green-100 rounded">
+            <p className="font-semibold">{getElementTypeName(element.type)}:</p>
+            <p className="italic">Generated content for: {element.description}</p>
+          </div>
+        );
+      }
+
+      switch (element.type) {
+        case 'ul':
+        case 'ol':
+          const ListComponent = element.type === 'ul' ? 'ul' : 'ol';
           return (
-            <div key={index} className="mb-4 p-3 bg-yellow-100 rounded">
-              <p className="font-semibold">Dynamic {getElementTypeName(element.type)}:</p>
-              <p className="italic">{element.description}</p>
-              <p className="italic">Items: {element.listItemDescription}</p>
-            </div>
+            <ListComponent key={index} className={`mb-4 pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
+              {element.content.map((item, idx) => (
+                <li key={idx} className="mb-2">
+                  {item.nestedSpans.length > 0 ? (
+                    item.nestedSpans.map((span, spanIdx) => (
+                      <React.Fragment key={spanIdx}>
+                        <span dangerouslySetInnerHTML={{ __html: span.content || (span.description && `<span class="italic text-gray-600">Generated content for: ${span.description}</span>`) }} />
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    <span dangerouslySetInnerHTML={{ __html: item.content || (item.description && `<span class="italic text-gray-600">Generated content for: ${item.description}</span>`) }} />
+                  )}
+                </li>
+              ))}
+            </ListComponent>
           );
-        }
+        case 'br':
+          return <hr key={index} className="my-4 border-t border-gray-300" />;
+        case 'h1':
+          return <h1 key={index} className="text-4xl font-bold mb-4" dangerouslySetInnerHTML={{ __html: element.content }} />;
+        case 'h2':
+          return <h2 key={index} className="text-3xl font-semibold mb-3" dangerouslySetInnerHTML={{ __html: element.content }} />;
+        case 'h3':
+          return <h3 key={index} className="text-2xl font-medium mb-2" dangerouslySetInnerHTML={{ __html: element.content }} />;
+        case 'strong':
+          return <strong key={index} className="font-bold" dangerouslySetInnerHTML={{ __html: element.content }} />;
+        case 'span':
+          return <span key={index} dangerouslySetInnerHTML={{ __html: element.content }} />;
+        default:
+          return <p key={index} className="mb-4" dangerouslySetInnerHTML={{ __html: element.content }} />;
+      }
+    })}
+  </div>
+);
 
-        if (element.hasDescription) {
-          return (
-            <div key={index} className="mb-4 p-3 bg-green-100 rounded">
-              <p className="font-semibold">{getElementTypeName(element.type)}:</p>
-              <p className="italic">Generated content for: {element.description}</p>
-            </div>
-          );
-        }
-
-        switch (element.type) {
-          case 'ul':
-          case 'ol':
-            const ListComponent = element.type === 'ul' ? 'ul' : 'ol';
-            return (
-              <ListComponent key={index} className={`mb-4 pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
-                {element.content.map((item, idx) => (
-                  <li key={idx} className="mb-2">
-                    {item.nestedSpans.length > 0 ? (
-                      item.nestedSpans.map((span, spanIdx) => (
-                        <React.Fragment key={spanIdx}>
-                          <span dangerouslySetInnerHTML={{ __html: span.content || (span.description && `<span class="italic text-gray-600">Generated content for: ${span.description}</span>`) }} />
-                        </React.Fragment>
-                      ))
-                    ) : (
-                      <span dangerouslySetInnerHTML={{ __html: item.content || (item.description && `<span class="italic text-gray-600">Generated content for: ${item.description}</span>`) }} />
-                    )}
-                  </li>
-                ))}
-              </ListComponent>
-            );
-          case 'br':
-            return <hr key={index} className="my-4 border-t border-gray-300" />;
-          case 'h1':
-            return <h1 key={index} className="text-4xl font-bold mb-4" dangerouslySetInnerHTML={{ __html: element.content }} />;
-          case 'h2':
-            return <h2 key={index} className="text-3xl font-semibold mb-3" dangerouslySetInnerHTML={{ __html: element.content }} />;
-          case 'h3':
-            return <h3 key={index} className="text-2xl font-medium mb-2" dangerouslySetInnerHTML={{ __html: element.content }} />;
-          case 'strong':
-            return <strong key={index} className="font-bold" dangerouslySetInnerHTML={{ __html: element.content }} />;
-          case 'span':
-            return <span key={index} dangerouslySetInnerHTML={{ __html: element.content }} />;
-          default:
-            return <p key={index} className="mb-4" dangerouslySetInnerHTML={{ __html: element.content }} />;
-        }
-      })}
-    </div>
-  );
-
-  return (
+return (
   <div className="font-sans p-8 bg-gray-100 min-h-screen">
     <div className="max-w-7xl mx-auto">
       <h1 className="text-3xl font-bold text-gray-800 mb-8">JSON Template Builder</h1>
@@ -705,7 +662,7 @@ const JsonTemplateBuilderRevert = () => {
                         updateElement={updateElement}
                         removeElement={removeElement}
                         modifyListItem={modifyListItem}
-                        insertVariable={insertVariable}
+                        insertVariable={(id) => updateElement(id, { content: `${element.content} {{Group//Variable Name}}` })}
                         addNestedSpan={addNestedSpan}
                         updateNestedSpan={updateNestedSpan}
                         removeNestedSpan={removeNestedSpan}
@@ -740,7 +697,6 @@ const JsonTemplateBuilderRevert = () => {
     </div>
   </div>
 );
-
 };
 
 export default JsonTemplateBuilderRevert;
