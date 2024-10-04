@@ -80,13 +80,13 @@ const FormattedInput = ({ value, onChange, placeholder }) => {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onSelect={handleSelect}
-        className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
         placeholder={placeholder}
       />
-      <div className="absolute top-full left-0 mt-1 space-x-2">
-        <button onClick={() => insertTag('strong')} className="text-blue-500 hover:text-blue-700">Bold</button>
-        <button onClick={() => insertTag('em')} className="text-blue-500 hover:text-blue-700">Italic</button>
-        <button onClick={() => onChange(value + '<br>')} className="text-blue-500 hover:text-blue-700">Line Break</button>
+      <div className="flex space-x-2 mb-2">
+        <button onClick={() => insertTag('strong')} className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600">Bold</button>
+        <button onClick={() => insertTag('em')} className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600">Italic</button>
+        <button onClick={() => onChange(value + '<br>')} className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600">Line Break</button>
       </div>
     </div>
   );
@@ -101,37 +101,37 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, inse
         {...provided.draggableProps}
         {...provided.dragHandleProps}
       >
-        <div className="flex items-center mb-2">
-          <span className="mr-2 text-gray-500">{/* List marker is handled in the preview */}</span>
+        <div className="flex flex-col mb-2">
           <FormattedInput
             value={item.content}
             onChange={(value) => modifyListItem(elementId, item.id, 'content', value)}
             placeholder="List item content"
           />
-          <button
-            onClick={() => modifyListItem(elementId, item.id, 'remove')}
-            className="ml-2 text-red-500 hover:text-red-700 transition-colors duration-200"
-          >
-            <TrashIcon className="h-5 w-5" />
-          </button>
+          <input
+            value={item.description}
+            onChange={(e) => modifyListItem(elementId, item.id, 'description', e.target.value)}
+            className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+            placeholder="Item description"
+          />
         </div>
-        <input
-          value={item.description}
-          onChange={(e) => modifyListItem(elementId, item.id, 'description', e.target.value)}
-          className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
-          placeholder="Item description"
-        />
-        <div className="mt-2 space-x-2">
-          <button onClick={() => modifyListItem(elementId, item.id, 'removeContent')} className="text-red-500 hover:text-red-700 transition-colors duration-200">
+        <div className="flex flex-wrap gap-2 mb-2">
+          <button onClick={() => modifyListItem(elementId, item.id, 'removeContent')} className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600">
             Remove Content
           </button>
-          <button onClick={() => insertVariable(elementId, item.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
-            <VariableIcon className="h-5 w-5 inline mr-1" />
+          <button onClick={() => insertVariable(elementId, item.id)} className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600">
             Insert Variable
           </button>
-          <button onClick={() => insertBreak(elementId, item.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
-            <VariableIcon className="h-5 w-5 inline mr-1" />
+          <button onClick={() => insertBreak(elementId, item.id)} className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600">
             Add Break
+          </button>
+          <button onClick={() => addNestedSpan(elementId, item.id)} className="px-2 py-1 text-xs bg-purple-500 text-white rounded hover:bg-purple-600">
+            Add Nested Span
+          </button>
+          <button
+            onClick={() => modifyListItem(elementId, item.id, 'remove')}
+            className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+          >
+            Remove Item
           </button>
         </div>
         {item.nestedSpans.map((span, spanIdx) => (
@@ -147,24 +147,157 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, inse
               className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
               placeholder="Nested span description"
             />
-            <div className="flex justify-between mt-2">
-              <button onClick={() => removeNestedSpan(elementId, item.id, span.id)} className="text-red-500 hover:text-red-700 transition-colors duration-200">
+            <div className="flex flex-wrap gap-2 mt-2">
+              <button onClick={() => removeNestedSpan(elementId, item.id, span.id)} className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600">
                 Remove Span
               </button>
-              <button onClick={() => insertVariable(elementId, item.id, span.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
-                <VariableIcon className="h-5 w-5 inline mr-1" />
+              <button onClick={() => insertVariable(elementId, item.id, span.id)} className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600">
                 Insert Variable
               </button>
-              <button onClick={() => insertBreak(elementId, item.id, span.id)} className="text-blue-500 hover:text-blue-700 transition-colors duration-200">
-                <VariableIcon className="h-5 w-5 inline mr-1" />
+              <button onClick={() => insertBreak(elementId, item.id, span.id)} className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600">
                 Add Break
               </button>
             </div>
           </div>
         ))}
-        <button onClick={() => addNestedSpan(elementId, item.id)} className="mt-2 text-green-500 hover:text-green-700 transition-colors duration-200">
-          Add Nested Span
-        </button>
+      </div>
+    )}
+  </Draggable>
+);
+
+const Element = ({
+  element,
+  index,
+  updateElement,
+  removeElement,
+  modifyListItem,
+  insertVariable,
+  insertBreak,
+  addNestedSpan,
+  updateNestedSpan,
+  removeNestedSpan
+}) => (
+  <Draggable draggableId={element.id} index={index} key={element.id}>
+    {(provided) => (
+      <div
+        className="mb-6 p-6 border rounded-lg bg-white shadow-sm transition-all duration-200 hover:shadow-md"
+        ref={provided.innerRef}
+        {...provided.draggableProps}
+      >
+        <div className="flex justify-between items-center mb-4" {...provided.dragHandleProps}>
+          <h3 className="text-lg font-semibold text-gray-700">{getElementTypeName(element.type)}</h3>
+          <button onClick={() => removeElement(element.id)} className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600">
+            Remove
+          </button>
+        </div>
+        {element.type === 'br' ? (
+          <p className="text-sm text-gray-500 italic">Line Break (No content)</p>
+        ) : ['ul', 'ol'].includes(element.type) ? (
+          <>
+            <label className="flex items-center mb-4 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={element.isDynamic}
+                onChange={(e) => updateElement(element.id, { isDynamic: e.target.checked })}
+                className="mr-2"
+              />
+              <span>Dynamic List</span>
+            </label>
+            <textarea
+              value={element.description}
+              onChange={(e) => updateElement(element.id, { description: e.target.value })}
+              placeholder="List Description"
+              className="w-full p-2 mb-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {element.isDynamic ? (
+              <textarea
+                value={element.listItemDescription}
+                onChange={(e) => updateElement(element.id, { listItemDescription: e.target.value })}
+                placeholder="Item Description"
+                className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            ) : (
+              <Droppable droppableId={element.id} type={`list-${element.id}`}>
+                {(provided) => (
+                  <div ref={provided.innerRef} {...provided.droppableProps}>
+                    {element.content.map((item, idx) => (
+                      <ListItem
+                        key={item.id}
+                        item={item}
+                        index={idx}
+                        elementId={element.id}
+                        modifyListItem={modifyListItem}
+                        insertVariable={insertVariable}
+                        insertBreak={insertBreak}
+                        addNestedSpan={addNestedSpan}
+                        updateNestedSpan={updateNestedSpan}
+                        removeNestedSpan={removeNestedSpan}
+                      />
+                    ))}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            )}
+            {!element.isDynamic && (
+              <div className="mt-4">
+                <button
+                  onClick={() => modifyListItem(element.id, null, 'add')}
+                  className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600"
+                >
+                  Add Item
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            {!element.hasDescription ? (
+              <FormattedInput
+                value={element.content}
+                onChange={(value) => updateElement(element.id, { content: value })}
+                placeholder={`${getElementTypeName(element.type)} content`}
+              />
+            ) : (
+              <p className="text-sm text-gray-500 italic">Content won't be used since a description is provided.</p>
+            )}
+            {element.hasDescription ? (
+              <>
+                <textarea
+                  value={element.description}
+                  onChange={(e) => updateElement(element.id, { description: e.target.value })}
+                  placeholder="Description/Instructions for AI"
+                  className="w-full p-2 mt-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {!['ul', 'ol'].includes(element.type) && (
+                  <button
+                    onClick={() => updateElement(element.id, { hasDescription: false, description: '' })}
+                    className="mt-2 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    Remove Description
+                  </button>
+                )}
+              </>
+            ) : (
+              <button
+                onClick={() => updateElement(element.id, { hasDescription: true })}
+                className="mt-2 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Add Description
+              </button>
+            )}
+            {!['ul', 'ol', 'br'].includes(element.type) && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button onClick={() => insertVariable(element.id)} className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600">
+                  Insert Variable
+                </button>
+                <button onClick={() => insertBreak(element.id)} className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600">
+                  Add Break
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </div>
     )}
   </Draggable>
