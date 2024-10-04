@@ -57,7 +57,7 @@ const AddElementSidebar = ({ addElement }) => (
   </div>
 );
 
-const FormattedInput = ({ value, onChange, placeholder }) => {
+const FormattedInput = ({ value, onChange, placeholder, onRemove, onAddNestedSpan, onRemoveNestedSpan }) => {
   const [selectionStart, setSelectionStart] = useState(0);
   const [selectionEnd, setSelectionEnd] = useState(0);
 
@@ -96,16 +96,30 @@ const FormattedInput = ({ value, onChange, placeholder }) => {
           <span className="italic">I</span>
         </button>
         <button onClick={insertBreak} className="p-1 text-blue-500 hover:text-blue-700">
-          <VariableIcon className="h-5 w-5" />
+          <span>BR</span>
         </button>
         <button onClick={() => onChange(value + ' {{Group//Variable Name}}')} className="p-1 text-green-500 hover:text-green-700">
           <VariableIcon className="h-5 w-5" />
         </button>
+        {onRemove && (
+          <button onClick={onRemove} className="p-1 text-red-500 hover:text-red-700">
+            <TrashIcon className="h-5 w-5" />
+          </button>
+        )}
+        {onAddNestedSpan && (
+          <button onClick={onAddNestedSpan} className="p-1 text-purple-500 hover:text-purple-700">
+            <PlusIcon className="h-5 w-5" />
+          </button>
+        )}
+        {onRemoveNestedSpan && (
+          <button onClick={onRemoveNestedSpan} className="p-1 text-red-500 hover:text-red-700">
+            <MinusIcon className="h-5 w-5" />
+          </button>
+        )}
       </div>
     </div>
   );
 };
-
 const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addNestedSpan, updateNestedSpan, removeNestedSpan }) => (
   <Draggable draggableId={item.id} index={index} key={item.id}>
     {(provided) => (
@@ -120,6 +134,8 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addN
             value={item.content}
             onChange={(value) => modifyListItem(elementId, item.id, 'content', value)}
             placeholder="List item content"
+            onRemove={() => modifyListItem(elementId, item.id, 'removeContent')}
+            onAddNestedSpan={() => addNestedSpan(elementId, item.id)}
           />
           <input
             value={item.description}
@@ -128,26 +144,13 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addN
             placeholder="Item description"
           />
         </div>
-        <div className="flex flex-wrap gap-2 mb-2">
-          <button onClick={() => modifyListItem(elementId, item.id, 'removeContent')} className="p-1 text-red-500 hover:text-red-700">
-            <TrashIcon className="h-5 w-5" />
-          </button>
-          <button onClick={() => addNestedSpan(elementId, item.id)} className="p-1 text-purple-500 hover:text-purple-700">
-            <PlusIcon className="h-5 w-5" />
-          </button>
-          <button
-            onClick={() => modifyListItem(elementId, item.id, 'remove')}
-            className="p-1 text-red-500 hover:text-red-700"
-          >
-            <MinusIcon className="h-5 w-5" />
-          </button>
-        </div>
         {item.nestedSpans.map((span, spanIdx) => (
           <div key={span.id} className="mt-2 ml-4 p-2 bg-gray-100 rounded">
             <FormattedInput
               value={span.content}
               onChange={(value) => updateNestedSpan(elementId, item.id, span.id, 'content', value)}
               placeholder="Nested span content"
+              onRemoveNestedSpan={() => removeNestedSpan(elementId, item.id, span.id)}
             />
             <input
               value={span.description}
@@ -155,13 +158,14 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addN
               className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
               placeholder="Nested span description"
             />
-            <div className="flex flex-wrap gap-2 mt-2">
-              <button onClick={() => removeNestedSpan(elementId, item.id, span.id)} className="p-1 text-red-500 hover:text-red-700">
-                <TrashIcon className="h-5 w-5" />
-              </button>
-            </div>
           </div>
         ))}
+        <button
+          onClick={() => modifyListItem(elementId, item.id, 'remove')}
+          className="mt-2 p-1 text-red-500 hover:text-red-700"
+        >
+          <TrashIcon className="h-5 w-5" /> Remove Item
+        </button>
       </div>
     )}
   </Draggable>
