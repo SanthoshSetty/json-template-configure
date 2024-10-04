@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { PlusIcon, MinusIcon, TrashIcon, VariableIcon, BoldIcon, ItalicIcon } from '@heroicons/react/solid';
+import { PlusIcon, MinusIcon, TrashIcon, VariableIcon } from '@heroicons/react/24/solid';
+import { BoldIcon, ItalicIcon } from '@heroicons/react/24/solid';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { v4 as uuidv4 } from 'uuid';
 
