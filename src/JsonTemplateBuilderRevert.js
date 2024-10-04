@@ -177,13 +177,9 @@ const Element = ({
   };
 
   const insertLineBreak = () => {
-    const cursorPosition = document.activeElement.selectionStart;
-    const newContent = 
-      element.content.slice(0, cursorPosition) +
-      '<br>' +
-      element.content.slice(cursorPosition);
-    updateElement(element.id, { content: newContent });
-  };
+  const newContent = element.content.trim() + '<br>';
+  updateElement(element.id, { content: newContent });
+};
 
   return (
     <Draggable draggableId={element.id} index={index} key={element.id}>
