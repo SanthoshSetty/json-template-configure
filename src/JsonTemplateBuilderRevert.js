@@ -31,8 +31,8 @@ const ElementTypes = {
 };
 
 const defaultContent = {
-  ul: [{ id: uuidv4(), content: 'List item 1', description: '', nestedSpans: [] }],
-  ol: [{ id: uuidv4(), content: 'List item 1', description: '', nestedSpans: [] }],
+  ul: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
+  ol: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
   br: '', 
   h1: 'Heading 1',
   h2: 'Heading 2',
@@ -120,6 +120,7 @@ const FormattedInput = ({ value, onChange, placeholder, onRemove, onAddNestedSpa
     </div>
   );
 };
+
 const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addNestedSpan, updateNestedSpan, removeNestedSpan }) => (
   <Draggable draggableId={item.id} index={index} key={item.id}>
     {(provided) => (
@@ -138,7 +139,7 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addN
             onAddNestedSpan={() => addNestedSpan(elementId, item.id)}
           />
           <input
-            value={item.description}
+            value={item.description || ''}
             onChange={(e) => modifyListItem(elementId, item.id, 'description', e.target.value)}
             className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
             placeholder="Item description"
@@ -153,7 +154,7 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addN
               onRemoveNestedSpan={() => removeNestedSpan(elementId, item.id, span.id)}
             />
             <input
-              value={span.description}
+              value={span.description || ''}
               onChange={(e) => updateNestedSpan(elementId, item.id, span.id, 'description', e.target.value)}
               className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
               placeholder="Nested span description"
@@ -209,14 +210,14 @@ const Element = ({
               <span>Dynamic List</span>
             </label>
             <textarea
-              value={element.description}
+              value={element.description || ''}
               onChange={(e) => updateElement(element.id, { description: e.target.value })}
               placeholder="List Description"
               className="w-full p-2 mb-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             {element.isDynamic ? (
               <textarea
-                value={element.listItemDescription}
+                value={element.listItemDescription || ''}
                 onChange={(e) => updateElement(element.id, { listItemDescription: e.target.value })}
                 placeholder="Item Description"
                 className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -256,40 +257,17 @@ const Element = ({
           </>
         ) : (
           <>
-            {!element.hasDescription ? (
-              <FormattedInput
-                value={element.content}
-                onChange={(value) => updateElement(element.id, { content: value })}
-                placeholder={`${getElementTypeName(element.type)} content`}
-              />
-            ) : (
-              <p className="text-sm text-gray-500 italic">Content won't be used since a description is provided.</p>
-            )}
-            {element.hasDescription ? (
-              <>
-                <textarea
-                  value={element.description}
-                  onChange={(e) => updateElement(element.id, { description: e.target.value })}
-                  placeholder="Description/Instructions for AI"
-                  className="w-full p-2 mt-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                {!['ul', 'ol'].includes(element.type) && (
-                  <button
-                    onClick={() => updateElement(element.id, { hasDescription: false, description: '' })}
-                    className="mt-2 p-1 text-blue-500 hover:text-blue-700"
-                  >
-                    <MinusIcon className="h-5 w-5" />
-                  </button>
-                )}
-              </>
-            ) : (
-              <button
-                onClick={() => updateElement(element.id, { hasDescription: true })}
-                className="mt-2 p-1 text-blue-500 hover:text-blue-700"
-              >
-                <PlusIcon className="h-5 w-5" />
-              </button>
-            )}
+            <FormattedInput
+              value={element.content}
+              onChange={(value) => updateElement(element.id, { content: value })}
+              placeholder={`${getElementTypeName(element.type)} content`}
+            />
+            <textarea
+              value={element.description || ''}
+              onChange={(e) => updateElement(element.id, { description: e.target.value })}
+              placeholder="Description/Instructions for AI"
+              className="w-full p-2 mt-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </>
         )}
       </div>
@@ -312,9 +290,9 @@ const JsonTemplateBuilderRevert = () => {
         id: uuidv4(),
         type,
         content: defaultContent[type] || 'New element',
-        description: '',
+        description: null,
         isDynamic: false,
-        listItemDescription: '',
+        listItemDescription: null,
         hasDescription: false
       }
     ]);
@@ -329,7 +307,10 @@ const JsonTemplateBuilderRevert = () => {
       prev.map((el) => {
         if (el.id === id) {
           const updatedElement = { ...el, ...updates };
-          if ('description' in updates && updates.description.trim() === '') updatedElement.hasDescription = false;
+          if ('description' in updates) {
+            updatedElement.description = updates.description.trim() === '' ? null : updates.description;
+            updatedElement.hasDescription = updatedElement.description !== null;
+          }
           return updatedElement;
         }
         return el;
@@ -337,13 +318,13 @@ const JsonTemplateBuilderRevert = () => {
     );
   }, []);
 
-  const modifyListItem = useCallback((elementId, itemId, action, value = '') => {
+const modifyListItem = useCallback((elementId, itemId, action, value = '') => {
   setElements((prev) =>
     prev.map((el) => {
       if (el.id === elementId) {
         let newContent = [...el.content];
         if (action === 'add') {
-          newContent.push({ id: uuidv4(), content: '', description: '', nestedSpans: [] });
+          newContent.push({ id: uuidv4(), content: '', description: null, nestedSpans: [] });
         } else if (action === 'remove') {
           newContent = newContent.filter(item => item.id !== itemId);
         } else if (action === 'removeContent') {
@@ -351,7 +332,7 @@ const JsonTemplateBuilderRevert = () => {
         } else if (action === 'content') {
           newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: value } : item));
         } else if (action === 'description') {
-          newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value } : item));
+          newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value.trim() === '' ? null : value } : item));
         }
         return { ...el, content: newContent };
       }
@@ -360,13 +341,13 @@ const JsonTemplateBuilderRevert = () => {
   );
 }, []);
 
-const addNestedSpan = useCallback((elementId, itemId) => {
+  const addNestedSpan = useCallback((elementId, itemId) => {
   setElements((prev) =>
     prev.map((el) => {
       if (el.id === elementId) {
         const newContent = el.content.map((item) => {
           if (item.id === itemId) {
-            return { ...item, nestedSpans: [...item.nestedSpans, { id: uuidv4(), content: '', description: '' }] };
+            return { ...item, nestedSpans: [...item.nestedSpans, { id: uuidv4(), content: '', description: null }] };
           }
           return item;
         });
@@ -383,7 +364,15 @@ const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) =
       if (el.id === elementId) {
         const newContent = el.content.map((item) => {
           if (item.id === itemId) {
-            const updatedSpans = item.nestedSpans.map((span) => (span.id === spanId ? { ...span, [field]: value } : span));
+            const updatedSpans = item.nestedSpans.map((span) => {
+              if (span.id === spanId) {
+                if (field === 'description') {
+                  return { ...span, [field]: value.trim() === '' ? null : value };
+                }
+                return { ...span, [field]: value };
+              }
+              return span;
+            });
             return { ...item, nestedSpans: updatedSpans };
           }
           return item;
@@ -447,19 +436,19 @@ const convertToJsonSchema = () => ({
         const baseProps = { tag: { enum: [element.type] } };
 
         if (element.type === 'br') {
-          return { properties: baseProps };
+          return { properties: baseProps, description: element.description };
         }
 
         if (['ul', 'ol'].includes(element.type)) {
           if (element.isDynamic) {
             return {
-              description: element.description || '',
+              description: element.description,
               properties: {
                 ...baseProps,
                 children: [
                   {
                     type: 'array',
-                    description: element.listItemDescription || '',
+                    description: element.listItemDescription,
                     items: {
                       properties: {
                         tag: { enum: ['li'] },
@@ -472,7 +461,7 @@ const convertToJsonSchema = () => ({
             };
           } else {
             const listItems = element.content.map((item) => ({
-              description: item.description || '',
+              description: item.description,
               properties: {
                 tag: { enum: ['li'] },
                 ...(item.content ? { content: { enum: [item.content] } } : {}),
@@ -488,7 +477,7 @@ const convertToJsonSchema = () => ({
                     : null
               }
             }));
-            return { description: element.description || '', properties: { ...baseProps, children: listItems } };
+            return { description: element.description, properties: { ...baseProps, children: listItems } };
           }
         }
 
@@ -497,9 +486,7 @@ const convertToJsonSchema = () => ({
           content: element.hasDescription ? undefined : { enum: [element.content] },
           children: null
         };
-        return element.hasDescription
-          ? { description: element.description, properties: elementProps }
-          : { properties: elementProps };
+        return { description: element.description, properties: elementProps };
       })
     }
   }
@@ -516,22 +503,22 @@ const updateElementsFromSchema = () => {
           id: uuidv4(),
           type,
           content: '',
-          description: '',
+          description: child.description || null,
           isDynamic: false,
-          listItemDescription: '',
-          hasDescription: false
+          listItemDescription: null,
+          hasDescription: !!child.description
         };
       }
 
       if (['ul', 'ol'].includes(type)) {
         if (child.properties.children && child.properties.children[0].type === 'array') {
           // Dynamic List
-          const listItemDescription = child.properties.children[0].description || '';
+          const listItemDescription = child.properties.children[0].description || null;
           return {
             id: uuidv4(),
             type,
             content: [],
-            description: child.description || '',
+            description: child.description || null,
             isDynamic: true,
             listItemDescription,
             hasDescription: !!child.description
@@ -543,13 +530,13 @@ const updateElementsFromSchema = () => {
               ? item.properties.children.map((span) => ({
                   id: uuidv4(),
                   content: span.properties.content?.enum[0] || '',
-                  description: span.description || ''
+                  description: span.description || null
                 }))
               : [];
             return {
               id: uuidv4(),
               content: item.properties.content?.enum[0] || '',
-              description: item.description || '',
+              description: item.description || null,
               nestedSpans
             };
           });
@@ -557,9 +544,9 @@ const updateElementsFromSchema = () => {
             id: uuidv4(),
             type,
             content: listItems,
-            description: child.description || '',
+            description: child.description || null,
             isDynamic: false,
-            listItemDescription: '',
+            listItemDescription: null,
             hasDescription: !!child.description
           };
         }
@@ -570,9 +557,9 @@ const updateElementsFromSchema = () => {
         id: uuidv4(),
         type,
         content: child.properties.content?.enum[0] || '',
-        description: child.description || '',
+        description: child.description || null,
         isDynamic: false,
-        listItemDescription: '',
+        listItemDescription: null,
         hasDescription: !!child.description
       };
     });
