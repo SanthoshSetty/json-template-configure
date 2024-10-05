@@ -430,26 +430,32 @@ const handleDragEnd = (result) => {
 
 const convertToJsonSchema = () => ({
   schema: {
+    description: null,
     properties: {
       tag: { enum: ['body'] },
       children: elements.map((element) => {
         const baseProps = { tag: { enum: [element.type] } };
+        const baseSchema = {
+          description: element.description || null,
+          properties: { ...baseProps }
+        };
 
         if (element.type === 'br') {
-          return { properties: baseProps, description: element.description };
+          return baseSchema;
         }
 
         if (['ul', 'ol'].includes(element.type)) {
           if (element.isDynamic) {
             return {
-              description: element.description,
+              ...baseSchema,
               properties: {
                 ...baseProps,
                 children: [
                   {
                     type: 'array',
-                    description: element.listItemDescription,
+                    description: element.listItemDescription || null,
                     items: {
+                      description: null,
                       properties: {
                         tag: { enum: ['li'] },
                         children: null
@@ -461,23 +467,23 @@ const convertToJsonSchema = () => ({
             };
           } else {
             const listItems = element.content.map((item) => ({
-              description: item.description,
+              description: item.description || null,
               properties: {
                 tag: { enum: ['li'] },
                 ...(item.content ? { content: { enum: [item.content] } } : {}),
                 children:
                   item.nestedSpans.length > 0
                     ? item.nestedSpans.map((span) => ({
+                        description: span.description || null,
                         properties: {
                           tag: { enum: ['span'] },
-                          ...(span.content ? { content: { enum: [span.content] } } : {}),
-                          ...(span.description ? { description: span.description } : {})
+                          ...(span.content ? { content: { enum: [span.content] } } : {})
                         }
                       }))
                     : null
               }
             }));
-            return { description: element.description, properties: { ...baseProps, children: listItems } };
+            return { ...baseSchema, properties: { ...baseProps, children: listItems } };
           }
         }
 
@@ -486,12 +492,11 @@ const convertToJsonSchema = () => ({
           content: element.hasDescription ? undefined : { enum: [element.content] },
           children: null
         };
-        return { description: element.description, properties: elementProps };
+        return { ...baseSchema, properties: elementProps };
       })
     }
   }
 });
-
 const updateElementsFromSchema = () => {
   try {
     const parsedSchema = JSON.parse(jsonSchema);
