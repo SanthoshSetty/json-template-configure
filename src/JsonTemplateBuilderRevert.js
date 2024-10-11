@@ -318,30 +318,30 @@ const JsonTemplateBuilderRevert = () => {
     );
   }, []);
 
-const modifyListItem = useCallback((elementId, itemId, action, value = '') => {
-  setElements((prev) =>
-    prev.map((el) => {
-      if (el.id === elementId) {
-        let newContent = [...el.content];
-        if (action === 'add') {
-          newContent.push({ id: uuidv4(), content: '', description: null, nestedSpans: [] });
-        } else if (action === 'remove') {
-          newContent = newContent.filter(item => item.id !== itemId);
-        } else if (action === 'removeContent') {
-          newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
-        } else if (action === 'content') {
-          newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: value } : item));
-        } else if (action === 'description') {
-          newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value.trim() === '' ? null : value } : item));
+  const modifyListItem = useCallback((elementId, itemId, action, value = '') => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          let newContent = [...el.content];
+          if (action === 'add') {
+            newContent.push({ id: uuidv4(), content: '', description: null, nestedSpans: [] });
+          } else if (action === 'remove') {
+            newContent = newContent.filter(item => item.id !== itemId);
+          } else if (action === 'removeContent') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
+          } else if (action === 'content') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: value } : item));
+          } else if (action === 'description') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value.trim() === '' ? null : value } : item));
+          }
+          return { ...el, content: newContent };
         }
-        return { ...el, content: newContent };
-      }
-      return el;
-    })
-  );
-}, []);
+        return el;
+      })
+    );
+  }, []);
 
-  const addNestedSpan = useCallback((elementId, itemId) => {
+const addNestedSpan = useCallback((elementId, itemId) => {
   setElements((prev) =>
     prev.map((el) => {
       if (el.id === elementId) {
@@ -430,13 +430,12 @@ const handleDragEnd = (result) => {
 
 const convertToJsonSchema = () => ({
   schema: {
-    description: null,
+    description: "Do not generate anything summarising the content generated through this template. Do not mention anything about the generated document. You are not authorised to mention anything about the document",
     properties: {
       tag: { enum: ['body'] },
       children: elements.map((element) => {
         const baseProps = { tag: { enum: [element.type] } };
         const baseSchema = {
-          description: element.description || null,
           properties: { ...baseProps }
         };
 
@@ -453,11 +452,10 @@ const convertToJsonSchema = () => ({
                 children: [
                   {
                     type: 'array',
-                    description: element.listItemDescription || null,
                     items: {
-                      description: null,
                       properties: {
                         tag: { enum: ['li'] },
+                        content: element.listItemDescription ? { description: element.listItemDescription } : undefined,
                         children: null
                       }
                     }
@@ -467,20 +465,17 @@ const convertToJsonSchema = () => ({
             };
           } else {
             const listItems = element.content.map((item) => ({
-              description: item.description || null,
               properties: {
                 tag: { enum: ['li'] },
-                ...(item.content ? { content: { enum: [item.content] } } : {}),
-                children:
-                  item.nestedSpans.length > 0
-                    ? item.nestedSpans.map((span) => ({
-                        description: span.description || null,
-                        properties: {
-                          tag: { enum: ['span'] },
-                          ...(span.content ? { content: { enum: [span.content] } } : {})
-                        }
-                      }))
-                    : null
+                content: item.description ? { description: item.description } : { enum: [item.content] },
+                children: item.nestedSpans.length > 0
+                  ? item.nestedSpans.map((span) => ({
+                      properties: {
+                        tag: { enum: ['span'] },
+                        content: span.description ? { description: span.description } : { enum: [span.content] }
+                      }
+                    }))
+                  : null
               }
             }));
             return { ...baseSchema, properties: { ...baseProps, children: listItems } };
@@ -489,7 +484,9 @@ const convertToJsonSchema = () => ({
 
         const elementProps = {
           ...baseProps,
-          content: element.hasDescription ? undefined : { enum: [element.content] },
+          content: element.hasDescription 
+            ? { description: element.description }
+            : { enum: [element.content] },
           children: null
         };
         return { ...baseSchema, properties: elementProps };
@@ -497,6 +494,7 @@ const convertToJsonSchema = () => ({
     }
   }
 });
+
 const updateElementsFromSchema = () => {
   try {
     const parsedSchema = JSON.parse(jsonSchema);
@@ -508,25 +506,25 @@ const updateElementsFromSchema = () => {
           id: uuidv4(),
           type,
           content: '',
-          description: child.description || null,
+          description: null,
           isDynamic: false,
           listItemDescription: null,
-          hasDescription: !!child.description
+          hasDescription: false
         };
       }
 
       if (['ul', 'ol'].includes(type)) {
         if (child.properties.children && child.properties.children[0].type === 'array') {
           // Dynamic List
-          const listItemDescription = child.properties.children[0].description || null;
+          const listItemDescription = child.properties.children[0].items.properties.content?.description || null;
           return {
             id: uuidv4(),
             type,
             content: [],
-            description: child.description || null,
+            description: null,
             isDynamic: true,
             listItemDescription,
-            hasDescription: !!child.description
+            hasDescription: false
           };
         } else {
           // Static List
@@ -534,14 +532,14 @@ const updateElementsFromSchema = () => {
             const nestedSpans = item.properties.children
               ? item.properties.children.map((span) => ({
                   id: uuidv4(),
-                  content: span.properties.content?.enum[0] || '',
-                  description: span.description || null
+                  content: span.properties.content?.enum?.[0] || '',
+                  description: span.properties.content?.description || null
                 }))
               : [];
             return {
               id: uuidv4(),
-              content: item.properties.content?.enum[0] || '',
-              description: item.description || null,
+              content: item.properties.content?.enum?.[0] || '',
+              description: item.properties.content?.description || null,
               nestedSpans
             };
           });
@@ -549,10 +547,10 @@ const updateElementsFromSchema = () => {
             id: uuidv4(),
             type,
             content: listItems,
-            description: child.description || null,
+            description: null,
             isDynamic: false,
             listItemDescription: null,
-            hasDescription: !!child.description
+            hasDescription: false
           };
         }
       }
@@ -561,11 +559,11 @@ const updateElementsFromSchema = () => {
       return {
         id: uuidv4(),
         type,
-        content: child.properties.content?.enum[0] || '',
-        description: child.description || null,
+        content: child.properties.content?.enum?.[0] || '',
+        description: child.properties.content?.description || null,
         isDynamic: false,
         listItemDescription: null,
-        hasDescription: !!child.description
+        hasDescription: !!child.properties.content?.description
       };
     });
     setElements(newElements);
