@@ -30,7 +30,7 @@ const ElementTypes = {
   BREAK: 'br'
 };
 
-const defaultListDescription = "Generate ONLY the list items as specified. For unordered lists, use bullet points. For ordered lists, use sequential numbers. Do not add any introductory text or concluding remarks. Each item should be concise and directly related to the topic at hand. Do not explain or elaborate on the list structure itself";
+const defaultListDescription = "Generate ONLY the list items as specified. For unordered lists, use bullet points. For ordered lists, use sequential numbers. Do not add any introductory text or concluding remarks. Each item should be concise and directly related to the topic at hand. Do not explain or elaborate on the list structure itself.";
 
 const defaultContent = {
   ul: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
@@ -199,16 +199,6 @@ const Element = ({
           </button>
         </div>
         {['ul', 'ol'].includes(element.type) && (
-          <textarea
-            value={element.description || defaultListDescription}
-            onChange={(e) => updateElement(element.id, { description: e.target.value })}
-            className="w-full p-2 mb-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="List Description"
-          />
-        )}
-        {element.type === 'br' ? (
-          <p className="text-sm text-gray-500 italic">Line Break (No content)</p>
-        ) : ['ul', 'ol'].includes(element.type) ? (
           <>
             <label className="flex items-center mb-4 text-sm text-gray-600">
               <input
@@ -219,10 +209,23 @@ const Element = ({
               />
               <span>Dynamic List</span>
             </label>
+            {!element.isDynamic && (
+              <textarea
+                value={element.description || defaultListDescription}
+                onChange={(e) => updateElement(element.id, { description: e.target.value })}
+                className="w-full p-2 mb-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="List Description"
+              />
+            )}
             {element.isDynamic ? (
               <textarea
                 value={element.listItemDescription || ''}
-                onChange={(e) => updateElement(element.id, { listItemDescription: e.target.value })}
+                onChange={(e) => {
+                  updateElement(element.id, { 
+                    listItemDescription: e.target.value,
+                    description: e.target.value // Copy item description to list description
+                  })
+                }}
                 placeholder="Item Description"
                 className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -259,7 +262,10 @@ const Element = ({
               </div>
             )}
           </>
-        ) : (
+        )}
+        {element.type === 'br' ? (
+          <p className="text-sm text-gray-500 italic">Line Break (No content)</p>
+        ) : !['ul', 'ol'].includes(element.type) && (
           <>
             <FormattedInput
               value={element.content}
@@ -434,13 +440,12 @@ const handleDragEnd = (result) => {
 
 const convertToJsonSchema = () => ({
   schema: {
-    description: "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements. Avoid generating any introductory text, section titles, or descriptive elements unless explicitly requested. Focus solely on the required data in the format provided, and ensure no content is generated outside the template's structural elements",
+    description: "Do not generate anything summarising the content generated through this template. Do not mention anything about the generated document. You are not authorised to mention anything about the document",
     properties: {
       tag: { enum: ['body'] },
       children: elements.map((element) => {
         const baseProps = { tag: { enum: [element.type] } };
         const baseSchema = {
-          ...(element.description ? { description: element.description } : {}),
           properties: { ...baseProps }
         };
 
@@ -450,19 +455,23 @@ const convertToJsonSchema = () => ({
 
         if (['ul', 'ol'].includes(element.type)) {
           if (element.isDynamic) {
+            baseSchema.description = element.listItemDescription; // Use item description as list description
             baseSchema.properties.children = [
               {
                 type: 'array',
                 items: {
                   properties: {
                     tag: { enum: ['li'] },
-                    content: element.listItemDescription ? { description: element.listItemDescription } : undefined,
+                    content: { description: element.listItemDescription },
                     children: null
                   }
                 }
               }
             ];
           } else {
+            if (element.description) {
+              baseSchema.description = element.description;
+            }
             baseSchema.properties.children = element.content.map((item) => ({
               properties: {
                 tag: { enum: ['li'] },
@@ -485,6 +494,7 @@ const convertToJsonSchema = () => ({
           return baseSchema;
         }
 
+        // For other elements
         const elementProps = {
           ...baseProps,
           content: element.content.trim() !== ''
@@ -580,7 +590,9 @@ const renderPreview = () => (
       if (['ul', 'ol'].includes(element.type)) {
         return (
           <div key={index} className="mb-4">
-            <p className="italic text-gray-600 mb-2">List description: {element.description || defaultListDescription}</p>
+            {!element.isDynamic && element.description && (
+              <p className="italic text-gray-600 mb-2">List description: {element.description}</p>
+            )}
             {element.isDynamic ? (
               <div className="p-3 bg-yellow-100 rounded">
                 <p className="font-semibold">Dynamic {getElementTypeName(element.type)}:</p>
