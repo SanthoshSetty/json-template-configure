@@ -430,13 +430,12 @@ const handleDragEnd = (result) => {
 
 const convertToJsonSchema = () => ({
   schema: {
-    description: "Ensure that the content produced strictly follows the given template, providing detailed and specific information without any summarization or commentary on the generated content. All required fields must be thoroughly completed, using the appropriate structure as specified in the template. You are not authorized to mention or reference the document, nor to provide any summary, commentary, or concluding remarks. The content should be presented clearly and concisely, maintaining a formal and neutral tone, with a focus solely on the required data and details",
+    description: "Do not generate anything summarising the content generated through this template. Do not mention anything about the generated document. You are not authorised to mention anything about the document",
     properties: {
       tag: { enum: ['body'] },
       children: elements.map((element) => {
         const baseProps = { tag: { enum: [element.type] } };
         const baseSchema = {
-          ...(element.description ? { description: element.description } : {}),
           properties: { ...baseProps }
         };
 
@@ -445,6 +444,11 @@ const convertToJsonSchema = () => ({
         }
 
         if (['ul', 'ol'].includes(element.type)) {
+          // For lists, put the description above properties
+          if (element.description) {
+            baseSchema.description = element.description;
+          }
+
           if (element.isDynamic) {
             return {
               ...baseSchema,
@@ -453,10 +457,10 @@ const convertToJsonSchema = () => ({
                 children: [
                   {
                     type: 'array',
-                    ...(element.listItemDescription ? { description: element.listItemDescription } : {}),
                     items: {
                       properties: {
                         tag: { enum: ['li'] },
+                        content: element.listItemDescription ? { description: element.listItemDescription } : undefined,
                         children: null
                       }
                     }
@@ -466,16 +470,18 @@ const convertToJsonSchema = () => ({
             };
           } else {
             const listItems = element.content.map((item) => ({
-              ...(item.description ? { description: item.description } : {}),
               properties: {
                 tag: { enum: ['li'] },
-                content: { enum: [item.content] },
+                content: item.content.trim() !== '' 
+                  ? { enum: [item.content] }
+                  : (item.description ? { description: item.description } : undefined),
                 children: item.nestedSpans.length > 0
                   ? item.nestedSpans.map((span) => ({
-                      ...(span.description ? { description: span.description } : {}),
                       properties: {
                         tag: { enum: ['span'] },
-                        content: { enum: [span.content] }
+                        content: span.content.trim() !== ''
+                          ? { enum: [span.content] }
+                          : (span.description ? { description: span.description } : undefined)
                       }
                     }))
                   : null
@@ -485,11 +491,12 @@ const convertToJsonSchema = () => ({
           }
         }
 
+        // For other elements
         const elementProps = {
           ...baseProps,
-          content: element.hasDescription 
-            ? { description: element.description }
-            : { enum: [element.content] },
+          content: element.content.trim() !== ''
+            ? { enum: [element.content] }
+            : (element.description ? { description: element.description } : undefined),
           children: null
         };
         return { ...baseSchema, properties: elementProps };
