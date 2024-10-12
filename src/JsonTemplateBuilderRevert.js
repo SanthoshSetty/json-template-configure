@@ -30,6 +30,8 @@ const ElementTypes = {
   BREAK: 'br'
 };
 
+const defaultListDescription = "Generate ONLY the list items as specified. For unordered lists, use bullet points. For ordered lists, use sequential numbers. Do not add any introductory text or concluding remarks. Each item should be concise and directly related to the topic at hand. Do not explain or elaborate on the list structure itself.";
+
 const defaultContent = {
   ul: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
   ol: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
@@ -196,6 +198,14 @@ const Element = ({
             <TrashIcon className="h-5 w-5" />
           </button>
         </div>
+        {['ul', 'ol'].includes(element.type) && (
+          <textarea
+            value={element.description || defaultListDescription}
+            onChange={(e) => updateElement(element.id, { description: e.target.value })}
+            className="w-full p-2 mb-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="List Description"
+          />
+        )}
         {element.type === 'br' ? (
           <p className="text-sm text-gray-500 italic">Line Break (No content)</p>
         ) : ['ul', 'ol'].includes(element.type) ? (
@@ -209,12 +219,6 @@ const Element = ({
               />
               <span>Dynamic List</span>
             </label>
-            <textarea
-              value={element.description || ''}
-              onChange={(e) => updateElement(element.id, { description: e.target.value })}
-              placeholder="List Description"
-              className="w-full p-2 mb-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
             {element.isDynamic ? (
               <textarea
                 value={element.listItemDescription || ''}
@@ -290,10 +294,10 @@ const JsonTemplateBuilderRevert = () => {
         id: uuidv4(),
         type,
         content: defaultContent[type] || 'New element',
-        description: null,
+        description: ['ul', 'ol'].includes(type) ? defaultListDescription : null,
         isDynamic: false,
         listItemDescription: null,
-        hasDescription: false
+        hasDescription: ['ul', 'ol'].includes(type)
       }
     ]);
   }, []);
@@ -430,24 +434,23 @@ const handleDragEnd = (result) => {
 
 const convertToJsonSchema = () => ({
   schema: {
-    description: "Ensure that the content produced strictly follows the given template, providing detailed and specific information without any summarization or commentary on the generated content. All required fields must be thoroughly completed, using the appropriate structure as specified in the template. You are not authorized to mention or reference the document, nor to provide any summary, commentary, or concluding remarks. The content should be presented clearly and concisely, maintaining a formal and neutral tone, with a focus solely on the required data and details",
+    description: "Do not generate anything summarising the content generated through this template. Do not mention anything about the generated document. You are not authorised to mention anything about the document",
     properties: {
       tag: { enum: ['body'] },
       children: elements.map((element) => {
         const baseProps = { tag: { enum: [element.type] } };
+        const baseSchema = {
+          ...(element.description ? { description: element.description } : {}),
+          properties: { ...baseProps }
+        };
 
         if (element.type === 'br') {
-          return { properties: baseProps };
+          return baseSchema;
         }
 
         if (['ul', 'ol'].includes(element.type)) {
-          // For ul and ol, put the description above properties
-          const listSchema = element.description
-            ? { description: element.description, properties: baseProps }
-            : { properties: baseProps };
-
           if (element.isDynamic) {
-            listSchema.properties.children = [
+            baseSchema.properties.children = [
               {
                 type: 'array',
                 items: {
@@ -460,7 +463,7 @@ const convertToJsonSchema = () => ({
               }
             ];
           } else {
-            listSchema.properties.children = element.content.map((item) => ({
+            baseSchema.properties.children = element.content.map((item) => ({
               properties: {
                 tag: { enum: ['li'] },
                 content: item.content.trim() !== '' 
@@ -479,20 +482,17 @@ const convertToJsonSchema = () => ({
               }
             }));
           }
-
-          return listSchema;
+          return baseSchema;
         }
 
-        // For other elements
-        return {
-          properties: {
-            ...baseProps,
-            content: element.content.trim() !== ''
-              ? { enum: [element.content] }
-              : (element.description ? { description: element.description } : undefined),
-            children: null
-          }
+        const elementProps = {
+          ...baseProps,
+          content: element.content.trim() !== ''
+            ? { enum: [element.content] }
+            : (element.description ? { description: element.description } : undefined),
+          children: null
         };
+        return { ...baseSchema, properties: elementProps };
       })
     }
   }
@@ -509,32 +509,29 @@ const updateElementsFromSchema = () => {
           id: uuidv4(),
           type,
           content: '',
-          description: null,
+          description: child.description || null,
           isDynamic: false,
           listItemDescription: null,
-          hasDescription: false
+          hasDescription: !!child.description
         };
       }
 
       if (['ul', 'ol'].includes(type)) {
-        const description = child.description || null;
+        const description = child.description || defaultListDescription;
         if (child.properties.children && Array.isArray(child.properties.children)) {
           // Static List
-          const listItems = child.properties.children.map((item) => {
-            const nestedSpans = item.properties.children
+          const listItems = child.properties.children.map((item) => ({
+            id: uuidv4(),
+            content: item.properties.content?.enum?.[0] || '',
+            description: item.properties.content?.description || null,
+            nestedSpans: item.properties.children
               ? item.properties.children.map((span) => ({
                   id: uuidv4(),
                   content: span.properties.content?.enum?.[0] || '',
                   description: span.properties.content?.description || null
                 }))
-              : [];
-            return {
-              id: uuidv4(),
-              content: item.properties.content?.enum?.[0] || '',
-              description: item.properties.content?.description || null,
-              nestedSpans
-            };
-          });
+              : []
+          }));
           return {
             id: uuidv4(),
             type,
@@ -542,7 +539,7 @@ const updateElementsFromSchema = () => {
             description,
             isDynamic: false,
             listItemDescription: null,
-            hasDescription: !!description
+            hasDescription: true
           };
         } else if (child.properties.children && child.properties.children[0].type === 'array') {
           // Dynamic List
@@ -554,7 +551,7 @@ const updateElementsFromSchema = () => {
             description,
             isDynamic: true,
             listItemDescription,
-            hasDescription: !!description
+            hasDescription: true
           };
         }
       }
@@ -564,10 +561,10 @@ const updateElementsFromSchema = () => {
         id: uuidv4(),
         type,
         content: child.properties.content?.enum?.[0] || '',
-        description: child.properties.content?.description || null,
+        description: child.description || child.properties.content?.description || null,
         isDynamic: false,
         listItemDescription: null,
-        hasDescription: !!child.properties.content?.description
+        hasDescription: !!(child.description || child.properties.content?.description)
       };
     });
     setElements(newElements);
@@ -583,9 +580,7 @@ const renderPreview = () => (
       if (['ul', 'ol'].includes(element.type)) {
         return (
           <div key={index} className="mb-4">
-            {element.description && (
-              <p className="italic text-gray-600 mb-2">List description: {element.description}</p>
-            )}
+            <p className="italic text-gray-600 mb-2">List description: {element.description || defaultListDescription}</p>
             {element.isDynamic ? (
               <div className="p-3 bg-yellow-100 rounded">
                 <p className="font-semibold">Dynamic {getElementTypeName(element.type)}:</p>
@@ -711,6 +706,7 @@ return (
     </div>
   </div>
 );
-}; 
+
+};
 
 export default JsonTemplateBuilderRevert;
