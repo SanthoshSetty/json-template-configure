@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+cimport React, { useState, useCallback, useEffect } from 'react';
 import { PlusIcon, MinusIcon, TrashIcon, VariableIcon } from '@heroicons/react/solid';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { v4 as uuidv4 } from 'uuid';
@@ -222,7 +222,10 @@ const Element = ({
             {element.isDynamic ? (
               <textarea
                 value={element.listItemDescription || ''}
-                onChange={(e) => updateElement(element.id, { listItemDescription: e.target.value })}
+                onChange={(e) => updateElement(element.id, { 
+                  listItemDescription: e.target.value,
+                  description: e.target.value // Copy to List Description
+                })}
                 placeholder="Item Description"
                 className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -314,6 +317,9 @@ const JsonTemplateBuilderRevert = () => {
           if ('description' in updates) {
             updatedElement.description = updates.description.trim() === '' ? null : updates.description;
             updatedElement.hasDescription = updatedElement.description !== null;
+          }
+          if (updatedElement.isDynamic && 'listItemDescription' in updates) {
+            updatedElement.description = updates.listItemDescription;
           }
           return updatedElement;
         }
@@ -705,8 +711,8 @@ return (
       </DragDropContext>
     </div>
   </div>
-);
 
+);
 };
 
 export default JsonTemplateBuilderRevert;
