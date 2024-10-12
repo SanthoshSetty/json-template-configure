@@ -430,7 +430,7 @@ const handleDragEnd = (result) => {
 
 const convertToJsonSchema = () => ({
   schema: {
-    description: "Do not generate anything summarising the content generated through this template. Do not mention anything about the generated document. You are not authorised to mention anything about the document",
+    description: "Ensure that the content produced strictly follows the given template, providing detailed and specific information without any summarization or commentary on the generated content. All required fields must be thoroughly completed, using the appropriate structure as specified in the template. You are not authorized to mention or reference the document, nor to provide any summary, commentary, or concluding remarks. The content should be presented clearly and concisely, maintaining a formal and neutral tone, with a focus solely on the required data and details",
     properties: {
       tag: { enum: ['body'] },
       children: elements.map((element) => {
