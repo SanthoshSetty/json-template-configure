@@ -319,27 +319,27 @@ const JsonTemplateBuilderRevert = () => {
   }, []);
 
   const modifyListItem = useCallback((elementId, itemId, action, value = '') => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === elementId) {
-          let newContent = [...el.content];
-          if (action === 'add') {
-            newContent.push({ id: uuidv4(), content: '', description: null, nestedSpans: [] });
-          } else if (action === 'remove') {
-            newContent = newContent.filter(item => item.id !== itemId);
-          } else if (action === 'removeContent') {
-            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
-          } else if (action === 'content') {
-            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: value } : item));
-          } else if (action === 'description') {
-            newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value.trim() === '' ? null : value } : item));
-          }
-          return { ...el, content: newContent };
+  setElements((prev) =>
+    prev.map((el) => {
+      if (el.id === elementId) {
+        let newContent = [...el.content];
+        if (action === 'add') {
+          newContent.push({ id: uuidv4(), content: '', description: null, nestedSpans: [] });
+        } else if (action === 'remove') {
+          newContent = newContent.filter(item => item.id !== itemId);
+        } else if (action === 'removeContent') {
+          newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
+        } else if (action === 'content') {
+          newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: value } : item));
+        } else if (action === 'description') {
+          newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value.trim() === '' ? null : value } : item));
         }
-        return el;
-      })
-    );
-  }, []);
+        return { ...el, content: newContent };
+      }
+      return el;
+    })
+  );
+}, []);
 
 const addNestedSpan = useCallback((elementId, itemId) => {
   setElements((prev) =>
@@ -436,6 +436,7 @@ const convertToJsonSchema = () => ({
       children: elements.map((element) => {
         const baseProps = { tag: { enum: [element.type] } };
         const baseSchema = {
+          ...(element.description ? { description: element.description } : {}),
           properties: { ...baseProps }
         };
 
@@ -452,10 +453,10 @@ const convertToJsonSchema = () => ({
                 children: [
                   {
                     type: 'array',
+                    ...(element.listItemDescription ? { description: element.listItemDescription } : {}),
                     items: {
                       properties: {
                         tag: { enum: ['li'] },
-                        content: element.listItemDescription ? { description: element.listItemDescription } : undefined,
                         children: null
                       }
                     }
@@ -465,14 +466,16 @@ const convertToJsonSchema = () => ({
             };
           } else {
             const listItems = element.content.map((item) => ({
+              ...(item.description ? { description: item.description } : {}),
               properties: {
                 tag: { enum: ['li'] },
-                content: item.description ? { description: item.description } : { enum: [item.content] },
+                content: { enum: [item.content] },
                 children: item.nestedSpans.length > 0
                   ? item.nestedSpans.map((span) => ({
+                      ...(span.description ? { description: span.description } : {}),
                       properties: {
                         tag: { enum: ['span'] },
-                        content: span.description ? { description: span.description } : { enum: [span.content] }
+                        content: { enum: [span.content] }
                       }
                     }))
                   : null
@@ -506,25 +509,25 @@ const updateElementsFromSchema = () => {
           id: uuidv4(),
           type,
           content: '',
-          description: null,
+          description: child.description || null,
           isDynamic: false,
           listItemDescription: null,
-          hasDescription: false
+          hasDescription: !!child.description
         };
       }
 
       if (['ul', 'ol'].includes(type)) {
         if (child.properties.children && child.properties.children[0].type === 'array') {
           // Dynamic List
-          const listItemDescription = child.properties.children[0].items.properties.content?.description || null;
+          const listItemDescription = child.properties.children[0].description || null;
           return {
             id: uuidv4(),
             type,
             content: [],
-            description: null,
+            description: child.description || null,
             isDynamic: true,
             listItemDescription,
-            hasDescription: false
+            hasDescription: !!child.description
           };
         } else {
           // Static List
@@ -532,14 +535,14 @@ const updateElementsFromSchema = () => {
             const nestedSpans = item.properties.children
               ? item.properties.children.map((span) => ({
                   id: uuidv4(),
-                  content: span.properties.content?.enum?.[0] || '',
-                  description: span.properties.content?.description || null
+                  content: span.properties.content.enum[0] || '',
+                  description: span.description || null
                 }))
               : [];
             return {
               id: uuidv4(),
-              content: item.properties.content?.enum?.[0] || '',
-              description: item.properties.content?.description || null,
+              content: item.properties.content.enum[0] || '',
+              description: item.description || null,
               nestedSpans
             };
           });
@@ -547,10 +550,10 @@ const updateElementsFromSchema = () => {
             id: uuidv4(),
             type,
             content: listItems,
-            description: null,
+            description: child.description || null,
             isDynamic: false,
             listItemDescription: null,
-            hasDescription: false
+            hasDescription: !!child.description
           };
         }
       }
@@ -560,10 +563,10 @@ const updateElementsFromSchema = () => {
         id: uuidv4(),
         type,
         content: child.properties.content?.enum?.[0] || '',
-        description: child.properties.content?.description || null,
+        description: child.description || child.properties.content?.description || null,
         isDynamic: false,
         listItemDescription: null,
-        hasDescription: !!child.properties.content?.description
+        hasDescription: !!(child.description || child.properties.content?.description)
       };
     });
     setElements(newElements);
@@ -691,6 +694,6 @@ return (
     </div>
   </div>
 );
-};
+}; 
 
 export default JsonTemplateBuilderRevert;
