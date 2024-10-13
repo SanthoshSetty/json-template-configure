@@ -30,7 +30,7 @@ const ElementTypes = {
   BREAK: 'br'
 };
 
-const defaultListDescription = " ";
+const defaultListDescription = "";
 
 const defaultContent = {
   ul: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
@@ -444,7 +444,7 @@ const handleDragEnd = (result) => {
 
 const convertToJsonSchema = () => ({
   schema: {
-    description: "Do not generate anything summarising the content generated through this template. Do not mention anything about the generated document. You are not authorised to mention anything about the document",
+    description: "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements. Avoid generating any introductory text, section titles, or descriptive elements unless explicitly requested. Focus solely on the required data in the format provided, and ensure no content is generated outside the template's structural elements.",
     properties: {
       tag: { enum: ['body'] },
       children: elements.map((element) => {
