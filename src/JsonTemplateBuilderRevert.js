@@ -524,15 +524,16 @@ const updateElementsFromSchema = () => {
           id: uuidv4(),
           type,
           content: '',
-          description: child.description || null,
+          description: null,
           isDynamic: false,
           listItemDescription: null,
-          hasDescription: !!child.description
+          hasDescription: false
         };
       }
 
       if (['ul', 'ol'].includes(type)) {
-        const description = child.description || defaultListDescription;
+        // List description is always set to the default
+        const description = "Follow instructions mentioned in list description";
         if (child.properties.children && Array.isArray(child.properties.children)) {
           // Static List
           const listItems = child.properties.children.map((item) => ({
@@ -576,10 +577,10 @@ const updateElementsFromSchema = () => {
         id: uuidv4(),
         type,
         content: child.properties.content?.enum?.[0] || '',
-        description: child.description || child.properties.content?.description || null,
+        description: child.properties.content?.description || null,
         isDynamic: false,
         listItemDescription: null,
-        hasDescription: !!(child.description || child.properties.content?.description)
+        hasDescription: !!child.properties.content?.description
       };
     });
     setElements(newElements);
@@ -595,7 +596,7 @@ const renderPreview = () => (
       if (['ul', 'ol'].includes(element.type)) {
         return (
           <div key={index} className="mb-4">
-            <p className="italic text-gray-600 mb-2">List description: {element.description || defaultListDescription}</p>
+            <p className="italic text-gray-600 mb-2">List description: Follow instructions mentioned in list description</p>
             {element.isDynamic ? (
               <div className="p-3 bg-yellow-100 rounded">
                 <p className="font-semibold">Dynamic {getElementTypeName(element.type)}:</p>
@@ -626,6 +627,7 @@ const renderPreview = () => (
     })}
   </div>
 );
+
 
 const ListComponent = ({ type, items }) => {
   const ListTag = type === 'ul' ? 'ul' : 'ol';
