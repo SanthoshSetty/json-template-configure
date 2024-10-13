@@ -471,7 +471,7 @@ const convertToJsonSchema = () => ({
                 items: {
                   properties: {
                     tag: { enum: ['li'] },
-                    content: element.listItemDescription ? { description: [element.listItemDescription] } : undefined,
+                    content: element.listItemDescription ? { description: element.listItemDescription } : undefined,
                     children: null
                   }
                 }
@@ -483,14 +483,14 @@ const convertToJsonSchema = () => ({
                 tag: { enum: ['li'] },
                 content: item.content.trim() !== '' 
                   ? { enum: [item.content] }
-                  : (item.description ? { description: [item.description] } : undefined),
+                  : (item.description ? { description: item.description } : undefined),
                 children: item.nestedSpans.length > 0
                   ? item.nestedSpans.map((span) => ({
                       properties: {
                         tag: { enum: ['span'] },
                         content: span.content.trim() !== ''
                           ? { enum: [span.content] }
-                          : (span.description ? { description: [span.description] } : undefined)
+                          : (span.description ? { description: span.description } : undefined)
                       }
                     }))
                   : null
@@ -505,7 +505,7 @@ const convertToJsonSchema = () => ({
           ...baseProps,
           content: element.content.trim() !== ''
             ? { enum: [element.content] }
-            : (element.description ? { description: [element.description] } : undefined),
+            : (element.description ? { description: element.description } : undefined),
           children: null
         };
         return { ...baseSchema, properties: elementProps };
