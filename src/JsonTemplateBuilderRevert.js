@@ -515,9 +515,11 @@ const convertToJsonSchema = () => ({
 
 const updateElementsFromSchema = () => {
   try {
+    console.log('Starting to update elements from schema');
     let parsedSchema;
     try {
       parsedSchema = JSON.parse(jsonSchema);
+      console.log('Successfully parsed JSON schema:', parsedSchema);
     } catch (parseError) {
       console.error('Error parsing JSON:', parseError);
       alert(`Invalid JSON format: ${parseError.message}`);
@@ -525,15 +527,20 @@ const updateElementsFromSchema = () => {
     }
 
     if (!parsedSchema.schema || !parsedSchema.schema.properties || !parsedSchema.schema.properties.children) {
+      console.error('Invalid schema structure:', parsedSchema);
       throw new Error('Invalid schema structure. Expected schema.properties.children.');
     }
 
     const newElements = parsedSchema.schema.properties.children.map((child, index) => {
+      console.log(`Processing child element at index ${index}:`, child);
+
       if (!child.properties || !child.properties.tag || !child.properties.tag.enum) {
+        console.error(`Invalid element structure at index ${index}:`, child);
         throw new Error(`Invalid element structure at index ${index}. Expected properties.tag.enum.`);
       }
 
       const type = child.properties.tag.enum[0];
+      console.log(`Element type: ${type}`);
       
       if (type === 'br') {
         return {
@@ -548,11 +555,15 @@ const updateElementsFromSchema = () => {
       }
 
       if (['ul', 'ol'].includes(type)) {
+        console.log(`Processing list element of type ${type}`);
         const description = "Follow instructions mentioned in list description";
         if (child.properties.children && Array.isArray(child.properties.children)) {
+          console.log('Processing static list');
           // Static List
           const listItems = child.properties.children.map((item, itemIndex) => {
+            console.log(`Processing list item at index ${itemIndex}:`, item);
             if (!item.properties || !item.properties.tag || !item.properties.tag.enum) {
+              console.error(`Invalid list item structure at element ${index}, item ${itemIndex}:`, item);
               throw new Error(`Invalid list item structure at element ${index}, item ${itemIndex}.`);
             }
             return {
@@ -561,7 +572,9 @@ const updateElementsFromSchema = () => {
               description: item.properties.content?.description || null,
               nestedSpans: item.properties.children
                 ? item.properties.children.map((span, spanIndex) => {
+                    console.log(`Processing nested span at index ${spanIndex}:`, span);
                     if (!span.properties || !span.properties.tag || !span.properties.tag.enum) {
+                      console.error(`Invalid nested span structure at element ${index}, item ${itemIndex}, span ${spanIndex}:`, span);
                       throw new Error(`Invalid nested span structure at element ${index}, item ${itemIndex}, span ${spanIndex}.`);
                     }
                     return {
@@ -583,6 +596,7 @@ const updateElementsFromSchema = () => {
             hasDescription: true
           };
         } else if (child.properties.children && child.properties.children[0]?.type === 'array') {
+          console.log('Processing dynamic list');
           // Dynamic List
           const listItemDescription = child.properties.children[0].items?.properties?.content?.description || null;
           return {
@@ -595,11 +609,13 @@ const updateElementsFromSchema = () => {
             hasDescription: true
           };
         } else {
+          console.error(`Invalid list structure at index ${index}:`, child);
           throw new Error(`Invalid list structure at index ${index}. Expected children array or dynamic list.`);
         }
       }
 
       // Other Element Types
+      console.log(`Processing other element type: ${type}`);
       return {
         id: uuidv4(),
         type,
@@ -611,6 +627,7 @@ const updateElementsFromSchema = () => {
       };
     });
 
+    console.log('New elements created:', newElements);
     setElements(newElements);
     alert('Template updated successfully!');
   } catch (error) {
