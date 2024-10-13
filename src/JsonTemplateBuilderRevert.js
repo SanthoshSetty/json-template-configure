@@ -515,8 +515,24 @@ const convertToJsonSchema = () => ({
 
 const updateElementsFromSchema = () => {
   try {
-    const parsedSchema = JSON.parse(jsonSchema);
-    const newElements = parsedSchema.schema.properties.children.map((child) => {
+    let parsedSchema;
+    try {
+      parsedSchema = JSON.parse(jsonSchema);
+    } catch (parseError) {
+      console.error('Error parsing JSON:', parseError);
+      alert(`Invalid JSON format: ${parseError.message}`);
+      return;
+    }
+
+    if (!parsedSchema.schema || !parsedSchema.schema.properties || !parsedSchema.schema.properties.children) {
+      throw new Error('Invalid schema structure. Expected schema.properties.children.');
+    }
+
+    const newElements = parsedSchema.schema.properties.children.map((child, index) => {
+      if (!child.properties || !child.properties.tag || !child.properties.tag.enum) {
+        throw new Error(`Invalid element structure at index ${index}. Expected properties.tag.enum.`);
+      }
+
       const type = child.properties.tag.enum[0];
       
       if (type === 'br') {
@@ -532,22 +548,31 @@ const updateElementsFromSchema = () => {
       }
 
       if (['ul', 'ol'].includes(type)) {
-        // List description is always set to the default
         const description = "Follow instructions mentioned in list description";
         if (child.properties.children && Array.isArray(child.properties.children)) {
           // Static List
-          const listItems = child.properties.children.map((item) => ({
-            id: uuidv4(),
-            content: item.properties.content?.enum?.[0] || '',
-            description: item.properties.content?.description || null,
-            nestedSpans: item.properties.children
-              ? item.properties.children.map((span) => ({
-                  id: uuidv4(),
-                  content: span.properties.content?.enum?.[0] || '',
-                  description: span.properties.content?.description || null
-                }))
-              : []
-          }));
+          const listItems = child.properties.children.map((item, itemIndex) => {
+            if (!item.properties || !item.properties.tag || !item.properties.tag.enum) {
+              throw new Error(`Invalid list item structure at element ${index}, item ${itemIndex}.`);
+            }
+            return {
+              id: uuidv4(),
+              content: item.properties.content?.enum?.[0] || '',
+              description: item.properties.content?.description || null,
+              nestedSpans: item.properties.children
+                ? item.properties.children.map((span, spanIndex) => {
+                    if (!span.properties || !span.properties.tag || !span.properties.tag.enum) {
+                      throw new Error(`Invalid nested span structure at element ${index}, item ${itemIndex}, span ${spanIndex}.`);
+                    }
+                    return {
+                      id: uuidv4(),
+                      content: span.properties.content?.enum?.[0] || '',
+                      description: span.properties.content?.description || null
+                    };
+                  })
+                : []
+            };
+          });
           return {
             id: uuidv4(),
             type,
@@ -557,9 +582,9 @@ const updateElementsFromSchema = () => {
             listItemDescription: null,
             hasDescription: true
           };
-        } else if (child.properties.children && child.properties.children[0].type === 'array') {
+        } else if (child.properties.children && child.properties.children[0]?.type === 'array') {
           // Dynamic List
-          const listItemDescription = child.properties.children[0].items.properties.content?.description || null;
+          const listItemDescription = child.properties.children[0].items?.properties?.content?.description || null;
           return {
             id: uuidv4(),
             type,
@@ -569,6 +594,8 @@ const updateElementsFromSchema = () => {
             listItemDescription,
             hasDescription: true
           };
+        } else {
+          throw new Error(`Invalid list structure at index ${index}. Expected children array or dynamic list.`);
         }
       }
 
@@ -583,10 +610,12 @@ const updateElementsFromSchema = () => {
         hasDescription: !!child.properties.content?.description
       };
     });
+
     setElements(newElements);
+    alert('Template updated successfully!');
   } catch (error) {
-    console.error('Error parsing JSON schema:', error);
-    alert('Invalid JSON schema. Please check your input.');
+    console.error('Error updating elements from schema:', error);
+    alert(`Error updating template: ${error.message}\nPlease check the console for more details.`);
   }
 };
 
