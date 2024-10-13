@@ -444,12 +444,12 @@ const handleDragEnd = (result) => {
 
 const convertToJsonSchema = () => ({
   schema: {
-    description: "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements. Avoid generating any introductory text, section titles, or descriptive elements unless explicitly requested. Focus solely on the required data in the format provided, and ensure no content is generated outside the template's structural elements",
+    description: "Do not generate anything summarising the content generated through this template. Do not mention anything about the generated document. You are not authorised to mention anything about the document",
     properties: {
       tag: { enum: ['body'] },
       children: elements.map((element) => {
         const baseProps = { tag: { enum: [element.type] } };
-        const baseSchema = {
+        let baseSchema = {
           properties: { ...baseProps }
         };
 
@@ -458,9 +458,11 @@ const convertToJsonSchema = () => ({
         }
 
         if (['ul', 'ol'].includes(element.type)) {
-          // No changes for ul and ol elements
           if (element.description) {
-            baseSchema.description = element.description;
+            baseSchema = {
+              description: element.description,
+              properties: { ...baseProps }
+            };
           }
           if (element.isDynamic) {
             baseSchema.properties.children = [
@@ -469,7 +471,7 @@ const convertToJsonSchema = () => ({
                 items: {
                   properties: {
                     tag: { enum: ['li'] },
-                    content: element.listItemDescription ? { description: element.listItemDescription } : undefined,
+                    content: element.listItemDescription ? { description: [element.listItemDescription] } : undefined,
                     children: null
                   }
                 }
@@ -481,14 +483,14 @@ const convertToJsonSchema = () => ({
                 tag: { enum: ['li'] },
                 content: item.content.trim() !== '' 
                   ? { enum: [item.content] }
-                  : (item.description ? { description: item.description } : undefined),
+                  : (item.description ? { description: [item.description] } : undefined),
                 children: item.nestedSpans.length > 0
                   ? item.nestedSpans.map((span) => ({
                       properties: {
                         tag: { enum: ['span'] },
                         content: span.content.trim() !== ''
                           ? { enum: [span.content] }
-                          : (span.description ? { description: span.description } : undefined)
+                          : (span.description ? { description: [span.description] } : undefined)
                       }
                     }))
                   : null
@@ -501,10 +503,9 @@ const convertToJsonSchema = () => ({
         // For non-ul and non-ol elements
         const elementProps = {
           ...baseProps,
-          content: {
-            ...(element.content.trim() !== '' ? { enum: [element.content] } : {}),
-            ...(element.description ? { description: element.description } : {})
-          },
+          content: element.content.trim() !== ''
+            ? { enum: [element.content] }
+            : (element.description ? { description: [element.description] } : undefined),
           children: null
         };
         return { ...baseSchema, properties: elementProps };
@@ -512,6 +513,7 @@ const convertToJsonSchema = () => ({
     }
   }
 });
+
 
 const updateElementsFromSchema = () => {
   try {
