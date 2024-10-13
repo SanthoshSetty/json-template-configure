@@ -174,7 +174,7 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addN
   </Draggable>
 );
 
-onst Element = ({
+const Element = ({
   element,
   index,
   updateElement,
