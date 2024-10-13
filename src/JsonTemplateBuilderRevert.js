@@ -174,7 +174,7 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addN
   </Draggable>
 );
 
-const Element = ({
+onst Element = ({
   element,
   index,
   updateElement,
@@ -199,16 +199,6 @@ const Element = ({
           </button>
         </div>
         {['ul', 'ol'].includes(element.type) && (
-          <textarea
-            value={element.description || defaultListDescription}
-            onChange={(e) => updateElement(element.id, { description: e.target.value })}
-            className="w-full p-2 mb-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="List Description"
-          />
-        )}
-        {element.type === 'br' ? (
-          <p className="text-sm text-gray-500 italic">Line Break (No content)</p>
-        ) : ['ul', 'ol'].includes(element.type) ? (
           <>
             <label className="flex items-center mb-4 text-sm text-gray-600">
               <input
@@ -219,6 +209,20 @@ const Element = ({
               />
               <span>Dynamic List</span>
             </label>
+            {!element.isDynamic && (
+              <textarea
+                value={element.description || defaultListDescription}
+                onChange={(e) => updateElement(element.id, { description: e.target.value })}
+                className="w-full p-2 mb-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="List Description"
+              />
+            )}
+          </>
+        )}
+        {element.type === 'br' ? (
+          <p className="text-sm text-gray-500 italic">Line Break (No content)</p>
+        ) : ['ul', 'ol'].includes(element.type) ? (
+          <>
             {element.isDynamic ? (
               <textarea
                 value={element.listItemDescription || ''}
