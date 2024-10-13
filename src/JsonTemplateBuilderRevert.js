@@ -449,17 +449,18 @@ const convertToJsonSchema = () => ({
       tag: { enum: ['body'] },
       children: elements.map((element) => {
         const baseProps = { tag: { enum: [element.type] } };
-        let baseSchema = {
-          properties: { ...baseProps }
-        };
+        let baseSchema = {};
 
         if (element.type === 'br') {
-          return baseSchema;
+          return { properties: baseProps };
         }
 
         if (['ul', 'ol'].includes(element.type)) {
-          // Set default list description
-          baseSchema.description = "Follow instructions mentioned in list description";
+          // Set default list description above properties
+          baseSchema = {
+            description: "Follow instructions mentioned in list description",
+            properties: { ...baseProps }
+          };
           
           if (element.isDynamic) {
             baseSchema.properties.children = [
@@ -498,14 +499,15 @@ const convertToJsonSchema = () => ({
         }
 
         // For non-ul and non-ol elements
-        const elementProps = {
-          ...baseProps,
-          content: element.content.trim() !== ''
-            ? { enum: [element.content] }
-            : (element.description ? { description: element.description } : undefined),
-          children: null
+        return {
+          properties: {
+            ...baseProps,
+            content: element.content.trim() !== ''
+              ? { enum: [element.content] }
+              : (element.description ? { description: element.description } : undefined),
+            children: null
+          }
         };
-        return { ...baseSchema, properties: elementProps };
       })
     }
   }
