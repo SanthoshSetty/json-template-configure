@@ -450,7 +450,6 @@ const convertToJsonSchema = () => ({
       children: elements.map((element) => {
         const baseProps = { tag: { enum: [element.type] } };
         const baseSchema = {
-          ...(element.description ? { description: element.description } : {}),
           properties: { ...baseProps }
         };
 
@@ -459,6 +458,10 @@ const convertToJsonSchema = () => ({
         }
 
         if (['ul', 'ol'].includes(element.type)) {
+          // No changes for ul and ol elements
+          if (element.description) {
+            baseSchema.description = element.description;
+          }
           if (element.isDynamic) {
             baseSchema.properties.children = [
               {
@@ -495,11 +498,13 @@ const convertToJsonSchema = () => ({
           return baseSchema;
         }
 
+        // For non-ul and non-ol elements
         const elementProps = {
           ...baseProps,
-          content: element.content.trim() !== ''
-            ? { enum: [element.content] }
-            : (element.description ? { description: element.description } : undefined),
+          content: {
+            ...(element.content.trim() !== '' ? { enum: [element.content] } : {}),
+            ...(element.description ? { description: element.description } : {})
+          },
           children: null
         };
         return { ...baseSchema, properties: elementProps };
