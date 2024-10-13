@@ -556,7 +556,7 @@ const updateElementsFromSchema = () => {
 
       if (['ul', 'ol'].includes(type)) {
         console.log(`Processing list element of type ${type}`);
-        const description = "Follow instructions mentioned in list description";
+        const description = child.description || "Follow instructions mentioned in list description";
         if (child.properties.children && Array.isArray(child.properties.children)) {
           console.log('Processing static list');
           // Static List
@@ -566,6 +566,7 @@ const updateElementsFromSchema = () => {
               console.error(`Invalid list item structure at element ${index}, item ${itemIndex}:`, item);
               throw new Error(`Invalid list item structure at element ${index}, item ${itemIndex}.`);
             }
+            
             return {
               id: uuidv4(),
               content: item.properties.content?.enum?.[0] || '',
@@ -586,6 +587,7 @@ const updateElementsFromSchema = () => {
                 : []
             };
           });
+          console.log(`Created list items:`, listItems);
           return {
             id: uuidv4(),
             type,
@@ -635,7 +637,6 @@ const updateElementsFromSchema = () => {
     alert(`Error updating template: ${error.message}\nPlease check the console for more details.`);
   }
 };
-
 const renderPreview = () => (
   <div className="p-5 bg-gray-100 rounded mb-5 text-gray-800">
     {elements.map((element, index) => {
