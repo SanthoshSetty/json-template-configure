@@ -444,7 +444,7 @@ const handleDragEnd = (result) => {
 
 const convertToJsonSchema = () => ({
   schema: {
-    description: "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements. Avoid generating any introductory text, section titles, or descriptive elements unless explicitly requested. Focus solely on the required data in the format provided, and ensure no content is generated outside the template's structural elements.",
+    description: "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements. Avoid generating any introductory text, section titles, or descriptive elements unless explicitly requested. Focus solely on the required data in the format provided, and ensure no content is generated outside the template's structural elements.Do not mention product name or any details about the product outside the ul,ol,p,span,strong elements",
     properties: {
       tag: { enum: ['body'] },
       children: elements.map((element) => {
@@ -458,12 +458,9 @@ const convertToJsonSchema = () => ({
         }
 
         if (['ul', 'ol'].includes(element.type)) {
-          if (element.description) {
-            baseSchema = {
-              description: element.description,
-              properties: { ...baseProps }
-            };
-          }
+          // Set default list description
+          baseSchema.description = "Follow instructions mentioned in list description";
+          
           if (element.isDynamic) {
             baseSchema.properties.children = [
               {
@@ -513,7 +510,6 @@ const convertToJsonSchema = () => ({
     }
   }
 });
-
 
 const updateElementsFromSchema = () => {
   try {
