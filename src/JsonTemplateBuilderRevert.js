@@ -449,66 +449,39 @@ const convertToJsonSchema = () => ({
       tag: { enum: ['body'] },
       children: elements.map((element) => {
         const baseProps = { tag: { enum: [element.type] } };
-        let baseSchema = {
-          properties: { ...baseProps }
-        };
+        let schema = { properties: baseProps };
 
         if (element.type === 'br') {
-          return baseSchema;
+          return schema;
         }
 
         if (['ul', 'ol'].includes(element.type)) {
           if (element.description) {
-            baseSchema = {
-              description: element.description,
-              properties: { ...baseProps }
-            };
+            schema.description = element.description;
           }
-          if (element.isDynamic) {
-            baseSchema.properties.children = [
-              {
-                type: 'array',
-                items: {
-                  properties: {
-                    tag: { enum: ['li'] },
-                    content: element.listItemDescription ? { description: [element.listItemDescription] } : undefined,
-                    children: null
-                  }
+          schema.properties.children = [
+            {
+              type: 'array',
+              items: {
+                properties: {
+                  tag: { enum: ['li'] },
+                  content: {
+                    description: element.isDynamic ? element.listItemDescription : undefined
+                  },
+                  children: null
                 }
               }
-            ];
-          } else {
-            baseSchema.properties.children = element.content.map((item) => ({
-              properties: {
-                tag: { enum: ['li'] },
-                content: item.content.trim() !== '' 
-                  ? { enum: [item.content] }
-                  : (item.description ? { description: [item.description] } : undefined),
-                children: item.nestedSpans.length > 0
-                  ? item.nestedSpans.map((span) => ({
-                      properties: {
-                        tag: { enum: ['span'] },
-                        content: span.content.trim() !== ''
-                          ? { enum: [span.content] }
-                          : (span.description ? { description: [span.description] } : undefined)
-                      }
-                    }))
-                  : null
-              }
-            }));
-          }
-          return baseSchema;
+            }
+          ];
+          return schema;
         }
 
         // For non-ul and non-ol elements
-        const elementProps = {
-          ...baseProps,
-          content: element.content.trim() !== ''
-            ? { enum: [element.content] }
-            : (element.description ? { description: [element.description] } : undefined),
-          children: null
-        };
-        return { ...baseSchema, properties: elementProps };
+        schema.properties.content = element.content.trim() !== ''
+          ? { enum: [element.content] }
+          : (element.description ? { description: element.description } : undefined);
+        schema.properties.children = null;
+        return schema;
       })
     }
   }
