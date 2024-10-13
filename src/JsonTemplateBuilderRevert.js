@@ -1,4 +1,4 @@
-cimport React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { PlusIcon, MinusIcon, TrashIcon, VariableIcon } from '@heroicons/react/solid';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { v4 as uuidv4 } from 'uuid';
@@ -711,8 +711,8 @@ return (
       </DragDropContext>
     </div>
   </div>
-
 );
+
 };
 
 export default JsonTemplateBuilderRevert;
