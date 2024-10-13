@@ -30,7 +30,7 @@ const ElementTypes = {
   BREAK: 'br'
 };
 
-const defaultListDescription = "";
+const defaultListDescription = "Follow instructions mentioned in list description";
 
 const defaultContent = {
   ul: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
@@ -209,14 +209,12 @@ const Element = ({
               />
               <span>Dynamic List</span>
             </label>
-            {!element.isDynamic && (
-              <textarea
-                value={element.description || defaultListDescription}
-                onChange={(e) => updateElement(element.id, { description: e.target.value })}
-                className="w-full p-2 mb-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="List Description"
-              />
-            )}
+            <textarea
+              value={element.description || defaultListDescription}
+              onChange={(e) => updateElement(element.id, { description: e.target.value })}
+              className="w-full p-2 mb-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="List Description"
+            />
           </>
         )}
         {element.type === 'br' ? (
@@ -319,8 +317,8 @@ const JsonTemplateBuilderRevert = () => {
         if (el.id === id) {
           const updatedElement = { ...el, ...updates };
           if ('description' in updates) {
-            updatedElement.description = updates.description.trim() === '' ? null : updates.description;
-            updatedElement.hasDescription = updatedElement.description !== null;
+            updatedElement.description = updates.description.trim() === '' ? defaultListDescription : updates.description;
+            updatedElement.hasDescription = true;
           }
           if (updatedElement.isDynamic && 'listItemDescription' in updates) {
             updatedElement.description = updates.listItemDescription;
@@ -333,245 +331,229 @@ const JsonTemplateBuilderRevert = () => {
   }, []);
 
   const modifyListItem = useCallback((elementId, itemId, action, value = '') => {
-  setElements((prev) =>
-    prev.map((el) => {
-      if (el.id === elementId) {
-        let newContent = [...el.content];
-        if (action === 'add') {
-          newContent.push({ id: uuidv4(), content: '', description: null, nestedSpans: [] });
-        } else if (action === 'remove') {
-          newContent = newContent.filter(item => item.id !== itemId);
-        } else if (action === 'removeContent') {
-          newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
-        } else if (action === 'content') {
-          newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: value } : item));
-        } else if (action === 'description') {
-          newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value.trim() === '' ? null : value } : item));
-        }
-        return { ...el, content: newContent };
-      }
-      return el;
-    })
-  );
-}, []);
-
-const addNestedSpan = useCallback((elementId, itemId) => {
-  setElements((prev) =>
-    prev.map((el) => {
-      if (el.id === elementId) {
-        const newContent = el.content.map((item) => {
-          if (item.id === itemId) {
-            return { ...item, nestedSpans: [...item.nestedSpans, { id: uuidv4(), content: '', description: null }] };
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          let newContent = [...el.content];
+          if (action === 'add') {
+            newContent.push({ id: uuidv4(), content: '', description: null, nestedSpans: [] });
+          } else if (action === 'remove') {
+            newContent = newContent.filter(item => item.id !== itemId);
+          } else if (action === 'removeContent') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
+          } else if (action === 'content') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: value } : item));
+          } else if (action === 'description') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value.trim() === '' ? null : value } : item));
           }
-          return item;
-        });
-        return { ...el, content: newContent };
-      }
-      return el;
-    })
-  );
-}, []);
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
 
-const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) => {
-  setElements((prev) =>
-    prev.map((el) => {
-      if (el.id === elementId) {
-        const newContent = el.content.map((item) => {
-          if (item.id === itemId) {
-            const updatedSpans = item.nestedSpans.map((span) => {
-              if (span.id === spanId) {
-                if (field === 'description') {
-                  return { ...span, [field]: value.trim() === '' ? null : value };
+  const addNestedSpan = useCallback((elementId, itemId) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          const newContent = el.content.map((item) => {
+            if (item.id === itemId) {
+              return { ...item, nestedSpans: [...item.nestedSpans, { id: uuidv4(), content: '', description: null }] };
+            }
+            return item;
+          });
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          const newContent = el.content.map((item) => {
+            if (item.id === itemId) {
+              const updatedSpans = item.nestedSpans.map((span) => {
+                if (span.id === spanId) {
+                  if (field === 'description') {
+                    return { ...span, [field]: value.trim() === '' ? null : value };
+                  }
+                  return { ...span, [field]: value };
                 }
-                return { ...span, [field]: value };
-              }
-              return span;
-            });
-            return { ...item, nestedSpans: updatedSpans };
-          }
-          return item;
-        });
-        return { ...el, content: newContent };
-      }
-      return el;
-    })
-  );
-}, []);
-
-const removeNestedSpan = useCallback((elementId, itemId, spanId) => {
-  setElements((prev) =>
-    prev.map((el) => {
-      if (el.id === elementId) {
-        const newContent = el.content.map((item) => {
-          if (item.id === itemId) {
-            return { ...item, nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId) };
-          }
-          return item;
-        });
-        return { ...el, content: newContent };
-      }
-      return el;
-    })
-  );
-}, []);
-
-const handleDragEnd = (result) => {
-  const { destination, source, type } = result;
-
-  if (!destination) return;
-
-  // Reorder elements
-  if (type === 'ELEMENT') {
-    const reorderedElements = Array.from(elements);
-    const [movedElement] = reorderedElements.splice(source.index, 1);
-    reorderedElements.splice(destination.index, 0, movedElement);
-    setElements(reorderedElements);
-  }
-
-  // Reorder list items
-  if (type.startsWith('list-')) {
-    const elementId = type.split('-')[1];
-    const reorderedElements = Array.from(elements);
-    const elementIndex = reorderedElements.findIndex((el) => el.id === elementId);
-    if (elementIndex === -1) return;
-    const listItems = Array.from(reorderedElements[elementIndex].content);
-    const [movedItem] = listItems.splice(source.index, 1);
-    listItems.splice(destination.index, 0, movedItem);
-    reorderedElements[elementIndex].content = listItems;
-    setElements(reorderedElements);
-  }
-};
-
-const convertToJsonSchema = () => ({
-  schema: {
-    description: "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements. Avoid generating any introductory text, section titles, or descriptive elements unless explicitly requested. Focus solely on the required data in the format provided, and ensure no content is generated outside the template's structural elements.Do not mention product name or any details about the product outside the ul,ol,p,span,strong elements",
-    properties: {
-      tag: { enum: ['body'] },
-      children: elements.map((element) => {
-        const baseProps = { tag: { enum: [element.type] } };
-        let baseSchema = {};
-
-        if (element.type === 'br') {
-          return { properties: baseProps };
+                return span;
+              });
+              return { ...item, nestedSpans: updatedSpans };
+            }
+            return item;
+          });
+          return { ...el, content: newContent };
         }
+        return el;
+      })
+    );
+  }, []);
 
-        if (['ul', 'ol'].includes(element.type)) {
-          // Set default list description above properties
-          baseSchema = {
-            description: "Follow instructions mentioned in list description",
-            properties: { ...baseProps }
-          };
-          
-          if (element.isDynamic) {
-            baseSchema.properties.children = [
-              {
-                type: 'array',
-                items: {
-                  properties: {
-                    tag: { enum: ['li'] },
-                    content: element.listItemDescription ? { description: element.listItemDescription } : undefined,
-                    children: null
+  const removeNestedSpan = useCallback((elementId, itemId, spanId) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          const newContent = el.content.map((item) => {
+            if (item.id === itemId) {
+              return { ...item, nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId) };
+            }
+            return item;
+          });
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  const handleDragEnd = (result) => {
+    const { destination, source, type } = result;
+
+    if (!destination) return;
+
+    // Reorder elements
+    if (type === 'ELEMENT') {
+      const reorderedElements = Array.from(elements);
+      const [movedElement] = reorderedElements.splice(source.index, 1);
+      reorderedElements.splice(destination.index, 0, movedElement);
+      setElements(reorderedElements);
+    }
+
+    // Reorder list items
+    if (type.startsWith('list-')) {
+      const elementId = type.split('-')[1];
+      const reorderedElements = Array.from(elements);
+      const elementIndex = reorderedElements.findIndex((el) => el.id === elementId);
+      if (elementIndex === -1) return;
+      const listItems = Array.from(reorderedElements[elementIndex].content);
+      const [movedItem] = listItems.splice(source.index, 1);
+      listItems.splice(destination.index, 0, movedItem);
+      reorderedElements[elementIndex].content = listItems;
+      setElements(reorderedElements);
+    }
+  };
+
+  const convertToJsonSchema = () => ({
+    schema: {
+      description: "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements. Avoid generating any introductory text, section titles, or descriptive elements unless explicitly requested. Focus solely on the required data in the format provided, and ensure no content is generated outside the template's structural elements.Do not mention product name or any details about the product outside the ul,ol,p,span,strong elements",
+      properties: {
+        tag: { enum: ['body'] },
+        children: elements.map((element) => {
+          const baseProps = { tag: { enum: [element.type] } };
+          let baseSchema = {};
+
+          if (element.type === 'br') {
+            return { properties: baseProps };
+          }
+
+          if (['ul', 'ol'].includes(element.type)) {
+            baseSchema = {
+              description: element.description || defaultListDescription,
+              properties: { ...baseProps }
+            };
+            
+            if (element.isDynamic) {
+              baseSchema.properties.children = [
+                {
+                  type: 'array',
+                  items: {
+                    properties: {
+                      tag: { enum: ['li'] },
+                      content: element.listItemDescription ? { description: element.listItemDescription } : undefined,
+                      children: null
+                    }
                   }
                 }
-              }
-            ];
-          } else {
-            baseSchema.properties.children = element.content.map((item) => ({
-              properties: {
-                tag: { enum: ['li'] },
-                content: item.content.trim() !== '' 
-                  ? { enum: [item.content] }
-                  : (item.description ? { description: item.description } : undefined),
-                children: item.nestedSpans.length > 0
-                  ? item.nestedSpans.map((span) => ({
-                      properties: {
-                        tag: { enum: ['span'] },
-                        content: span.content.trim() !== ''
-                          ? { enum: [span.content] }
-                          : (span.description ? { description: span.description } : undefined)
-                      }
-                    }))
-                  : null
-              }
-            }));
+              ];
+            } else {
+              baseSchema.properties.children = element.content.map((item) => ({
+                properties: {
+                  tag: { enum: ['li'] },
+                  content: item.content.trim() !== '' 
+                    ? { enum: [item.content] }
+                    : (item.description ? { description: item.description } : undefined),
+                  children: item.nestedSpans.length > 0
+                    ? item.nestedSpans.map((span) => ({
+                        properties: {
+                          tag: { enum: ['span'] },
+                          content: span.content.trim() !== ''
+                            ? { enum: [span.content] }
+                            : (span.description ? { description: span.description } : undefined)
+                        }
+                      }))
+                    : null
+                }
+              }));
+            }
+            return baseSchema;
           }
-          return baseSchema;
+
+          // For non-ul and non-ol elements
+          return {
+            properties: {
+              ...baseProps,
+              content: element.content.trim() !== ''
+                ? { enum: [element.content] }
+                : (element.description ? { description: element.description } : undefined),
+              children: null
+            }
+          };
+        })
+      }
+    }
+  });
+
+  const updateElementsFromSchema = () => {
+    try {
+      let parsedSchema;
+      try {
+        parsedSchema = JSON.parse(jsonSchema);
+        console.log('Successfully parsed JSON schema:', parsedSchema);
+      } catch (parseError) {
+        console.error('Error parsing JSON:', parseError);
+        alert(`Invalid JSON format: ${parseError.message}`);
+        return;
+      }
+
+      if (!parsedSchema.schema || !parsedSchema.schema.properties || !parsedSchema.schema.properties.children) {
+        console.error('Invalid schema structure:', parsedSchema);
+        throw new Error('Invalid schema structure. Expected schema.properties.children.');
+      }
+
+      const newElements = parsedSchema.schema.properties.children.map((child, index) => {
+        console.log(`Processing child element at index ${index}:`, child);
+
+        if (!child.properties || !child.properties.tag || !child.properties.tag.enum) {
+          console.error(`Invalid element structure at index ${index}:`, child);
+          throw new Error(`Invalid element structure at index ${index}. Expected properties.tag.enum.`);
         }
 
-        // For non-ul and non-ol elements
-        return {
-          properties: {
-            ...baseProps,
-            content: element.content.trim() !== ''
-              ? { enum: [element.content] }
-              : (element.description ? { description: element.description } : undefined),
-            children: null
-          }
-        };
-      })
-    }
-  }
-});
+        const type = child.properties.tag.enum[0];
+        console.log(`Element type: ${type}`);
+        
+        if (type === 'br') {
+          return {
+            id: uuidv4(),
+            type,
+            content: '',
+            description: null,
+            isDynamic: false,
+            listItemDescription: null,
+            hasDescription: false
+          };
+        }
 
-const updateElementsFromSchema = () => {
-  try {
-    console.log('Starting to update elements from schema');
-    let parsedSchema;
-    try {
-      parsedSchema = JSON.parse(jsonSchema);
-      console.log('Successfully parsed JSON schema:', parsedSchema);
-    } catch (parseError) {
-      console.error('Error parsing JSON:', parseError);
-      alert(`Invalid JSON format: ${parseError.message}`);
-      return;
-    }
-
-    if (!parsedSchema.schema || !parsedSchema.schema.properties || !parsedSchema.schema.properties.children) {
-      console.error('Invalid schema structure:', parsedSchema);
-      throw new Error('Invalid schema structure. Expected schema.properties.children.');
-    }
-
-    const newElements = parsedSchema.schema.properties.children.map((child, index) => {
-      console.log(`Processing child element at index ${index}:`, child);
-
-      if (!child.properties || !child.properties.tag || !child.properties.tag.enum) {
-        console.error(`Invalid element structure at index ${index}:`, child);
-        throw new Error(`Invalid element structure at index ${index}. Expected properties.tag.enum.`);
-      }
-
-      const type = child.properties.tag.enum[0];
-      console.log(`Element type: ${type}`);
-      
-      if (type === 'br') {
-        return {
-          id: uuidv4(),
-          type,
-          content: '',
-          description: null,
-          isDynamic: false,
-          listItemDescription: null,
-          hasDescription: false
-        };
-      }
-
-      if (['ul', 'ol'].includes(type)) {
-        console.log(`Processing list element of type ${type}`);
-        const description = child.description || "Follow instructions mentioned in list description";
-        if (child.properties.children && Array.isArray(child.properties.children)) {
-          console.log('Processing dynamic list');
-          // Dynamic List
-          if (child.properties.children[0] && child.properties.children[0].type === 'array') {
-            const listItemDescription = child.properties.children[0].items?.properties?.content?.description || null;
-            return {
-              id: uuidv4(),
-              type,
-              content: [],
-              description,
-              isDynamic: true,
-              listItemDescription,
-              hasDescription: true
-            };
-          } else {
+        if (['ul', 'ol'].includes(type)) {
+          console.log(`Processing list element of type ${type}`);
+          const description = child.description || defaultListDescription;
+          if (child.properties.children && Array.isArray(child.properties.children)) {
             console.log('Processing static list');
             // Static List
             const listItems = child.properties.children.map((item, itemIndex) => {
@@ -611,101 +593,113 @@ const updateElementsFromSchema = () => {
               listItemDescription: null,
               hasDescription: true
             };
+          } else if (child.properties.children && child.properties.children[0]?.type === 'array') {
+            console.log('Processing dynamic list');
+            // Dynamic List
+            const listItemDescription = child.properties.children[0].items?.properties?.content?.description || null;
+            return {
+              id: uuidv4(),
+              type,
+              content: [],
+              description,
+              isDynamic: true,
+              listItemDescription,
+              hasDescription: true
+            };
+          } else {
+            console.error(`Invalid list structure at index ${index}:`, child);
+            throw new Error(`Invalid list structure at index ${index}. Expected children array or dynamic list.`);
           }
-        } else {
-          console.error(`Invalid list structure at index ${index}:`, child);
-          throw new Error(`Invalid list structure at index ${index}. Expected children array.`);
         }
-      }
 
-      // Other Element Types
-      console.log(`Processing other element type: ${type}`);
-      return {
-        id: uuidv4(),
-        type,
-        content: child.properties.content?.enum?.[0] || '',
-        description: child.properties.content?.description || null,
-        isDynamic: false,
-        listItemDescription: null,
-        hasDescription: !!child.properties.content?.description
-      };
-    });
+        // Other Element Types
+        console.log(`Processing other element type: ${type}`);
+        return {
+          id: uuidv4(),
+          type,
+          content: child.properties.content?.enum?.[0] || '',
+          description: child.properties.content?.description || null,
+          isDynamic: false,
+          listItemDescription: null,
+          hasDescription: !!child.properties.content?.description
+        };
+      });
 
-    console.log('New elements created:', newElements);
-    setElements(newElements);
-    alert('Template updated successfully!');
-  } catch (error) {
-    console.error('Error updating elements from schema:', error);
-    alert(`Error updating template: ${error.message}\nPlease check the console for more details.`);
-  }
-};
+      console.log('New elements created:', newElements);
+      setElements(newElements);
+      alert('Template updated successfully!');
+    } catch (error) {
+      console.error('Error updating elements from schema:', error);
+      alert(`Error updating template: ${error.message}\nPlease check the console for more details.`);
+    }
+  };
 
-const renderPreview = () => (
-  <div className="p-5 bg-gray-100 rounded mb-5 text-gray-800">
-    {elements.map((element, index) => {
-      if (['ul', 'ol'].includes(element.type)) {
+  const renderPreview = () => (
+    <div className="p-5 bg-gray-100 rounded mb-5 text-gray-800">
+      {elements.map((element, index) => {
+        if (['ul', 'ol'].includes(element.type)) {
+          return (
+            <div key={index} className="mb-4">
+              <p className="italic text-gray-600 mb-2">List description: {element.description || defaultListDescription}</p>
+              {element.isDynamic ? (
+                <div className="p-3 bg-yellow-100 rounded">
+                  <p className="font-semibold">Dynamic {getElementTypeName(element.type)}:</p>
+                  <p className="italic">Items: {element.listItemDescription || 'No description provided'}</p>
+                </div>
+              ) : (
+                <ListComponent
+                  type={element.type}
+                  items={element.content}
+                />
+              )}
+            </div>
+          );
+        }
+
+        if (element.type === 'br') {
+          return <hr key={index} className="my-4 border-t border-gray-300" />;
+        }
+
+        const ElementComponent = getElementComponent(element.type);
         return (
-          <div key={index} className="mb-4">
-            <p className="italic text-gray-600 mb-2">List description: Follow instructions mentioned in list description</p>
-            {element.isDynamic ? (
-              <div className="p-3 bg-yellow-100 rounded">
-                <p className="font-semibold">Dynamic {getElementTypeName(element.type)}:</p>
-                <p className="italic">Items: {element.listItemDescription || 'No description provided'}</p>
-              </div>
-            ) : (
-              <ListComponent
-                type={element.type}
-                items={element.content}
-              />
+          <ElementComponent key={index} className="mb-4">
+            {element.content || (element.description && 
+              <span className="italic text-gray-600">Generated content for: {element.description}</span>
             )}
-          </div>
+          </ElementComponent>
         );
-      }
-
-      if (element.type === 'br') {
-        return <hr key={index} className="my-4 border-t border-gray-300" />;
-      }
-
-      const ElementComponent = getElementComponent(element.type);
-      return (
-        <ElementComponent key={index} className="mb-4">
-          {element.content || (element.description && 
-            <span className="italic text-gray-600">Generated content for: {element.description}</span>
-          )}
-        </ElementComponent>
-      );
-    })}
-  </div>
-);
-
-
-const ListComponent = ({ type, items }) => {
-  const ListTag = type === 'ul' ? 'ul' : 'ol';
-  return (
-    <ListTag className={`pl-5 ${type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
-      {items.map((item, idx) => (
-        <li key={idx} className="mb-2">
-          {item.content || (item.description && 
-            <span className="italic text-gray-600">Generated content for: {item.description}</span>
-          )}
-          {item.nestedSpans.length > 0 && (
-            <span>
-              {item.nestedSpans.map((span, spanIdx) => (
-                <span key={spanIdx}>
-                  {span.content || (span.description && 
-                    <span className="italic text-gray-600">Generated content for: {span.description}</span>
-                  )}
-                </span>
-              ))}
-            </span>
-          )}
-        </li>
-      ))}
-    </ListTag>
+      })}
+    </div>
   );
-};
 
-const getElementComponent = (type) => {
+  const ListComponent = ({ type, items }) => {
+    const ListTag = type === 'ul' ? 'ul' : 'ol';
+    return (
+      <ListTag className={`pl-5 ${type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
+        {items.map((item, idx) => (
+          <li key={idx} className="mb-2">
+            {item.content || (item.description && 
+              <span className="italic text-gray-600">Generated content for: {item.description}</span>
+            )}
+            {item.nestedSpans.length > 0 && (
+              <span>
+                {item.nestedSpans.map((span, spanIdx) => (
+                  <span key={spanIdx}>
+                    {span.content || (span.description && 
+                      <span className="italic text-gray-600">Generated content for: {span.description}</span>
+                    )}
+                  </span>
+                ))}
+              </span>
+            )}
+          </li>
+        ))}
+      </ListTag>
+    );
+  };
+
+  
+ const getElementComponent = (type) => {
   switch (type) {
     case 'h1': return ({ children, className }) => <h1 className={`text-4xl font-bold ${className}`}>{children}</h1>;
     case 'h2': return ({ children, className }) => <h2 className={`text-3xl font-semibold ${className}`}>{children}</h2>;
@@ -773,7 +767,6 @@ return (
     </div>
   </div>
 );
-
 };
 
 export default JsonTemplateBuilderRevert;
