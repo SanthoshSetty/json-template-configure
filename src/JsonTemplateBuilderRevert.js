@@ -558,61 +558,63 @@ const updateElementsFromSchema = () => {
         console.log(`Processing list element of type ${type}`);
         const description = child.description || "Follow instructions mentioned in list description";
         if (child.properties.children && Array.isArray(child.properties.children)) {
-          console.log('Processing static list');
-          // Static List
-          const listItems = child.properties.children.map((item, itemIndex) => {
-            console.log(`Processing list item at index ${itemIndex}:`, item);
-            if (!item.properties || !item.properties.tag || !item.properties.tag.enum) {
-              console.error(`Invalid list item structure at element ${index}, item ${itemIndex}:`, item);
-              throw new Error(`Invalid list item structure at element ${index}, item ${itemIndex}.`);
-            }
-            
-            return {
-              id: uuidv4(),
-              content: item.properties.content?.enum?.[0] || '',
-              description: item.properties.content?.description || null,
-              nestedSpans: item.properties.children
-                ? item.properties.children.map((span, spanIndex) => {
-                    console.log(`Processing nested span at index ${spanIndex}:`, span);
-                    if (!span.properties || !span.properties.tag || !span.properties.tag.enum) {
-                      console.error(`Invalid nested span structure at element ${index}, item ${itemIndex}, span ${spanIndex}:`, span);
-                      throw new Error(`Invalid nested span structure at element ${index}, item ${itemIndex}, span ${spanIndex}.`);
-                    }
-                    return {
-                      id: uuidv4(),
-                      content: span.properties.content?.enum?.[0] || '',
-                      description: span.properties.content?.description || null
-                    };
-                  })
-                : []
-            };
-          });
-          console.log(`Created list items:`, listItems);
-          return {
-            id: uuidv4(),
-            type,
-            content: listItems,
-            description,
-            isDynamic: false,
-            listItemDescription: null,
-            hasDescription: true
-          };
-        } else if (child.properties.children && child.properties.children[0]?.type === 'array') {
           console.log('Processing dynamic list');
           // Dynamic List
-          const listItemDescription = child.properties.children[0].items?.properties?.content?.description || null;
-          return {
-            id: uuidv4(),
-            type,
-            content: [],
-            description,
-            isDynamic: true,
-            listItemDescription,
-            hasDescription: true
-          };
+          if (child.properties.children[0] && child.properties.children[0].type === 'array') {
+            const listItemDescription = child.properties.children[0].items?.properties?.content?.description || null;
+            return {
+              id: uuidv4(),
+              type,
+              content: [],
+              description,
+              isDynamic: true,
+              listItemDescription,
+              hasDescription: true
+            };
+          } else {
+            console.log('Processing static list');
+            // Static List
+            const listItems = child.properties.children.map((item, itemIndex) => {
+              console.log(`Processing list item at index ${itemIndex}:`, item);
+              if (!item.properties || !item.properties.tag || !item.properties.tag.enum) {
+                console.error(`Invalid list item structure at element ${index}, item ${itemIndex}:`, item);
+                throw new Error(`Invalid list item structure at element ${index}, item ${itemIndex}.`);
+              }
+              
+              return {
+                id: uuidv4(),
+                content: item.properties.content?.enum?.[0] || '',
+                description: item.properties.content?.description || null,
+                nestedSpans: item.properties.children
+                  ? item.properties.children.map((span, spanIndex) => {
+                      console.log(`Processing nested span at index ${spanIndex}:`, span);
+                      if (!span.properties || !span.properties.tag || !span.properties.tag.enum) {
+                        console.error(`Invalid nested span structure at element ${index}, item ${itemIndex}, span ${spanIndex}:`, span);
+                        throw new Error(`Invalid nested span structure at element ${index}, item ${itemIndex}, span ${spanIndex}.`);
+                      }
+                      return {
+                        id: uuidv4(),
+                        content: span.properties.content?.enum?.[0] || '',
+                        description: span.properties.content?.description || null
+                      };
+                    })
+                  : []
+              };
+            });
+            console.log(`Created list items:`, listItems);
+            return {
+              id: uuidv4(),
+              type,
+              content: listItems,
+              description,
+              isDynamic: false,
+              listItemDescription: null,
+              hasDescription: true
+            };
+          }
         } else {
           console.error(`Invalid list structure at index ${index}:`, child);
-          throw new Error(`Invalid list structure at index ${index}. Expected children array or dynamic list.`);
+          throw new Error(`Invalid list structure at index ${index}. Expected children array.`);
         }
       }
 
@@ -637,6 +639,7 @@ const updateElementsFromSchema = () => {
     alert(`Error updating template: ${error.message}\nPlease check the console for more details.`);
   }
 };
+
 const renderPreview = () => (
   <div className="p-5 bg-gray-100 rounded mb-5 text-gray-800">
     {elements.map((element, index) => {
