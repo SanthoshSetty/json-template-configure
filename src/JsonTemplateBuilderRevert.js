@@ -450,13 +450,9 @@ const convertToJsonSchema = () => ({
         }
 
         if (['ul', 'ol'].includes(element.type)) {
-          baseSchema = {
-            properties: { ...baseProps }
-          };
-          
-          if (element.description !== null) {
-            baseSchema.description = element.description;
-          }
+          baseSchema = element.description !== null 
+            ? { description: element.description, properties: { ...baseProps } }
+            : { properties: { ...baseProps } };
           
           if (element.isDynamic) {
             baseSchema.properties.children = [
