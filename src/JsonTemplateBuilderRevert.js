@@ -85,7 +85,7 @@ const FormattedInput = ({ value, onChange, placeholder, onRemove, onAddNestedSpa
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onSelect={handleSelect}
-        className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2 h-20"
+        className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2 h-16"
         placeholder={placeholder}
       />
       <div className="flex space-x-2 mb-2">
@@ -146,7 +146,7 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addN
           <input
             value={item.description || ''}
             onChange={(e) => modifyListItem(elementId, item.id, 'description', e.target.value)}
-            className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2 h-10"
+            className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2 h-8"
             placeholder="Item description"
           />
         </div>
@@ -161,7 +161,7 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addN
             <input
               value={span.description || ''}
               onChange={(e) => updateNestedSpan(elementId, item.id, span.id, 'description', e.target.value)}
-              className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2 h-10"
+              className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2 h-8"
               placeholder="Nested span description"
             />
           </div>
@@ -226,7 +226,7 @@ const Element = ({
                 <textarea
                   value={element.description}
                   onChange={(e) => updateElement(element.id, { description: e.target.value })}
-                  className="w-full p-2 mb-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-20"
+                  className="w-full p-2 mb-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
                   placeholder="List Description"
                 />
               )}
@@ -241,7 +241,7 @@ const Element = ({
                   value={element.listItemDescription || ''}
                   onChange={(e) => updateElement(element.id, { listItemDescription: e.target.value })}
                   placeholder="Item Description"
-                  className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-20"
+                  className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
                 />
               ) : (
                 <Droppable droppableId={element.id} type={`list-${element.id}`}>
@@ -289,7 +289,7 @@ const Element = ({
                   value={element.description || ''}
                   onChange={(e) => updateElement(element.id, { description: e.target.value })}
                   placeholder="Description/Instructions for AI"
-                  className="w-full p-2 mt-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-20"
+                  className="w-full p-2 mt-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
                 />
               )}
             </>
