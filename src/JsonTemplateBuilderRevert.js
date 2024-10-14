@@ -209,7 +209,7 @@ const Element = ({
             </label>
             {!element.isDynamic && (
               <textarea
-                value={element.description === null ? '' : element.description}
+                value={element.description}
                 onChange={(e) => updateElement(element.id, { description: e.target.value })}
                 className="w-full p-2 mb-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="List Description"
@@ -309,22 +309,22 @@ const JsonTemplateBuilderRevert = () => {
   }, []);
 
   const updateElement = useCallback((id, updates) => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === id) {
-          const updatedElement = { ...el, ...updates };
-          if ('description' in updates) {
-            updatedElement.description = updates.description.trim() === '' ? null : updates.description;
-          }
-          if (updatedElement.isDynamic) {
-            updatedElement.description = null;
-          }
-          return updatedElement;
+  setElements((prev) =>
+    prev.map((el) => {
+      if (el.id === id) {
+        const updatedElement = { ...el, ...updates };
+        if (['ul', 'ol'].includes(updatedElement.type)) {
+          updatedElement.description = "Follow instructions mentioned in list description";
         }
-        return el;
-      })
-    );
-  }, []);
+        if (updatedElement.isDynamic) {
+          updatedElement.content = [];
+        }
+        return updatedElement;
+      }
+      return el;
+    })
+  );
+}, []);
 
   const modifyListItem = useCallback((elementId, itemId, action, value = '') => {
   setElements((prev) =>
