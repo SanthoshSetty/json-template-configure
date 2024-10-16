@@ -446,13 +446,15 @@ const JsonTemplateBuilderRevert = () => {
     const [movedElement] = reorderedElements.splice(source.index, 1);
     reorderedElements.splice(destination.index, 0, movedElement);
     setElements(reorderedElements);
+    return; // Exit early since we've handled the ELEMENT type
   }
 
   // Reorder list items
-  if (type.startsWith('list-')) {
-    const elementId = type.split('-')[1];
-    setElements(prevElements => {
-      const updatedElements = prevElements.map(element => {
+  if (type === 'list') {
+    const elementId = source.droppableId; // Use droppableId to identify the list
+
+    setElements((prevElements) =>
+      prevElements.map((element) => {
         if (element.id === elementId) {
           const reorderedItems = Array.from(element.content);
           const [movedItem] = reorderedItems.splice(source.index, 1);
@@ -460,9 +462,8 @@ const JsonTemplateBuilderRevert = () => {
           return { ...element, content: reorderedItems };
         }
         return element;
-      });
-      return updatedElements;
-    });
+      })
+    );
   }
 };
 
