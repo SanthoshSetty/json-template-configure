@@ -1,19 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { PlusIcon, MinusIcon, TrashIcon, VariableIcon } from '@heroicons/react/solid';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { v4 as uuidv4 } from 'uuid';
-
-const ElementTypes = {
-  HEADING1: 'h1',
-  HEADING2: 'h2',
-  HEADING3: 'h3',
-  PARAGRAPH: 'p',
-  UNORDERED_LIST: 'ul',
-  ORDERED_LIST: 'ol',
-  SPAN: 'span',
-  STRONG: 'strong',
-  BREAK: 'br'
-};
 
 const getElementTypeName = (type) => {
   const typeNames = {
@@ -29,6 +17,45 @@ const getElementTypeName = (type) => {
   };
   return typeNames[type] || type.toUpperCase();
 };
+
+const ElementTypes = {
+  HEADING1: 'h1',
+  HEADING2: 'h2',
+  HEADING3: 'h3',
+  PARAGRAPH: 'p',
+  UNORDERED_LIST: 'ul',
+  ORDERED_LIST: 'ol',
+  SPAN: 'span',
+  STRONG: 'strong',
+  BREAK: 'br'
+};
+
+const defaultContent = {
+  ul: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
+  ol: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
+  br: '', 
+  h1: 'Heading 1',
+  h2: 'Heading 2',
+  h3: 'Heading 3',
+  p: 'Paragraph text',
+  strong: 'Bold text',
+  span: 'Span text'
+};
+
+const AddElementSidebar = ({ addElement }) => (
+  <div className="w-full md:w-64 bg-white shadow-md rounded-lg p-6">
+    <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Add Elements</h2>
+    {Object.entries(ElementTypes).map(([key, value]) => (
+      <button
+        key={key}
+        onClick={() => addElement(value)}
+        className="block w-full mb-2 text-left text-blue-500 hover:text-blue-700 transition-colors duration-200"
+      >
+        Add {key.replace(/_/g, ' ')}
+      </button>
+    ))}
+  </div>
+);
 
 const FormattedInput = ({ value, onChange, placeholder, onRemove, onAddNestedSpan, onRemoveNestedSpan, onAddDescription }) => {
   const [selectionStart, setSelectionStart] = useState(0);
@@ -76,7 +103,7 @@ const FormattedInput = ({ value, onChange, placeholder, onRemove, onAddNestedSpa
         </button>
         {onAddDescription && (
           <button onClick={onAddDescription} className="p-1 text-green-500 hover:text-green-700">
-            Toggle Description
+            Add Description
           </button>
         )}
         {onRemove && (
@@ -100,7 +127,7 @@ const FormattedInput = ({ value, onChange, placeholder, onRemove, onAddNestedSpa
 };
 
 const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addNestedSpan, updateNestedSpan, removeNestedSpan }) => (
-  <Draggable draggableId={item.id} index={index}>
+  <Draggable draggableId={item.id} index={index} key={item.id}>
     {(provided) => (
       <div
         className="mb-4 p-4 bg-gray-50 rounded-md"
@@ -113,7 +140,7 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addN
             value={item.content}
             onChange={(value) => modifyListItem(elementId, item.id, 'content', value)}
             placeholder="List item content"
-            onRemove={() => modifyListItem(elementId, item.id, 'remove')}
+            onRemove={() => modifyListItem(elementId, item.id, 'removeContent')}
             onAddNestedSpan={() => addNestedSpan(elementId, item.id)}
           />
           <input
@@ -139,6 +166,12 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addN
             />
           </div>
         ))}
+        <button
+          onClick={() => modifyListItem(elementId, item.id, 'remove')}
+          className="mt-2 p-1 text-red-500 hover:text-red-700"
+        >
+          <TrashIcon className="h-5 w-5" /> Remove Item
+        </button>
       </div>
     )}
   </Draggable>
@@ -171,7 +204,7 @@ const Element = ({
   }, [element.description]);
 
   return (
-    <Draggable draggableId={element.id} index={index}>
+    <Draggable draggableId={element.id} index={index} key={element.id}>
       {(provided) => (
         <div
           className="mb-6 p-6 border rounded-lg bg-white shadow-sm transition-all duration-200 hover:shadow-md"
@@ -273,7 +306,7 @@ const Element = ({
   );
 };
 
-const JsonTemplateBuilder = () => {
+const JsonTemplateBuilderRevert = () => {
   const [elements, setElements] = useState([]);
   const [jsonSchema, setJsonSchema] = useState(JSON.stringify({ schema: { properties: { tag: { enum: ['body'] }, children: [] } } }, null, 2));
 
@@ -287,7 +320,7 @@ const JsonTemplateBuilder = () => {
       {
         id: uuidv4(),
         type,
-        content: type === 'ul' || type === 'ol' ? [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }] : '',
+        content: defaultContent[type] || 'New element',
         description: ['ul', 'ol'].includes(type) ? "Follow the instructions mentioned in List description" : null,
         isDynamic: false,
         listItemDescription: null,
@@ -318,7 +351,7 @@ const JsonTemplateBuilder = () => {
     );
   }, []);
 
-  const modifyListItem = useCallback((elementId, itemId, action, value = '') => {
+ const modifyListItem = useCallback((elementId, itemId, action, value = '') => {
     setElements((prev) =>
       prev.map((el) => {
         if (el.id === elementId) {
@@ -327,6 +360,8 @@ const JsonTemplateBuilder = () => {
             newContent.push({ id: uuidv4(), content: '', description: null, nestedSpans: [] });
           } else if (action === 'remove') {
             newContent = newContent.filter(item => item.id !== itemId);
+          } else if (action === 'removeContent') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
           } else if (action === 'content') {
             newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: value } : item));
           } else if (action === 'description') {
@@ -356,150 +391,151 @@ const JsonTemplateBuilder = () => {
     );
   }, []);
 
- const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) => {
-  setElements((prev) =>
-    prev.map((el) => {
-      if (el.id === elementId) {
-        const newContent = el.content.map((item) => {
-          if (item.id === itemId) {
-            const updatedSpans = item.nestedSpans.map((span) => {
-              if (span.id === spanId) {
-                if (field === 'description') {
-                  return { ...span, [field]: value.trim() === '' ? null : value };
+  const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          const newContent = el.content.map((item) => {
+            if (item.id === itemId) {
+              const updatedSpans = item.nestedSpans.map((span) => {
+                if (span.id === spanId) {
+                  if (field === 'description') {
+                    return { ...span, [field]: value.trim() === '' ? null : value };
+                  }
+                  return { ...span, [field]: value };
                 }
-                return { ...span, [field]: value };
-              }
-              return span;
-            });
-            return { ...item, nestedSpans: updatedSpans };
-          }
-          return item;
-        });
-        return { ...el, content: newContent };
-      }
-      return el;
-    })
-  );
-}, []);
+                return span;
+              });
+              return { ...item, nestedSpans: updatedSpans };
+            }
+            return item;
+          });
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
 
-const removeNestedSpan = useCallback((elementId, itemId, spanId) => {
-  setElements((prev) =>
-    prev.map((el) => {
-      if (el.id === elementId) {
-        const newContent = el.content.map((item) => {
-          if (item.id === itemId) {
-            return { ...item, nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId) };
-          }
-          return item;
-        });
-        return { ...el, content: newContent };
-      }
-      return el;
-    })
-  );
-}, []);
+  const removeNestedSpan = useCallback((elementId, itemId, spanId) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          const newContent = el.content.map((item) => {
+            if (item.id === itemId) {
+              return { ...item, nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId) };
+            }
+            return item;
+          });
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
 
-const handleDragEnd = (result) => {
+  
+ const handleDragEnd = (result) => {
   const { destination, source, type } = result;
 
   if (!destination) return;
 
-  setElements((prevElements) => {
-    const updatedElements = Array.from(prevElements);
+  // Reorder elements
+  if (type === 'ELEMENT') {
+    const reorderedElements = Array.from(elements);
+    const [movedElement] = reorderedElements.splice(source.index, 1);
+    reorderedElements.splice(destination.index, 0, movedElement);
+    setElements(reorderedElements);
+  }
 
-    if (type === 'ELEMENT') {
-      const [reorderedElement] = updatedElements.splice(source.index, 1);
-      updatedElements.splice(destination.index, 0, reorderedElement);
-    } else if (type.startsWith('list-')) {
-      const elementId = type.split('-')[1];
-      const elementIndex = updatedElements.findIndex((el) => el.id === elementId);
-      
-      if (elementIndex !== -1) {
-        const element = { ...updatedElements[elementIndex] };
-        const updatedContent = Array.from(element.content);
-        const [reorderedItem] = updatedContent.splice(source.index, 1);
-        updatedContent.splice(destination.index, 0, reorderedItem);
-        
-        element.content = updatedContent;
-        updatedElements[elementIndex] = element;
-      }
-    }
-
-    console.log('Updated elements after drag:', updatedElements);
-    return updatedElements;
-  });
+  // Reorder list items
+  if (type.startsWith('list-')) {
+    const elementId = type.split('-')[1];
+    setElements(prevElements => {
+      const updatedElements = prevElements.map(element => {
+        if (element.id === elementId) {
+          const reorderedItems = Array.from(element.content);
+          const [movedItem] = reorderedItems.splice(source.index, 1);
+          reorderedItems.splice(destination.index, 0, movedItem);
+          return { ...element, content: reorderedItems };
+        }
+        return element;
+      });
+      return updatedElements;
+    });
+  }
 };
 
-const convertToJsonSchema = () => ({
-  schema: {
-    description: "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements. Avoid generating any introductory text, section titles, or descriptive elements unless explicitly requested. Focus solely on the required data in the format provided, and ensure no content is generated outside the template's structural elements.Do not mention product name or any details about the product outside the ul,ol,p,span,strong elements",
-    properties: {
-      tag: { enum: ['body'] },
-      children: elements.map((element) => {
-        const baseProps = { tag: { enum: [element.type] } };
-        let baseSchema = {};
+  const convertToJsonSchema = () => ({
+    schema: {
+      description: "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements. Avoid generating any introductory text, section titles, or descriptive elements unless explicitly requested. Focus solely on the required data in the format provided, and ensure no content is generated outside the template's structural elements.Do not mention product name or any details about the product outside the ul,ol,p,span,strong elements",
+      properties: {
+        tag: { enum: ['body'] },
+        children: elements.map((element) => {
+          const baseProps = { tag: { enum: [element.type] } };
+          let baseSchema = {};
 
-        if (element.type === 'br') {
-          return { properties: baseProps };
-        }
+          if (element.type === 'br') {
+            return { properties: baseProps };
+          }
 
-        if (['ul', 'ol'].includes(element.type)) {
-          baseSchema = element.description !== null 
-            ? { description: element.description, properties: { ...baseProps } }
-            : { properties: { ...baseProps } };
-          
-          if (element.isDynamic) {
-            baseSchema.properties.children = [
-              {
-                type: 'array',
-                items: {
-                  properties: {
-                    tag: { enum: ['li'] },
-                    content: element.listItemDescription ? { description: element.listItemDescription } : undefined,
-                    children: null
+          if (['ul', 'ol'].includes(element.type)) {
+            baseSchema = element.description !== null 
+              ? { description: element.description, properties: { ...baseProps } }
+              : { properties: { ...baseProps } };
+            
+            if (element.isDynamic) {
+              baseSchema.properties.children = [
+                {
+                  type: 'array',
+                  items: {
+                    properties: {
+                      tag: { enum: ['li'] },
+                      content: element.listItemDescription ? { description: element.listItemDescription } : undefined,
+                      children: null
+                    }
                   }
                 }
-              }
-            ];
-          } else {
-            baseSchema.properties.children = element.content.map((item) => ({
-              properties: {
-                tag: { enum: ['li'] },
-                content: item.content.trim() !== '' 
-                  ? { enum: [item.content] }
-                  : (item.description ? { description: item.description } : undefined),
-                children: item.nestedSpans.length > 0
-                  ? item.nestedSpans.map((span) => ({
-                      properties: {
-                        tag: { enum: ['span'] },
-                        content: span.content.trim() !== ''
-                          ? { enum: [span.content] }
-                          : (span.description ? { description: span.description } : undefined)
-                      }
-                    }))
-                  : null
-              }
-            }));
+              ];
+            } else {
+              baseSchema.properties.children = element.content.map((item) => ({
+                properties: {
+                  tag: { enum: ['li'] },
+                  content: item.content.trim() !== '' 
+                    ? { enum: [item.content] }
+                    : (item.description ? { description: item.description } : undefined),
+                  children: item.nestedSpans.length > 0
+                    ? item.nestedSpans.map((span) => ({
+                        properties: {
+                          tag: { enum: ['span'] },
+                          content: span.content.trim() !== ''
+                            ? { enum: [span.content] }
+                            : (span.description ? { description: span.description } : undefined)
+                        }
+                      }))
+                    : null
+                }
+              }));
+            }
+            return baseSchema;
           }
-          return baseSchema;
-        }
 
-        // For non-ul and non-ol elements
-        return {
-          properties: {
-            ...baseProps,
-            content: element.content.trim() !== ''
-              ? { enum: [element.content] }
-              : (element.description ? { description: element.description } : undefined),
-            children: null
-          }
-        };
-      })
+          // For non-ul and non-ol elements
+          return {
+            properties: {
+              ...baseProps,
+              content: element.content.trim() !== ''
+                ? { enum: [element.content] }
+                : (element.description ? { description: element.description } : undefined),
+              children: null
+            }
+          };
+        })
+      }
     }
-  }
-});
+  });
 
-const updateElementsFromSchema = () => {
+  const updateElementsFromSchema = () => {
   try {
     let parsedSchema;
     try {
@@ -624,69 +660,140 @@ const updateElementsFromSchema = () => {
   }
 };
 
-return (
-  <div className="font-sans p-8 bg-gray-100 min-h-screen">
-    <div className="max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold text-gray-800 mb-8">JSON Template Builder</h1>
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="flex flex-col md:flex-row gap-8">
-          <div className="w-full md:w-64 bg-white shadow-md rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Add Elements</h2>
-            {Object.entries(ElementTypes).map(([key, value]) => (
-              <button
-                key={key}
-                onClick={() => addElement(value)}
-                className="block w-full mb-2 text-left text-blue-500 hover:text-blue-700 transition-colors duration-200"
-              >
-                Add {key.replace(/_/g, ' ')}
-              </button>
-            ))}
-          </div>
-          <div className="flex-1">
-            <div className="bg-white shadow-md rounded-lg p-6 mb-8">
-              <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Template Builder</h2>
-              <Droppable droppableId="elements" type="ELEMENT">
-                {(provided) => (
-                  <div ref={provided.innerRef} {...provided.droppableProps}>
-                    {elements.map((element, index) => (
-                      <Element
-                        key={element.id}
-                        element={element}
-                        index={index}
-                        updateElement={updateElement}
-                        removeElement={removeElement}
-                        modifyListItem={modifyListItem}
-                        insertVariable={(id) => updateElement(id, { content: `${element.content} {{Group//Variable Name}}` })}
-                        addNestedSpan={addNestedSpan}
-                        updateNestedSpan={updateNestedSpan}
-                        removeNestedSpan={removeNestedSpan}
-                      />
-                    ))}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
+  const renderPreview = () => (
+    <div className="p-5 bg-gray-100 rounded mb-5 text-gray-800">
+      {elements.map((element, index) => {
+        if (['ul', 'ol'].includes(element.type)) {
+          return (
+            <div key={index} className="mb-4">
+              {element.description !== null && (
+                <p className="italic text-gray-600 mb-2">List description: {element.description}</p>
+              )}
+              {element.isDynamic ? (
+                <div className="p-3 bg-yellow-100 rounded">
+                  <p className="font-semibold">Dynamic {getElementTypeName(element.type)}:</p>
+                  <p className="italic">Items: {element.listItemDescription || 'No description provided'}</p>
+                </div>
+              ) : (
+                <ListComponent
+                  type={element.type}
+                  items={element.content}
+                />
+              )}
             </div>
-            <div className="bg-white shadow-md rounded-lg p-6">
-              <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">JSON Schema</h2>
-              <textarea
-                value={jsonSchema}
-                onChange={(e) => setJsonSchema(e.target.value)}
-                className="w-full h-[300px] p-2 font-mono text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                onClick={updateElementsFromSchema}
-                className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors duration-200"
-              >
-                Update Template
-              </button>
-            </div>
-          </div>
-        </div>
-      </DragDropContext>
+          );
+        }
+
+        if (element.type === 'br') {
+          return <hr key={index} className="my-4 border-t border-gray-300" />;
+        }
+
+        const ElementComponent = getElementComponent(element.type);
+        return (
+          <ElementComponent key={index} className="mb-4">
+            {element.content || (element.description && 
+              <span className="italic text-gray-600">Generated content for: {element.description}</span>
+            )}
+          </ElementComponent>
+        );
+      })}
     </div>
-  </div>
-);
+  );
+
+  const ListComponent = ({ type, items }) => {
+    const ListTag = type === 'ul' ? 'ul' : 'ol';
+    return (
+      <ListTag className={`pl-5 ${type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
+        {items.map((item, idx) => (
+          <li key={idx} className="mb-2">
+            {item.content || (item.description && 
+              <span className="italic text-gray-600">Generated content for: {item.description}</span>
+            )}
+            {item.nestedSpans.length > 0 && (
+              <span>
+                {item.nestedSpans.map((span, spanIdx) => (
+                  <span key={spanIdx}>
+                    {span.content || (span.description && 
+                      <span className="italic text-gray-600">Generated content for: {span.description}</span>
+                    )}
+                  </span>
+                ))}
+              </span>
+            )}
+          </li>
+        ))}
+      </ListTag>
+    );
+  };
+
+  const getElementComponent = (type) => {
+    switch (type) {
+      case 'h1': return ({ children, className }) => <h1 className={`text-4xl font-bold ${className}`}>{children}</h1>;
+      case 'h2': return ({ children, className }) => <h2 className={`text-3xl font-semibold ${className}`}>{children}</h2>;
+      case 'h3': return ({ children, className }) => <h3 className={`text-2xl font-medium ${className}`}>{children}</h3>;
+      case 'p': return ({ children, className }) => <p className={className}>{children}</p>;
+      case 'strong': return ({ children, className }) => <strong className={`font-bold ${className}`}>{children}</strong>;
+      case 'span': return ({ children, className }) => <span className={className}>{children}</span>;
+      default: return ({ children, className }) => <div className={className}>{children}</div>;
+    }
+  };
+
+  return (
+    <div className="font-sans p-8 bg-gray-100 min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-3xl font-bold text-gray-800 mb-8">JSON Template Builder</h1>
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="flex flex-col md:flex-row gap-8">
+            <AddElementSidebar addElement={addElement} />
+            <div className="flex-1">
+              <div className="bg-white shadow-md rounded-lg p-6 mb-8">
+                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Template Builder</h2>
+                <Droppable droppableId="elements" type="ELEMENT">
+                  {(provided) => (
+                    <div ref={provided.innerRef} {...provided.droppableProps}>
+                      {elements.map((element, index) => (
+                        <Element
+                          key={element.id}
+                          element={element}
+                          index={index}
+                          updateElement={updateElement}
+                          removeElement={removeElement}
+                          modifyListItem={modifyListItem}
+                          insertVariable={(id) => updateElement(id, { content: `${element.content} {{Group//Variable Name}}` })}
+                          addNestedSpan={addNestedSpan}
+                          updateNestedSpan={updateNestedSpan}
+                          removeNestedSpan={removeNestedSpan}
+                        />
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </div>
+              <div className="bg-white shadow-md rounded-lg p-6 mb-8">
+                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Human-Readable Preview</h2>
+                {renderPreview()}
+              </div>
+              <div className="bg-white shadow-md rounded-lg p-6">
+                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">JSON Schema</h2>
+                <textarea
+                  value={jsonSchema}
+                  onChange={(e) => setJsonSchema(e.target.value)}
+                  className="w-full h-[300px] p-2 font-mono text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={updateElementsFromSchema}
+                  className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors duration-200"
+                >
+                  Update Template
+                </button>
+              </div>
+            </div>
+          </div>
+        </DragDropContext>
+      </div>
+    </div>
+  );
 };
 
-export default JsonTemplateBuilder;
+export default JsonTemplateBuilderRevert;
