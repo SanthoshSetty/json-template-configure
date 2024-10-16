@@ -250,26 +250,26 @@ const Element = ({
                   className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
                 />
               ) : (
-                <Droppable droppableId={element.id} type={`list-${element.id}`}>
-                  {(provided) => (
-                    <div ref={provided.innerRef} {...provided.droppableProps}>
-                      {element.content.map((item, idx) => (
-                        <ListItem
-                          key={item.id}
-                          item={item}
-                          index={idx}
-                          elementId={element.id}
-                          modifyListItem={modifyListItem}
-                          insertVariable={insertVariable}
-                          addNestedSpan={addNestedSpan}
-                          updateNestedSpan={updateNestedSpan}
-                          removeNestedSpan={removeNestedSpan}
-                        />
-                      ))}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
+                <Droppable droppableId={element.id} type="list">
+                   {(provided) => (
+                     <div ref={provided.innerRef} {...provided.droppableProps}>
+                       {element.content.map((item, idx) => (
+                         <ListItem
+                           key={item.id}
+                           item={item}
+                           index={idx}
+                           elementId={element.id}
+                           modifyListItem={modifyListItem}
+                           insertVariable={insertVariable}
+                           addNestedSpan={addNestedSpan}
+                           updateNestedSpan={updateNestedSpan}
+                           removeNestedSpan={removeNestedSpan}
+                         />
+                        ))}
+                         {provided.placeholder}
+                     </div>
+                    )}
+                  </Droppable>
               )}
               {!element.isDynamic && (
                 <div className="mt-4">
