@@ -415,17 +415,17 @@ const handleDragEnd = (result) => {
       const elementIndex = updatedElements.findIndex((el) => el.id === elementId);
       
       if (elementIndex !== -1) {
-        const updatedContent = Array.from(updatedElements[elementIndex].content);
+        const element = { ...updatedElements[elementIndex] };
+        const updatedContent = Array.from(element.content);
         const [reorderedItem] = updatedContent.splice(source.index, 1);
         updatedContent.splice(destination.index, 0, reorderedItem);
         
-        updatedElements[elementIndex] = {
-          ...updatedElements[elementIndex],
-          content: updatedContent
-        };
+        element.content = updatedContent;
+        updatedElements[elementIndex] = element;
       }
     }
 
+    console.log('Updated elements after drag:', updatedElements);
     return updatedElements;
   });
 };
