@@ -434,32 +434,37 @@ const JsonTemplateBuilderRevert = () => {
     );
   }, []);
 
-  const handleDragEnd = (result) => {
-    const { destination, source, type } = result;
+  
+ const handleDragEnd = (result) => {
+  const { destination, source, type } = result;
 
-    if (!destination) return;
+  if (!destination) return;
 
-    // Reorder elements
-    if (type === 'ELEMENT') {
-      const reorderedElements = Array.from(elements);
-      const [movedElement] = reorderedElements.splice(source.index, 1);
-      reorderedElements.splice(destination.index, 0, movedElement);
-      setElements(reorderedElements);
-    }
+  // Reorder elements
+  if (type === 'ELEMENT') {
+    const reorderedElements = Array.from(elements);
+    const [movedElement] = reorderedElements.splice(source.index, 1);
+    reorderedElements.splice(destination.index, 0, movedElement);
+    setElements(reorderedElements);
+  }
 
-    // Reorder list items
-    if (type.startsWith('list-')) {
-      const elementId = type.split('-')[1];
-      const reorderedElements = Array.from(elements);
-      const elementIndex = reorderedElements.findIndex((el) => el.id === elementId);
-      if (elementIndex === -1) return;
-      const listItems = Array.from(reorderedElements[elementIndex].content);
-      const [movedItem] = listItems.splice(source.index, 1);
-      listItems.splice(destination.index, 0, movedItem);
-      reorderedElements[elementIndex].content = listItems;
-      setElements(reorderedElements);
-    }
-  };
+  // Reorder list items
+  if (type.startsWith('list-')) {
+    const elementId = type.split('-')[1];
+    setElements(prevElements => {
+      const updatedElements = prevElements.map(element => {
+        if (element.id === elementId) {
+          const reorderedItems = Array.from(element.content);
+          const [movedItem] = reorderedItems.splice(source.index, 1);
+          reorderedItems.splice(destination.index, 0, movedItem);
+          return { ...element, content: reorderedItems };
+        }
+        return element;
+      });
+      return updatedElements;
+    });
+  }
+};
 
   const convertToJsonSchema = () => ({
     schema: {
