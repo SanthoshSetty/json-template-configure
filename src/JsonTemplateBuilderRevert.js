@@ -188,14 +188,20 @@ const Element = ({
   updateNestedSpan,
   removeNestedSpan
 }) => {
-  const [showDescription, setShowDescription] = useState(false);
+  const [showDescription, setShowDescription] = useState(!!element.description);
 
   const toggleDescription = () => {
-    setShowDescription(!showDescription);
-    if (!showDescription && !element.description) {
+    if (!element.description) {
       updateElement(element.id, { description: '' });
     }
+    setShowDescription(!showDescription);
   };
+
+  useEffect(() => {
+    if (element.description) {
+      setShowDescription(true);
+    }
+  }, [element.description]);
 
   return (
     <Draggable draggableId={element.id} index={index} key={element.id}>
@@ -224,7 +230,7 @@ const Element = ({
               </label>
               {!element.isDynamic && (
                 <textarea
-                  value={element.description}
+                  value={element.description || ''}
                   onChange={(e) => updateElement(element.id, { description: e.target.value })}
                   className="w-full p-2 mb-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
                   placeholder="List Description"
@@ -284,7 +290,7 @@ const Element = ({
                 placeholder={`${getElementTypeName(element.type)} content`}
                 onAddDescription={toggleDescription}
               />
-              {showDescription && (
+              {(showDescription || element.description) && (
                 <textarea
                   value={element.description || ''}
                   onChange={(e) => updateElement(element.id, { description: e.target.value })}
@@ -570,7 +576,6 @@ const JsonTemplateBuilderRevert = () => {
         if (child.properties.children && Array.isArray(child.properties.children)) {
           if (child.properties.children[0]?.type === 'array') {
             console.log('Processing dynamic list');
-            // Dynamic List
             const listItemDescription = child.properties.children[0].items?.properties?.content?.description || null;
             return {
               id: uuidv4(),
@@ -583,7 +588,6 @@ const JsonTemplateBuilderRevert = () => {
             };
           } else {
             console.log('Processing static list');
-            // Static List
             const listItems = child.properties.children.map((item, itemIndex) => {
               console.log(`Processing list item at index ${itemIndex}:`, item);
               if (!item.properties || !item.properties.tag || !item.properties.tag.enum) {
@@ -630,14 +634,15 @@ const JsonTemplateBuilderRevert = () => {
 
       // Other Element Types
       console.log(`Processing other element type: ${type}`);
+      const description = child.properties.content?.description || null;
       return {
         id: uuidv4(),
         type,
         content: child.properties.content?.enum?.[0] || '',
-        description: child.properties.content?.description || null,
+        description,
         isDynamic: false,
         listItemDescription: null,
-        hasDescription: !!child.properties.content?.description
+        hasDescription: !!description
       };
     });
 
