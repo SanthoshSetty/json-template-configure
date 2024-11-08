@@ -284,7 +284,7 @@ const Element = ({
                             index={idx}
                             elementId={element.id}
                             modifyListItem={modifyListItem}
-                            insertVariable={insertVariable}
+                            // Removed insertVariable from props
                             addNestedSpan={addNestedSpan}
                             updateNestedSpan={updateNestedSpan}
                             removeNestedSpan={removeNestedSpan}
