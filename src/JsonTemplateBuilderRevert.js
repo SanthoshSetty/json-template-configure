@@ -160,7 +160,7 @@ const ListItem = ({
   updateNestedSpan,
   removeNestedSpan,
 }) => (
-  <Draggable draggableId={item.id} index={index}>
+  <Draggable draggableId={item.id} index={index} type="LIST_ITEM">
     {(provided) => (
       <li
         ref={provided.innerRef}
@@ -180,7 +180,9 @@ const ListItem = ({
             />
             <input
               value={item.description || ''}
-              onChange={(e) => modifyListItem(elementId, item.id, 'description', e.target.value)}
+              onChange={(e) =>
+                modifyListItem(elementId, item.id, 'description', e.target.value)
+              }
               placeholder="Item description"
               className="w-full p-2 text-sm border rounded"
             />
@@ -197,7 +199,13 @@ const ListItem = ({
                 <input
                   value={span.description || ''}
                   onChange={(e) =>
-                    updateNestedSpan(elementId, item.id, span.id, 'description', e.target.value)
+                    updateNestedSpan(
+                      elementId,
+                      item.id,
+                      span.id,
+                      'description',
+                      e.target.value
+                    )
                   }
                   placeholder="Nested span description"
                   className="w-full mt-2 p-2 text-sm border rounded"
@@ -232,127 +240,132 @@ const Element = ({
   const [showDescription, setShowDescription] = useState(!!element.description);
 
   return (
-    <Draggable draggableId={element.id} index={index}>
-      {(provided) => (
-        <Droppable droppableId={element.id} type="ELEMENT">
-          {(nestedDroppableProvided, snapshot) => (
-            <div
-              ref={nestedDroppableProvided.innerRef}
-              {...nestedDroppableProvided.droppableProps}
-              className={`
-                mb-6 p-6 border rounded-lg bg-white shadow-sm
-                ${level > 0 ? 'ml-8 border-l-4 border-l-blue-200' : ''}
-                ${snapshot.isDraggingOver ? 'bg-blue-50' : ''}
-              `}
+    <Draggable draggableId={element.id} index={index} type="ELEMENT">
+      {(provided, snapshot) => (
+        <div
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+          className={`
+            mb-6 p-6 border rounded-lg bg-white shadow-sm
+            ${level > 0 ? 'ml-8 border-l-4 border-l-blue-200' : ''}
+            ${snapshot.isDragging ? 'bg-gray-100' : ''}
+          `}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2" {...provided.dragHandleProps}>
+              <FaBars className="h-5 w-5 text-gray-400" />
+              <h3 className="font-semibold">{getElementTypeName(element.type)}</h3>
+            </div>
+            <button
+              onClick={() => removeElement(element.id)}
+              className="text-red-600 hover:text-red-700"
             >
-              <div
-                ref={provided.innerRef}
-                {...provided.draggableProps}
-                className="flex items-center justify-between mb-4"
-              >
-                <div className="flex items-center gap-2" {...provided.dragHandleProps}>
-                  <FaBars className="h-5 w-5 text-gray-400" />
-                  <h3 className="font-semibold">{getElementTypeName(element.type)}</h3>
-                </div>
-                <button
-                  onClick={() => removeElement(element.id)}
-                  className="text-red-600 hover:text-red-700"
-                >
-                  <FaTrash className="h-5 w-5" />
-                </button>
-              </div>
+              <FaTrash className="h-5 w-5" />
+            </button>
+          </div>
 
-              {['ul', 'ol'].includes(element.type) ? (
+          {/* Element Content */}
+          {['ul', 'ol'].includes(element.type) ? (
+            <>
+              <label className="flex items-center gap-2 mb-4">
+                <input
+                  type="checkbox"
+                  checked={element.isDynamic}
+                  onChange={(e) => updateElement(element.id, { isDynamic: e.target.checked })}
+                />
+                <span className="text-sm text-gray-600">Dynamic List</span>
+              </label>
+              {!element.isDynamic && (
                 <>
-                  <label className="flex items-center gap-2 mb-4">
-                    <input
-                      type="checkbox"
-                      checked={element.isDynamic}
-                      onChange={(e) => updateElement(element.id, { isDynamic: e.target.checked })}
-                    />
-                    <span className="text-sm text-gray-600">Dynamic List</span>
-                  </label>
-                  {!element.isDynamic && (
-                    <>
-                      <textarea
-                        value={element.description || ''}
-                        onChange={(e) => updateElement(element.id, { description: e.target.value })}
-                        placeholder="List Description"
-                        className="w-full p-2 mb-4 border rounded"
-                      />
-                      <Droppable droppableId={`${element.id}-list`} type="LIST">
-                        {(droppableProvided) => (
-                          <div
-                            ref={droppableProvided.innerRef}
-                            {...droppableProvided.droppableProps}
-                            className="space-y-4"
-                          >
-                            {element.content.map((item, idx) => (
-                              <ListItem
-                                key={item.id}
-                                item={item}
-                                index={idx}
-                                elementId={element.id}
-                                modifyListItem={modifyListItem}
-                                addNestedSpan={addNestedSpan}
-                                updateNestedSpan={updateNestedSpan}
-                                removeNestedSpan={removeNestedSpan}
-                              />
-                            ))}
-                            {droppableProvided.placeholder}
-                          </div>
-                        )}
-                      </Droppable>
-                      <button
-                        onClick={() => modifyListItem(element.id, null, 'add')}
-                        className="mt-4 text-green-600 hover:text-green-700 flex items-center gap-1"
-                      >
-                        <FaPlus className="h-5 w-5" />
-                        <span>Add Item</span>
-                      </button>
-                    </>
-                  )}
-                </>
-              ) : element.type === 'br' ? (
-                <hr className="my-4 border-t border-gray-300" />
-              ) : (
-                <>
-                  <FormattedInput
-                    value={element.content}
-                    onChange={(value) => updateElement(element.id, { content: value })}
-                    placeholder={`${getElementTypeName(element.type)} content`}
-                    onAddDescription={() => setShowDescription(!showDescription)}
+                  <textarea
+                    value={element.description || ''}
+                    onChange={(e) => updateElement(element.id, { description: e.target.value })}
+                    placeholder="List Description"
+                    className="w-full p-2 mb-4 border rounded"
                   />
-                  {showDescription && (
-                    <textarea
-                      value={element.description || ''}
-                      onChange={(e) => updateElement(element.id, { description: e.target.value })}
-                      placeholder="Description/Instructions for AI"
-                      className="w-full mt-4 p-2 border rounded"
-                    />
-                  )}
+                  <Droppable droppableId={`${element.id}-list`} type="LIST_ITEM">
+                    {(droppableProvided) => (
+                      <ul
+                        ref={droppableProvided.innerRef}
+                        {...droppableProvided.droppableProps}
+                        className="space-y-4"
+                      >
+                        {element.content.map((item, idx) => (
+                          <ListItem
+                            key={item.id}
+                            item={item}
+                            index={idx}
+                            elementId={element.id}
+                            modifyListItem={modifyListItem}
+                            addNestedSpan={addNestedSpan}
+                            updateNestedSpan={updateNestedSpan}
+                            removeNestedSpan={removeNestedSpan}
+                          />
+                        ))}
+                        {droppableProvided.placeholder}
+                      </ul>
+                    )}
+                  </Droppable>
+                  <button
+                    onClick={() => modifyListItem(element.id, null, 'add')}
+                    className="mt-4 text-green-600 hover:text-green-700 flex items-center gap-1"
+                  >
+                    <FaPlus className="h-5 w-5" />
+                    <span>Add Item</span>
+                  </button>
                 </>
               )}
-
-              {/* Render nested elements */}
-              {element.children?.map((childElement, childIndex) => (
-                <Element
-                  key={childElement.id}
-                  element={childElement}
-                  index={childIndex}
-                  updateElement={updateElement}
-                  removeElement={removeElement}
-                  modifyListItem={modifyListItem}
-                  addNestedSpan={addNestedSpan}
-                  updateNestedSpan={updateNestedSpan}
-                  removeNestedSpan={removeNestedSpan}
-                  level={level + 1}
+            </>
+          ) : element.type === 'br' ? (
+            <hr className="my-4 border-t border-gray-300" />
+          ) : (
+            <>
+              <FormattedInput
+                value={element.content}
+                onChange={(value) => updateElement(element.id, { content: value })}
+                placeholder={`${getElementTypeName(element.type)} content`}
+                onAddDescription={() => setShowDescription(!showDescription)}
+              />
+              {showDescription && (
+                <textarea
+                  value={element.description || ''}
+                  onChange={(e) => updateElement(element.id, { description: e.target.value })}
+                  placeholder="Description/Instructions for AI"
+                  className="w-full mt-4 p-2 border rounded"
                 />
-              ))}
-              {nestedDroppableProvided.placeholder}
-            </div>
+              )}
+            </>
           )}
-        </Droppable>
+
+          {/* Nested Elements */}
+          <Droppable droppableId={element.id} type="ELEMENT">
+            {(provided, snapshot) => (
+              <div
+                ref={provided.innerRef}
+                {...provided.droppableProps}
+                className={`nested-droppable-area ${
+                  snapshot.isDraggingOver ? 'bg-blue-50' : ''
+                }`}
+              >
+                {element.children?.map((childElement, childIndex) => (
+                  <Element
+                    key={childElement.id}
+                    element={childElement}
+                    index={childIndex}
+                    updateElement={updateElement}
+                    removeElement={removeElement}
+                    modifyListItem={modifyListItem}
+                    addNestedSpan={addNestedSpan}
+                    updateNestedSpan={updateNestedSpan}
+                    removeNestedSpan={removeNestedSpan}
+                    level={level + 1}
+                  />
+                ))}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </div>
       )}
     </Draggable>
   );
@@ -604,7 +617,7 @@ const JsonTemplateBuilder = () => {
   }, []);
 
   const handleDragEnd = (result) => {
-    const { destination, source, draggableId } = result;
+    const { destination, source, draggableId, type } = result;
 
     if (!destination) return;
 
@@ -616,29 +629,42 @@ const JsonTemplateBuilder = () => {
     }
 
     setElements((prevElements) => {
-      // Clone the elements to avoid mutating state directly
       const newElements = [...prevElements];
 
-      // Find the dragged element
-      const draggedElement = findElementById(newElements, draggableId);
+      if (type === 'ELEMENT') {
+        // Handle element drag and drop
+        const draggedElement = findElementById(newElements, draggableId);
 
-      if (!draggedElement) return newElements;
+        if (!draggedElement) return newElements;
 
-      // Remove the dragged element from its original location
-      removeElementById(newElements, draggableId);
+        // Remove the dragged element from its original location
+        removeElementById(newElements, draggableId);
 
-      if (destination.droppableId === 'elements') {
-        // Dropped at the root level
-        draggedElement.parentId = null;
-        insertElementAt(newElements, destination.index, draggedElement);
-      } else {
-        // Dropped inside another element
-        const parentElement = findElementById(newElements, destination.droppableId);
-        if (parentElement) {
-          if (!parentElement.children) parentElement.children = [];
-          draggedElement.parentId = parentElement.id;
-          insertElementAt(parentElement.children, destination.index, draggedElement);
+        if (destination.droppableId === 'elements') {
+          // Moved to root level
+          draggedElement.parentId = null;
+          insertElementAt(newElements, destination.index, draggedElement);
+        } else {
+          // Moved into another element
+          const parentElement = findElementById(newElements, destination.droppableId);
+          if (parentElement) {
+            if (!parentElement.children) parentElement.children = [];
+            draggedElement.parentId = parentElement.id;
+            insertElementAt(parentElement.children, destination.index, draggedElement);
+          }
         }
+      } else if (type === 'LIST_ITEM') {
+        // Handle list item drag and drop
+        const sourceElement = findElementById(newElements, source.droppableId.replace('-list', ''));
+        const destinationElement = findElementById(
+          newElements,
+          destination.droppableId.replace('-list', '')
+        );
+
+        if (!sourceElement || !destinationElement) return newElements;
+
+        const [movedItem] = sourceElement.content.splice(source.index, 1);
+        destinationElement.content.splice(destination.index, 0, movedItem);
       }
 
       return newElements;
