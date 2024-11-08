@@ -36,8 +36,8 @@ const ElementTypes = {
 
 // Default content for new elements
 const defaultContent = {
-  ul: [{ id: generateId(), content: 'List item 1', description: null, nestedSpans: [] }],
-  ol: [{ id: generateId(), content: 'List item 1', description: null, nestedSpans: [] }],
+  ul: [],
+  ol: [],
   br: '',
   h1: 'Heading 1',
   h2: 'Heading 2',
@@ -221,7 +221,6 @@ const Element = ({
   updateElement,
   removeElement,
   modifyListItem,
-  insertVariable,
   addNestedSpan,
   updateNestedSpan,
   removeNestedSpan,
@@ -240,8 +239,8 @@ const Element = ({
             ${level > 0 ? 'ml-8 border-l-4 border-l-blue-200' : ''}
           `}
         >
-          <div className="flex items-center justify-between mb-4" {...provided.dragHandleProps}>
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2" {...provided.dragHandleProps}>
               <MenuIcon className="h-5 w-5 text-gray-400" />
               <h3 className="font-semibold">{getElementTypeName(element.type)}</h3>
             </div>
@@ -328,11 +327,13 @@ const Element = ({
 
           {/* Nested elements droppable area */}
           <Droppable droppableId={element.id} type="ELEMENT">
-            {(nestedDroppableProvided) => (
+            {(nestedDroppableProvided, snapshot) => (
               <div
                 ref={nestedDroppableProvided.innerRef}
                 {...nestedDroppableProvided.droppableProps}
-                className={`mt-4 ${element.children?.length > 0 ? 'p-4 border-l-2 border-blue-200' : ''}`}
+                className={`mt-4 ${
+                  snapshot.isDraggingOver ? 'bg-blue-50' : ''
+                }`}
               >
                 {element.children?.map((childElement, childIndex) => (
                   <Element
@@ -342,7 +343,6 @@ const Element = ({
                     updateElement={updateElement}
                     removeElement={removeElement}
                     modifyListItem={modifyListItem}
-                    insertVariable={insertVariable}
                     addNestedSpan={addNestedSpan}
                     updateNestedSpan={updateNestedSpan}
                     removeNestedSpan={removeNestedSpan}
@@ -377,6 +377,36 @@ const AddElementSidebar = ({ addElement }) => (
   </div>
 );
 
+// Helper functions for handleDragEnd
+const findElementById = (elements, id) => {
+  for (const el of elements) {
+    if (el.id === id) return el;
+    if (el.children) {
+      const childResult = findElementById(el.children, id);
+      if (childResult) return childResult;
+    }
+  }
+  return null;
+};
+
+const removeElementById = (elements, id) => {
+  for (let i = 0; i < elements.length; i++) {
+    if (elements[i].id === id) {
+      elements.splice(i, 1);
+      return true;
+    }
+    if (elements[i].children) {
+      const childResult = removeElementById(elements[i].children, id);
+      if (childResult) return true;
+    }
+  }
+  return false;
+};
+
+const insertElementAt = (elements, index, element) => {
+  elements.splice(index, 0, element);
+};
+
 // Main Component
 const JsonTemplateBuilder = () => {
   const [elements, setElements] = useState([]);
@@ -399,11 +429,12 @@ const JsonTemplateBuilder = () => {
       {
         id: generateId(),
         type,
-        content: defaultContent[type] || 'New element',
-        description: ['ul', 'ol'].includes(type) ? "Follow the instructions mentioned in List description" : null,
+        content: defaultContent[type] || '',
+        description: null,
         isDynamic: false,
         listItemDescription: null,
         hasDescription: ['ul', 'ol'].includes(type),
+        content: ['ul', 'ol'].includes(type) ? [] : defaultContent[type] || '',
         children: [],
         parentId: null
       }
@@ -411,24 +442,16 @@ const JsonTemplateBuilder = () => {
   }, []);
 
   const removeElement = useCallback((id) => {
-    setElements((prev) => {
-      const getChildIds = (elementId) => {
-        const children = prev.filter(el => el.parentId === elementId);
-        return [
-          elementId,
-          ...children.flatMap(child => getChildIds(child.id))
-        ];
-      };
-      
-      // Get all ids that need to be removed (including nested children)
-      const idsToRemove = getChildIds(id);
-      return prev.filter(el => !idsToRemove.includes(el.id));
+    setElements((prevElements) => {
+      const newElements = [...prevElements];
+      removeElementById(newElements, id);
+      return newElements;
     });
   }, []);
 
   const updateElement = useCallback((id, updates) => {
-    setElements((prev) =>
-      prev.map((el) => {
+    const updateElementRecursively = (elements) => {
+      return elements.map((el) => {
         if (el.id === id) {
           const updatedElement = { ...el, ...updates };
           if (['ul', 'ol'].includes(updatedElement.type) && updatedElement.isDynamic) {
@@ -436,17 +459,21 @@ const JsonTemplateBuilder = () => {
           }
           return updatedElement;
         }
+        if (el.children) {
+          return { ...el, children: updateElementRecursively(el.children) };
+        }
         return el;
-      })
-    );
+      });
+    };
+    setElements((prev) => updateElementRecursively(prev));
   }, []);
 
   const modifyListItem = useCallback((elementId, itemId, action, value = '') => {
-    setElements((prev) =>
-      prev.map((el) => {
+    const updateElements = (elements) => {
+      return elements.map((el) => {
         if (el.id === elementId) {
           let newContent = [...el.content];
-          
+
           switch (action) {
             case 'add':
               newContent.push({
@@ -477,17 +504,21 @@ const JsonTemplateBuilder = () => {
             default:
               break;
           }
-          
+
           return { ...el, content: newContent };
         }
+        if (el.children) {
+          return { ...el, children: updateElements(el.children) };
+        }
         return el;
-      })
-    );
+      });
+    };
+    setElements((prev) => updateElements(prev));
   }, []);
 
   const addNestedSpan = useCallback((elementId, itemId) => {
-    setElements((prev) =>
-      prev.map((el) => {
+    const updateElements = (elements) => {
+      return elements.map((el) => {
         if (el.id === elementId) {
           const newContent = el.content.map((item) => {
             if (item.id === itemId) {
@@ -503,14 +534,18 @@ const JsonTemplateBuilder = () => {
           });
           return { ...el, content: newContent };
         }
+        if (el.children) {
+          return { ...el, children: updateElements(el.children) };
+        }
         return el;
-      })
-    );
+      });
+    };
+    setElements((prev) => updateElements(prev));
   }, []);
 
   const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) => {
-    setElements((prev) =>
-      prev.map((el) => {
+    const updateElements = (elements) => {
+      return elements.map((el) => {
         if (el.id === elementId) {
           const newContent = el.content.map((item) => {
             if (item.id === itemId) {
@@ -529,14 +564,18 @@ const JsonTemplateBuilder = () => {
           });
           return { ...el, content: newContent };
         }
+        if (el.children) {
+          return { ...el, children: updateElements(el.children) };
+        }
         return el;
-      })
-    );
+      });
+    };
+    setElements((prev) => updateElements(prev));
   }, []);
 
   const removeNestedSpan = useCallback((elementId, itemId, spanId) => {
-    setElements((prev) =>
-      prev.map((el) => {
+    const updateElements = (elements) => {
+      return elements.map((el) => {
         if (el.id === elementId) {
           const newContent = el.content.map((item) => {
             if (item.id === itemId) {
@@ -549,9 +588,13 @@ const JsonTemplateBuilder = () => {
           });
           return { ...el, content: newContent };
         }
+        if (el.children) {
+          return { ...el, children: updateElements(el.children) };
+        }
         return el;
-      })
-    );
+      });
+    };
+    setElements((prev) => updateElements(prev));
   }, []);
 
   const handleDragEnd = (result) => {
@@ -567,72 +610,31 @@ const JsonTemplateBuilder = () => {
     }
 
     setElements((prevElements) => {
+      // Clone the elements to avoid mutating state directly
       const newElements = [...prevElements];
-      
-      // Handle dropping element into another element
-      if (destination.droppableId !== 'elements') {
-        const draggedElement = newElements.find(el => el.id === draggableId);
-        const targetElement = newElements.find(el => el.id === destination.droppableId);
-        
-        if (draggedElement && targetElement) {
-          // Remove element from its previous position
-          if (draggedElement.parentId) {
-            // Remove from previous parent's children
-            const oldParent = newElements.find(el => el.id === draggedElement.parentId);
-            if (oldParent) {
-              oldParent.children = oldParent.children.filter(child => child.id !== draggedElement.id);
-            }
-          }
-          
-          // Update parent-child relationships
-          draggedElement.parentId = targetElement.id;
-          if (!targetElement.children) targetElement.children = [];
-          targetElement.children.splice(destination.index, 0, draggedElement);
-          
-          // Remove from root level if it was there
-          const rootIndex = newElements.findIndex(el => el.id === draggableId);
-          if (rootIndex !== -1) {
-            newElements.splice(rootIndex, 1);
-          }
-        }
-        return newElements;
-      }
-      
-      // Handle reordering at root level
-      if (type === 'ELEMENT') {
-        const element = newElements.find(el => el.id === draggableId);
-        if (element) {
-          if (element.parentId) {
-            // Remove from parent's children
-            const parent = newElements.find(el => el.id === element.parentId);
-            if (parent) {
-              parent.children = parent.children.filter(child => child.id !== element.id);
-            }
-            element.parentId = null;
-          }
-          
-          // Reorder at root level
-          const elementIndex = newElements.findIndex(el => el.id === draggableId);
-          if (elementIndex !== -1) {
-            const [removed] = newElements.splice(elementIndex, 1);
-            newElements.splice(destination.index, 0, removed);
-          }
+
+      // Find the dragged element
+      const draggedElement = findElementById(newElements, draggableId);
+
+      if (!draggedElement) return newElements;
+
+      // Remove the dragged element from its original location
+      removeElementById(newElements, draggableId);
+
+      if (destination.droppableId === 'elements') {
+        // Dropped at the root level
+        draggedElement.parentId = null;
+        insertElementAt(newElements, destination.index, draggedElement);
+      } else {
+        // Dropped inside another element
+        const parentElement = findElementById(newElements, destination.droppableId);
+        if (parentElement) {
+          if (!parentElement.children) parentElement.children = [];
+          draggedElement.parentId = parentElement.id;
+          insertElementAt(parentElement.children, destination.index, draggedElement);
         }
       }
-      
-      // Handle list item reordering
-      if (type === 'LIST') {
-        return newElements.map((element) => {
-          if (element.id === source.droppableId) {
-            const newContent = [...element.content];
-            const [removed] = newContent.splice(source.index, 1);
-            newContent.splice(destination.index, 0, removed);
-            return { ...element, content: newContent };
-          }
-          return element;
-        });
-      }
-      
+
       return newElements;
     });
   };
@@ -640,7 +642,7 @@ const JsonTemplateBuilder = () => {
   const convertToJsonSchema = useCallback(() => {
     const convertElement = (element) => {
       const baseProps = { tag: { enum: [element.type] } };
-      
+
       if (element.type === 'br') {
         return { properties: baseProps };
       }
@@ -648,10 +650,13 @@ const JsonTemplateBuilder = () => {
       let schema = {
         properties: {
           ...baseProps,
-          content: element.content.trim() !== ''
-            ? { enum: [element.content] }
-            : (element.description ? { description: element.description } : undefined)
-        }
+          content:
+            element.content && element.content.trim() !== ''
+              ? { enum: [element.content] }
+              : element.description
+              ? { description: element.description }
+              : undefined,
+        },
       };
 
       if (['ul', 'ol'].includes(element.type)) {
@@ -688,10 +693,15 @@ const JsonTemplateBuilder = () => {
             }
           }));
         }
-      } else if (element.children?.length > 0) {
-        schema.properties.children = element.children.map(convertElement);
       } else {
-        schema.properties.children = null;
+        if (element.children && element.children.length > 0) {
+          schema.properties.children = {
+            type: 'array',
+            items: element.children.map(convertElement),
+          };
+        } else {
+          schema.properties.children = null;
+        }
       }
 
       return schema;
@@ -702,9 +712,7 @@ const JsonTemplateBuilder = () => {
         description: "Ensure that only the required data fields specified in the template are generated...",
         properties: {
           tag: { enum: ['body'] },
-          children: elements
-            .filter(element => !element.parentId)
-            .map(convertElement)
+          children: elements.filter((el) => !el.parentId).map(convertElement),
         }
       }
     };
@@ -726,6 +734,13 @@ const JsonTemplateBuilder = () => {
         ul: 'ul',
         ol: 'ol'
       }[element.type] || 'div';
+
+      const content = element.content || (element.description && <em>{element.description}</em>);
+
+      let childrenContent = null;
+      if (element.children && element.children.length > 0) {
+        childrenContent = element.children.map(renderElement);
+      }
 
       if (['ul', 'ol'].includes(element.type)) {
         return (
@@ -755,12 +770,10 @@ const JsonTemplateBuilder = () => {
 
       return (
         <Component key={element.id} className="mb-4">
-          {element.content || (element.description && 
-            <span className="italic text-gray-600">{element.description}</span>
-          )}
-          {element.children?.length > 0 && (
+          {content}
+          {childrenContent && (
             <div className="pl-4 border-l-2 border-gray-200 mt-2">
-              {element.children.map(renderElement)}
+              {childrenContent}
             </div>
           )}
         </Component>
