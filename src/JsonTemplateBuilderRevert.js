@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { PlusIcon, MinusIcon, TrashIcon, MenuIcon } from 'lucide-react';
+import { FaPlus, FaMinus, FaTrash, FaBars } from 'react-icons/fa';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 // Utility function to generate unique IDs
@@ -16,7 +16,7 @@ const getElementTypeName = (type) => {
     ol: 'Ordered List',
     span: 'Span',
     strong: 'Strong',
-    br: 'Line Break'
+    br: 'Line Break',
   };
   return typeNames[type] || type.toUpperCase();
 };
@@ -31,7 +31,7 @@ const ElementTypes = {
   ORDERED_LIST: 'ol',
   SPAN: 'span',
   STRONG: 'strong',
-  BREAK: 'br'
+  BREAK: 'br',
 };
 
 // Default content for new elements
@@ -44,7 +44,7 @@ const defaultContent = {
   h3: 'Heading 3',
   p: 'Paragraph text',
   strong: 'Bold text',
-  span: 'Span text'
+  span: 'Span text',
 };
 
 // Formatted Input Component with rich text controls
@@ -55,14 +55,14 @@ const FormattedInput = ({
   onRemove,
   onAddNestedSpan,
   onRemoveNestedSpan,
-  onAddDescription
+  onAddDescription,
 }) => {
   const [selection, setSelection] = useState({ start: 0, end: 0 });
 
   const handleSelect = (e) => {
     setSelection({
       start: e.target.selectionStart,
-      end: e.target.selectionEnd
+      end: e.target.selectionEnd,
     });
   };
 
@@ -89,32 +89,32 @@ const FormattedInput = ({
         className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2 h-16"
       />
       <div className="flex space-x-2">
-        <button 
+        <button
           onClick={() => insertTag('strong')}
           className="p-2 border rounded hover:bg-gray-100"
         >
           <strong>B</strong>
         </button>
-        <button 
+        <button
           onClick={() => insertTag('em')}
           className="p-2 border rounded hover:bg-gray-100"
         >
           <em>I</em>
         </button>
-        <button 
+        <button
           onClick={() => onChange(value + '<br>')}
           className="p-2 border rounded hover:bg-gray-100"
         >
           BR
         </button>
-        <button 
+        <button
           onClick={insertVariable}
           className="p-2 border rounded hover:bg-gray-100 text-green-600"
         >
           VAR
         </button>
         {onAddDescription && (
-          <button 
+          <button
             onClick={onAddDescription}
             className="p-2 border rounded hover:bg-gray-100 text-green-600"
           >
@@ -122,27 +122,27 @@ const FormattedInput = ({
           </button>
         )}
         {onRemove && (
-          <button 
+          <button
             onClick={onRemove}
             className="p-2 border rounded hover:bg-gray-100 text-red-600"
           >
-            <TrashIcon className="h-4 w-4" />
+            <FaTrash className="h-4 w-4" />
           </button>
         )}
         {onAddNestedSpan && (
-          <button 
+          <button
             onClick={onAddNestedSpan}
             className="p-2 border rounded hover:bg-gray-100 text-purple-600"
           >
-            <PlusIcon className="h-4 w-4" />
+            <FaPlus className="h-4 w-4" />
           </button>
         )}
         {onRemoveNestedSpan && (
-          <button 
+          <button
             onClick={onRemoveNestedSpan}
             className="p-2 border rounded hover:bg-gray-100 text-red-600"
           >
-            <MinusIcon className="h-4 w-4" />
+            <FaMinus className="h-4 w-4" />
           </button>
         )}
       </div>
@@ -156,10 +156,9 @@ const ListItem = ({
   index,
   elementId,
   modifyListItem,
-  insertVariable,
   addNestedSpan,
   updateNestedSpan,
-  removeNestedSpan
+  removeNestedSpan,
 }) => (
   <Draggable draggableId={item.id} index={index}>
     {(provided) => (
@@ -170,7 +169,7 @@ const ListItem = ({
       >
         <div className="flex items-start gap-2">
           <div {...provided.dragHandleProps} className="mt-2">
-            <MenuIcon className="h-5 w-5 text-gray-400" />
+            <FaBars className="h-5 w-5 text-gray-400" />
           </div>
           <div className="flex-1 space-y-4">
             <FormattedInput
@@ -189,13 +188,23 @@ const ListItem = ({
               <div key={span.id} className="ml-4 p-4 bg-gray-100 rounded">
                 <FormattedInput
                   value={span.content}
-                  onChange={(value) => updateNestedSpan(elementId, item.id, span.id, 'content', value)}
+                  onChange={(value) =>
+                    updateNestedSpan(elementId, item.id, span.id, 'content', value)
+                  }
                   placeholder="Nested span content"
                   onRemoveNestedSpan={() => removeNestedSpan(elementId, item.id, span.id)}
                 />
                 <input
                   value={span.description || ''}
-                  onChange={(e) => updateNestedSpan(elementId, item.id, span.id, 'description', e.target.value)}
+                  onChange={(e) =>
+                    updateNestedSpan(
+                      elementId,
+                      item.id,
+                      span.id,
+                      'description',
+                      e.target.value
+                    )
+                  }
                   placeholder="Nested span description"
                   className="w-full mt-2 p-2 text-sm border rounded"
                 />
@@ -205,7 +214,7 @@ const ListItem = ({
               onClick={() => modifyListItem(elementId, item.id, 'remove')}
               className="text-red-600 hover:text-red-700"
             >
-              <TrashIcon className="h-5 w-5" />
+              <FaTrash className="h-5 w-5" />
             </button>
           </div>
         </div>
@@ -224,7 +233,7 @@ const Element = ({
   addNestedSpan,
   updateNestedSpan,
   removeNestedSpan,
-  level = 0
+  level = 0,
 }) => {
   const [showDescription, setShowDescription] = useState(!!element.description);
 
@@ -241,14 +250,14 @@ const Element = ({
         >
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2" {...provided.dragHandleProps}>
-              <MenuIcon className="h-5 w-5 text-gray-400" />
+              <FaBars className="h-5 w-5 text-gray-400" />
               <h3 className="font-semibold">{getElementTypeName(element.type)}</h3>
             </div>
             <button
               onClick={() => removeElement(element.id)}
               className="text-red-600 hover:text-red-700"
             >
-              <TrashIcon className="h-5 w-5" />
+              <FaTrash className="h-5 w-5" />
             </button>
           </div>
 
@@ -284,7 +293,6 @@ const Element = ({
                             index={idx}
                             elementId={element.id}
                             modifyListItem={modifyListItem}
-                            // Removed insertVariable from props
                             addNestedSpan={addNestedSpan}
                             updateNestedSpan={updateNestedSpan}
                             removeNestedSpan={removeNestedSpan}
@@ -298,7 +306,7 @@ const Element = ({
                     onClick={() => modifyListItem(element.id, null, 'add')}
                     className="mt-4 text-green-600 hover:text-green-700 flex items-center gap-1"
                   >
-                    <PlusIcon className="h-5 w-5" />
+                    <FaPlus className="h-5 w-5" />
                     <span>Add Item</span>
                   </button>
                 </>
@@ -331,8 +339,8 @@ const Element = ({
               <div
                 ref={nestedDroppableProvided.innerRef}
                 {...nestedDroppableProvided.droppableProps}
-                className={`mt-4 ${
-                  snapshot.isDraggingOver ? 'bg-blue-50' : ''
+                className={`mt-4 nested-droppable-area ${
+                  snapshot.isDraggingOver ? 'bg-blue-50 border' : ''
                 }`}
               >
                 {element.children?.map((childElement, childIndex) => (
@@ -410,14 +418,20 @@ const insertElementAt = (elements, index, element) => {
 // Main Component
 const JsonTemplateBuilder = () => {
   const [elements, setElements] = useState([]);
-  const [jsonSchema, setJsonSchema] = useState(JSON.stringify({
-    schema: {
-      properties: {
-        tag: { enum: ['body'] },
-        children: []
-      }
-    }
-  }, null, 2));
+  const [jsonSchema, setJsonSchema] = useState(
+    JSON.stringify(
+      {
+        schema: {
+          properties: {
+            tag: { enum: ['body'] },
+            children: [],
+          },
+        },
+      },
+      null,
+      2
+    )
+  );
 
   useEffect(() => {
     setJsonSchema(JSON.stringify(convertToJsonSchema(), null, 2));
@@ -436,8 +450,8 @@ const JsonTemplateBuilder = () => {
         hasDescription: ['ul', 'ol'].includes(type),
         content: ['ul', 'ol'].includes(type) ? [] : defaultContent[type] || '',
         children: [],
-        parentId: null
-      }
+        parentId: null,
+      },
     ]);
   }, []);
 
@@ -480,25 +494,27 @@ const JsonTemplateBuilder = () => {
                 id: generateId(),
                 content: '',
                 description: null,
-                nestedSpans: []
+                nestedSpans: [],
               });
               break;
             case 'remove':
-              newContent = newContent.filter(item => item.id !== itemId);
+              newContent = newContent.filter((item) => item.id !== itemId);
               break;
             case 'removeContent':
-              newContent = newContent.map(item =>
+              newContent = newContent.map((item) =>
                 item.id === itemId ? { ...item, content: '' } : item
               );
               break;
             case 'content':
-              newContent = newContent.map(item =>
+              newContent = newContent.map((item) =>
                 item.id === itemId ? { ...item, content: value } : item
               );
               break;
             case 'description':
-              newContent = newContent.map(item =>
-                item.id === itemId ? { ...item, description: value.trim() === '' ? null : value } : item
+              newContent = newContent.map((item) =>
+                item.id === itemId
+                  ? { ...item, description: value.trim() === '' ? null : value }
+                  : item
               );
               break;
             default:
@@ -526,8 +542,8 @@ const JsonTemplateBuilder = () => {
                 ...item,
                 nestedSpans: [
                   ...item.nestedSpans,
-                  { id: generateId(), content: '', description: null }
-                ]
+                  { id: generateId(), content: '', description: null },
+                ],
               };
             }
             return item;
@@ -581,7 +597,7 @@ const JsonTemplateBuilder = () => {
             if (item.id === itemId) {
               return {
                 ...item,
-                nestedSpans: item.nestedSpans.filter(span => span.id !== spanId)
+                nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId),
               };
             }
             return item;
@@ -661,36 +677,45 @@ const JsonTemplateBuilder = () => {
 
       if (['ul', 'ol'].includes(element.type)) {
         if (element.isDynamic) {
-          schema.properties.children = [{
-            type: 'array',
-            items: {
-              properties: {
-                tag: { enum: ['li'] },
-                content: element.listItemDescription 
-                  ? { description: element.listItemDescription }
-                  : undefined,
-                children: null
-              }
-            }
-          }];
+          schema.properties.children = [
+            {
+              type: 'array',
+              items: {
+                properties: {
+                  tag: { enum: ['li'] },
+                  content: element.listItemDescription
+                    ? { description: element.listItemDescription }
+                    : undefined,
+                  children: null,
+                },
+              },
+            },
+          ];
         } else {
-          schema.properties.children = element.content.map(item => ({
+          schema.properties.children = element.content.map((item) => ({
             properties: {
               tag: { enum: ['li'] },
-              content: item.content.trim() !== ''
-                ? { enum: [item.content] }
-                : (item.description ? { description: item.description } : undefined),
-              children: item.nestedSpans.length > 0
-                ? item.nestedSpans.map(span => ({
-                    properties: {
-                      tag: { enum: ['span'] },
-                      content: span.content.trim() !== ''
-                        ? { enum: [span.content] }
-                        : (span.description ? { description: span.description } : undefined)
-                    }
-                  }))
-                : null
-            }
+              content:
+                item.content.trim() !== ''
+                  ? { enum: [item.content] }
+                  : item.description
+                  ? { description: item.description }
+                  : undefined,
+              children:
+                item.nestedSpans.length > 0
+                  ? item.nestedSpans.map((span) => ({
+                      properties: {
+                        tag: { enum: ['span'] },
+                        content:
+                          span.content.trim() !== ''
+                            ? { enum: [span.content] }
+                            : span.description
+                            ? { description: span.description }
+                            : undefined,
+                      },
+                    }))
+                  : null,
+            },
           }));
         }
       } else {
@@ -709,12 +734,13 @@ const JsonTemplateBuilder = () => {
 
     return {
       schema: {
-        description: "Ensure that only the required data fields specified in the template are generated...",
+        description:
+          'Ensure that only the required data fields specified in the template are generated...',
         properties: {
           tag: { enum: ['body'] },
           children: elements.filter((el) => !el.parentId).map(convertElement),
-        }
-      }
+        },
+      },
     };
   }, [elements]);
 
@@ -732,7 +758,7 @@ const JsonTemplateBuilder = () => {
         strong: 'strong',
         span: 'span',
         ul: 'ul',
-        ol: 'ol'
+        ol: 'ol',
       }[element.type] || 'div';
 
       const content = element.content || (element.description && <em>{element.description}</em>);
@@ -749,16 +775,12 @@ const JsonTemplateBuilder = () => {
               <p className="text-gray-600 italic mb-2">{element.description}</p>
             )}
             <Component className="pl-5 list-inside">
-              {element.content.map(item => (
+              {element.content.map((item) => (
                 <li key={item.id} className="mb-2">
-                  {item.content || (item.description && 
-                    <span className="italic text-gray-600">{item.description}</span>
-                  )}
-                  {item.nestedSpans.map(span => (
+                  {item.content || (item.description && <em>{item.description}</em>)}
+                  {item.nestedSpans.map((span) => (
                     <span key={span.id} className="ml-2">
-                      {span.content || (span.description &&
-                        <span className="italic text-gray-600">{span.description}</span>
-                      )}
+                      {span.content || (span.description && <em>{span.description}</em>)}
                     </span>
                   ))}
                 </li>
@@ -771,20 +793,14 @@ const JsonTemplateBuilder = () => {
       return (
         <Component key={element.id} className="mb-4">
           {content}
-          {childrenContent && (
-            <div className="pl-4 border-l-2 border-gray-200 mt-2">
-              {childrenContent}
-            </div>
-          )}
+          {childrenContent && <div className="pl-4">{childrenContent}</div>}
         </Component>
       );
     };
 
     return (
       <div className="space-y-4">
-        {elements
-          .filter(element => !element.parentId)
-          .map(renderElement)}
+        {elements.filter((element) => !element.parentId).map(renderElement)}
       </div>
     );
   };
@@ -803,7 +819,7 @@ const JsonTemplateBuilder = () => {
                   {(provided) => (
                     <div ref={provided.innerRef} {...provided.droppableProps}>
                       {elements
-                        .filter(element => !element.parentId)
+                        .filter((element) => !element.parentId)
                         .map((element, index) => (
                           <Element
                             key={element.id}
