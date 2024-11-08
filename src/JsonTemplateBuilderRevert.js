@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { FaPlus, FaMinus, FaTrash, FaBars } from 'react-icons/fa';
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 // Utility function to generate unique IDs
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -223,6 +222,7 @@ const Element = ({
   level = 0,
 }) => {
   const [showDescription, setShowDescription] = useState(!!element.description);
+  const [showDropdown, setShowDropdown] = useState(false);
 
   return (
     <div
@@ -329,33 +329,47 @@ const Element = ({
         </div>
       )}
 
-      {/* Dropdown to add child elements */}
+      {/* Plus button to add child elements */}
       <div className="mt-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Add Child Element:
-        </label>
-        <div className="flex items-center gap-2">
-          <select
-            onChange={(e) => {
-              const type = e.target.value;
-              if (type) {
-                addChildElement(element.id, type);
-                e.target.value = '';
-              }
-            }}
-            className="p-2 border rounded w-full"
-            defaultValue=""
-          >
-            <option value="" disabled>
-              Select element type
-            </option>
-            {Object.entries(ElementTypes).map(([key, value]) => (
-              <option key={key} value={value}>
-                {getElementTypeName(value)}
+        {showDropdown ? (
+          <div className="flex items-center gap-2">
+            <select
+              onChange={(e) => {
+                const type = e.target.value;
+                if (type) {
+                  addChildElement(element.id, type);
+                  e.target.value = '';
+                  setShowDropdown(false);
+                }
+              }}
+              className="p-2 border rounded w-full"
+              defaultValue=""
+            >
+              <option value="" disabled>
+                Select element type
               </option>
-            ))}
-          </select>
-        </div>
+              {Object.entries(ElementTypes).map(([key, value]) => (
+                <option key={key} value={value}>
+                  {getElementTypeName(value)}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => setShowDropdown(false)}
+              className="p-2 border rounded hover:bg-gray-100 text-red-600"
+            >
+              <FaMinus className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowDropdown(true)}
+            className="text-blue-600 hover:text-blue-700 flex items-center gap-1"
+          >
+            <FaPlus className="h-5 w-5" />
+            <span>Add Child Element</span>
+          </button>
+        )}
       </div>
     </div>
   );
