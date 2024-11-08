@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { PlusIcon, MinusIcon, TrashIcon, VariableIcon, MenuIcon } from '@heroicons/react/solid';
+import { PlusIcon, TrashIcon, MenuIcon } from '@heroicons/react/solid';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -70,27 +70,25 @@ const AddElementSidebar = ({ addElement }) => (
 );
 
 /**
- * Component for formatted input with options like bold, italic, line break, and variables.
+ * Component for formatted input.
  */
-const FormattedInput = ({ value, onChange, placeholder, onRemove }) => {
-  return (
-    <div className="relative">
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2 h-16"
-        placeholder={placeholder}
-      />
-      <div className="flex space-x-2 mb-2">
-        {onRemove && (
-          <button onClick={onRemove} className="p-1 text-red-500 hover:text-red-700">
-            <TrashIcon className="h-5 w-5" />
-          </button>
-        )}
-      </div>
+const FormattedInput = ({ value, onChange, placeholder, onRemove }) => (
+  <div className="relative">
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2 h-16"
+      placeholder={placeholder}
+    />
+    <div className="flex space-x-2 mb-2">
+      {onRemove && (
+        <button onClick={onRemove} className="p-1 text-red-500 hover:text-red-700">
+          <TrashIcon className="h-5 w-5" />
+        </button>
+      )}
     </div>
-  );
-};
+  </div>
+);
 
 /**
  * Component representing a single element (e.g., heading, paragraph, list) in the template.
@@ -99,24 +97,8 @@ const Element = ({
   element,
   index,
   updateElement,
-  removeElement,
-  addNestedElement
+  removeElement
 }) => {
-  const [showDescription, setShowDescription] = useState(!!element.description);
-
-  const toggleDescription = () => {
-    if (!element.description) {
-      updateElement(element.id, { description: '' });
-    }
-    setShowDescription(!showDescription);
-  };
-
-  useEffect(() => {
-    if (element.description) {
-      setShowDescription(true);
-    }
-  }, [element.description]);
-
   return (
     <Draggable draggableId={element.id} index={index} key={element.id}>
       {(provided) => (
@@ -124,8 +106,9 @@ const Element = ({
           className="mb-6 p-6 border rounded-lg bg-white shadow-sm transition-all duration-200 hover:shadow-md"
           ref={provided.innerRef}
           {...provided.draggableProps}
+          {...provided.dragHandleProps}
         >
-          <div className="flex justify-between items-center mb-4" {...provided.dragHandleProps}>
+          <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold text-gray-700">{getElementTypeName(element.type)}</h3>
             <button onClick={() => removeElement(element.id)} className="p-1 text-red-500 hover:text-red-700">
               <TrashIcon className="h-5 w-5" />
@@ -136,14 +119,6 @@ const Element = ({
             onChange={(value) => updateElement(element.id, { content: value })}
             placeholder={`${getElementTypeName(element.type)} content`}
           />
-          {(showDescription || element.description) && (
-            <textarea
-              value={element.description || ''}
-              onChange={(e) => updateElement(element.id, { description: e.target.value })}
-              placeholder="Description/Instructions for AI"
-              className="w-full p-2 mt-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
-            />
-          )}
           {/* Render Nested Children */}
           {element.children && element.children.length > 0 && (
             <div className="ml-4 mt-4">
@@ -164,7 +139,6 @@ const Element = ({
                       children: element.children.filter((childEl) => childEl.id !== childId),
                     });
                   }}
-                  addNestedElement={addNestedElement}
                 />
               ))}
             </div>
@@ -208,19 +182,6 @@ const JsonTemplateBuilderRevert = () => {
   }, []);
 
   /**
-   * Adds a nested child element.
-   */
-  const addNestedElement = (parentId, newElement) => {
-    setElements((prev) =>
-      prev.map((el) =>
-        el.id === parentId
-          ? { ...el, children: [...el.children, newElement] }
-          : el
-      )
-    );
-  };
-
-  /**
    * Removes an element from the template.
    */
   const removeElement = useCallback((id) => {
@@ -244,24 +205,16 @@ const JsonTemplateBuilderRevert = () => {
 
     if (!destination) return;
 
-    // Get the source and destination IDs
-    const sourceIndex = source.index;
-    const destinationIndex = destination.index;
-
-    // If dropped into the same spot, do nothing
-    if (sourceIndex === destinationIndex) return;
-
-    // Reorder or nest elements
     const newElements = Array.from(elements);
-    const [movedElement] = newElements.splice(sourceIndex, 1);
+    const [movedElement] = newElements.splice(source.index, 1);
 
-    if (destination.droppableId !== source.droppableId) {
-      // If it has been dropped onto another element, make it a child
-      const parentIndex = destinationIndex;
-      newElements[parentIndex].children.push(movedElement);
-    } else {
-      // Otherwise, reorder the element
-      newElements.splice(destinationIndex, 0, movedElement);
+    // If the destination is at a different index within the same level, reorder
+    if (destination.index !== source.index) {
+      newElements.splice(destination.index, 0, movedElement);
+    } else if (destination.droppableId !== source.droppableId) {
+      // If dropping onto another element, make it a child
+      const parentElementIndex = newElements.findIndex(el => el.id === destination.droppableId);
+      newElements[parentElementIndex].children.push(movedElement);
     }
 
     setElements(newElements);
@@ -321,7 +274,6 @@ const JsonTemplateBuilderRevert = () => {
                         index={index}
                         updateElement={updateElement}
                         removeElement={removeElement}
-                        addNestedElement={addNestedElement}
                       />
                     ))}
                     {provided.placeholder}
