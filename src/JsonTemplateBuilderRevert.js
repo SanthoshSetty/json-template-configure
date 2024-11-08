@@ -54,13 +54,15 @@ const defaultContent = {
 /**
  * Sidebar component to add new elements to the template.
  */
-const AddElementSidebar = ({ addElement }) => (
+const AddElementSidebar = ({ addElement, parentId = null }) => (
   <div className="w-full md:w-64 bg-white shadow-md rounded-lg p-6">
-    <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Add Elements</h2>
+    <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">
+      {parentId ? 'Add Child Element' : 'Add Elements'}
+    </h2>
     {Object.entries(ElementTypes).map(([key, value]) => (
       <button
         key={key}
-        onClick={() => addElement(value)}
+        onClick={() => addElement(value, !!parentId, parentId)}
         className="block w-full mb-2 text-left text-blue-500 hover:text-blue-700 transition-colors duration-200"
       >
         Add {key.replace(/_/g, ' ')}
@@ -142,66 +144,6 @@ const FormattedInput = ({ value, onChange, placeholder, onRemove, onAddNestedSpa
 };
 
 /**
- * Component representing an individual list item within a list.
- * Rendered as an <li> element to maintain semantic HTML structure.
- */
-const ListItem = ({ item, index, elementId, modifyListItem, addNestedSpan, updateNestedSpan, removeNestedSpan }) => (
-  <Draggable draggableId={item.id} index={index} key={item.id}>
-    {(provided) => (
-      <li
-        className="mb-4 p-4 bg-gray-50 rounded-md flex items-start"
-        ref={provided.innerRef}
-        {...provided.draggableProps}
-      >
-        {/* Optional Drag Handle */}
-        <div {...provided.dragHandleProps} className="mr-2 cursor-grab">
-          <MenuIcon className="h-5 w-5 text-gray-500" />
-        </div>
-        <div className="flex-1">
-          <div className="flex flex-col mb-2">
-            <FormattedInput
-              value={item.content}
-              onChange={(value) => modifyListItem(elementId, item.id, 'content', value)}
-              placeholder="List item content"
-              onRemove={() => modifyListItem(elementId, item.id, 'removeContent')}
-              onAddNestedSpan={() => addNestedSpan(elementId, item.id)}
-            />
-            <input
-              value={item.description || ''}
-              onChange={(e) => modifyListItem(elementId, item.id, 'description', e.target.value)}
-              className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2 h-8"
-              placeholder="Item description"
-            />
-          </div>
-          {item.nestedSpans.map((span, spanIdx) => (
-            <div key={span.id} className="mt-2 ml-4 p-2 bg-gray-100 rounded">
-              <FormattedInput
-                value={span.content}
-                onChange={(value) => updateNestedSpan(elementId, item.id, span.id, 'content', value)}
-                placeholder="Nested span content"
-                onRemoveNestedSpan={() => removeNestedSpan(elementId, item.id, span.id)}
-              />
-              <input
-                value={span.description || ''}
-                onChange={(e) => updateNestedSpan(elementId, item.id, span.id, 'description', e.target.value)}
-                className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2 h-8"
-                placeholder="Nested span description"
-              />
-            </div>
-          ))}
-          <button
-            onClick={() => modifyListItem(elementId, item.id, 'remove')}
-            className="mt-2 p-1 text-red-500 hover:text-red-700"
-          >
-            <TrashIcon className="h-5 w-5" /> Remove Item
-          </button>
-        </div>
-      </li>
-    )}
-  </Draggable>
-);
-
-/**
  * Component representing a single element (e.g., heading, paragraph, list) in the template.
  */
 const Element = ({
@@ -209,19 +151,24 @@ const Element = ({
   index,
   updateElement,
   removeElement,
+  addChildElement,
   modifyListItem,
   addNestedSpan,
   updateNestedSpan,
-  removeNestedSpan,
-  addChildElement
+  removeNestedSpan
 }) => {
   const [showDescription, setShowDescription] = useState(!!element.description);
+  const [showAddChildSidebar, setShowAddChildSidebar] = useState(false);
 
   const toggleDescription = () => {
     if (!element.description) {
       updateElement(element.id, { description: '' });
     }
     setShowDescription(!showDescription);
+  };
+
+  const toggleChildSidebar = () => {
+    setShowAddChildSidebar((prev) => !prev);
   };
 
   useEffect(() => {
@@ -241,7 +188,7 @@ const Element = ({
           <div className="flex justify-between items-center mb-4" {...provided.dragHandleProps}>
             <h3 className="text-lg font-semibold text-gray-700">{getElementTypeName(element.type)}</h3>
             <div className="flex items-center space-x-2">
-              <button onClick={() => addChildElement(element.id)} className="p-1 text-green-500 hover:text-green-700">
+              <button onClick={toggleChildSidebar} className="p-1 text-green-500 hover:text-green-700">
                 <PlusIcon className="h-5 w-5" /> Add Child
               </button>
               <button onClick={() => removeElement(element.id)} className="p-1 text-red-500 hover:text-red-700">
@@ -355,6 +302,12 @@ const Element = ({
               ))}
             </div>
           )}
+          {/* Add Child Element Sidebar */}
+          {showAddChildSidebar && (
+            <div className="ml-4 mt-4">
+              <AddElementSidebar addElement={addChildElement} parentId={element.id} />
+            </div>
+          )}
         </div>
       )}
     </Draggable>
@@ -411,10 +364,6 @@ const JsonTemplateBuilderRevert = () => {
     );
   }, []);
 
-  const addChildElement = useCallback((parentId) => {
-    addElement(ElementTypes.PARAGRAPH, true, parentId);
-  }, [addElement]);
-
   /**
    * Converts the current template elements to a JSON schema.
    */
@@ -469,7 +418,7 @@ const JsonTemplateBuilderRevert = () => {
                         index={index}
                         updateElement={updateElement}
                         removeElement={removeElement}
-                        addChildElement={addChildElement}
+                        addChildElement={addElement}
                         modifyListItem={() => {}}
                         addNestedSpan={() => {}}
                         updateNestedSpan={() => {}}
