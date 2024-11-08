@@ -743,6 +743,7 @@ const JsonTemplateBuilder = () => {
     });
   };
 
+  // Updated convertToJsonSchema function
   const convertToJsonSchema = useCallback(() => {
     const convertElement = (element) => {
       const baseProps = { tag: { enum: [element.type] } };
@@ -751,36 +752,31 @@ const JsonTemplateBuilder = () => {
         return { properties: baseProps };
       }
 
-      let schema = {
-        properties: {
-          ...baseProps,
-          content:
-            element.content && typeof element.content === 'string' && element.content.trim() !== ''
-              ? { enum: [element.content] }
-              : element.description
-              ? { description: element.description }
-              : undefined,
-        },
+      let properties = {
+        ...baseProps,
       };
+
+      if (element.content && typeof element.content === 'string' && element.content.trim() !== '') {
+        properties.content = { enum: [element.content] };
+      } else if (element.description) {
+        properties.content = { description: element.description };
+      }
 
       if (['ul', 'ol'].includes(element.type)) {
         if (element.isDynamic) {
-          schema.properties.children = [
+          properties.children = [
             {
-              type: 'array',
-              items: {
-                properties: {
-                  tag: { enum: ['li'] },
-                  content: element.listItemDescription
-                    ? { description: element.listItemDescription }
-                    : undefined,
-                  children: null,
-                },
+              properties: {
+                tag: { enum: ['li'] },
+                content: element.listItemDescription
+                  ? { description: element.listItemDescription }
+                  : undefined,
+                children: null,
               },
             },
           ];
         } else {
-          schema.properties.children = element.content.map((item) => ({
+          properties.children = element.content.map((item) => ({
             properties: {
               tag: { enum: ['li'] },
               content:
@@ -808,16 +804,13 @@ const JsonTemplateBuilder = () => {
         }
       } else {
         if (element.children && element.children.length > 0) {
-          schema.properties.children = {
-            type: 'array',
-            items: element.children.map(convertElement),
-          };
+          properties.children = element.children.map(convertElement);
         } else {
-          schema.properties.children = null;
+          properties.children = null;
         }
       }
 
-      return schema;
+      return { properties };
     };
 
     return {
@@ -896,45 +889,78 @@ const JsonTemplateBuilder = () => {
     );
   };
 
+  // Updated updateTemplateFromJson function
   const updateTemplateFromJson = () => {
     try {
       const parsedJson = JSON.parse(jsonTextarea);
-      const convertJsonToElements = (json) => {
-        // Implement the conversion logic based on your JSON structure
-        // For simplicity, assuming the JSON schema has an 'elements' array
-        // Adjust the logic according to your actual JSON schema format
 
-        const convertElement = (el) => {
-          const newElement = {
-            id: generateId(),
-            type: el.properties.tag.enum[0],
-            content: el.properties.content ? el.properties.content.enum[0] : '',
-            description: el.properties.content?.description || null,
-            isDynamic: false,
-            listItemDescription: null,
-            hasDescription: ['ul', 'ol'].includes(el.properties.tag.enum[0]),
-            children: [],
-            parentId: null,
-          };
+      const convertJsonToElements = (jsonElement) => {
+        const elProps = jsonElement.properties;
+        const type = elProps.tag.enum[0];
 
-          if (el.properties.children) {
-            if (Array.isArray(el.properties.children.items)) {
-              newElement.children = el.properties.children.items.map(convertElement);
-            } else {
-              newElement.children = [convertElement(el.properties.children.items)];
-            }
-          }
-
-          return newElement;
+        const newElement = {
+          id: generateId(),
+          type: type,
+          content: elProps.content?.enum ? elProps.content.enum[0] : '',
+          description: elProps.content?.description || null,
+          isDynamic: false,
+          listItemDescription: null,
+          hasDescription: ['ul', 'ol'].includes(type),
+          children: [],
+          parentId: null,
         };
 
-        const newElements = parsedJson.schema.properties.children.map(convertElement);
-        setElements(newElements);
+        if (['ul', 'ol'].includes(type)) {
+          if (elProps.children && elProps.children.length > 0) {
+            newElement.content = elProps.children.map((child) => {
+              const liProps = child.properties;
+              const listItem = {
+                id: generateId(),
+                content: liProps.content?.enum ? liProps.content.enum[0] : '',
+                description: liProps.content?.description || null,
+                nestedSpans: [],
+              };
+
+              if (liProps.children && liProps.children.length > 0) {
+                listItem.nestedSpans = liProps.children.map((span) => {
+                  const spanProps = span.properties;
+                  return {
+                    id: generateId(),
+                    content: spanProps.content?.enum ? spanProps.content.enum[0] : '',
+                    description: spanProps.content?.description || null,
+                  };
+                });
+              }
+
+              return listItem;
+            });
+          } else if (elProps.children && elProps.children[0]?.properties?.content?.description) {
+            newElement.isDynamic = true;
+            newElement.listItemDescription = elProps.children[0].properties.content.description;
+          }
+        }
+
+        if (elProps.children && !['ul', 'ol'].includes(type)) {
+          newElement.children = elProps.children.map((child) => {
+            const childElement = convertJsonToElements(child);
+            childElement.parentId = newElement.id;
+            return childElement;
+          });
+        }
+
+        return newElement;
       };
 
-      convertJsonToElements(parsedJson);
+      const newElements = parsedJson.schema.properties.children.map((child) => {
+        const element = convertJsonToElements(child);
+        element.parentId = null;
+        return element;
+      });
+
+      setElements(newElements);
     } catch (error) {
       alert('Invalid JSON format.');
+      console.error(error);
     }
   };
 
