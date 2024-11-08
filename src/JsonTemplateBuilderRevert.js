@@ -60,7 +60,7 @@ const AddElementSidebar = ({ addElement }) => (
     {Object.entries(ElementTypes).map(([key, value]) => (
       <button
         key={key}
-        onClick={() => addElement(value, false)} // Adding as a root level element by default
+        onClick={() => addElement(value)}
         className="block w-full mb-2 text-left text-blue-500 hover:text-blue-700 transition-colors duration-200"
       >
         Add {key.replace(/_/g, ' ')}
@@ -209,11 +209,11 @@ const Element = ({
   index,
   updateElement,
   removeElement,
-  addChildElement,
   modifyListItem,
   addNestedSpan,
   updateNestedSpan,
-  removeNestedSpan
+  removeNestedSpan,
+  addChildElement
 }) => {
   const [showDescription, setShowDescription] = useState(!!element.description);
 
@@ -240,9 +240,14 @@ const Element = ({
         >
           <div className="flex justify-between items-center mb-4" {...provided.dragHandleProps}>
             <h3 className="text-lg font-semibold text-gray-700">{getElementTypeName(element.type)}</h3>
-            <button onClick={() => removeElement(element.id)} className="p-1 text-red-500 hover:text-red-700">
-              <TrashIcon className="h-5 w-5" />
-            </button>
+            <div className="flex items-center space-x-2">
+              <button onClick={() => addChildElement(element.id)} className="p-1 text-green-500 hover:text-green-700">
+                <PlusIcon className="h-5 w-5" /> Add Child
+              </button>
+              <button onClick={() => removeElement(element.id)} className="p-1 text-red-500 hover:text-red-700">
+                <TrashIcon className="h-5 w-5" />
+              </button>
+            </div>
           </div>
           {['ul', 'ol'].includes(element.type) && (
             <>
@@ -321,17 +326,8 @@ const Element = ({
               )}
             </>
           ) : null}
-
-          {/* Button to Add Child Element */}
-          <button
-            onClick={() => addChildElement(element.id)}
-            className="mt-4 p-1 text-blue-500 hover:text-blue-700 flex items-center"
-          >
-            <PlusIcon className="h-5 w-5 mr-1" /> Add Child Element
-          </button>
-
           {/* Render Nested Children */}
-          {element.children.length > 0 && (
+          {element.children && element.children.length > 0 && (
             <div className="ml-4 mt-4">
               {element.children.map((child, idx) => (
                 <Element
@@ -340,14 +336,14 @@ const Element = ({
                   index={idx}
                   updateElement={(childId, updates) => {
                     updateElement(element.id, {
-                      children: element.children.map((childEl) => 
+                      children: element.children.map((childEl) =>
                         childEl.id === childId ? { ...childEl, ...updates } : childEl
-                      )
+                      ),
                     });
                   }}
                   removeElement={(childId) => {
                     updateElement(element.id, {
-                      children: element.children.filter((childEl) => childEl.id !== childId)
+                      children: element.children.filter((childEl) => childEl.id !== childId),
                     });
                   }}
                   addChildElement={addChildElement}
@@ -370,27 +366,35 @@ const Element = ({
  */
 const JsonTemplateBuilderRevert = () => {
   const [elements, setElements] = useState([]);
-  const [jsonSchema, setJsonSchema] = useState(JSON.stringify({ schema: { properties: { tag: { enum: ['body'] }, children: [] } } }, null, 2));
+  const [jsonSchema, setJsonSchema] = useState(
+    JSON.stringify({ schema: { properties: { tag: { enum: ['body'] }, children: [] } } }, null, 2)
+  );
 
+  /**
+   * Update the JSON schema whenever the elements state changes.
+   */
   useEffect(() => {
     setJsonSchema(JSON.stringify(convertToJsonSchema(), null, 2));
   }, [elements]);
 
+  /**
+   * Adds a new element to the template.
+   */
   const addElement = useCallback((type, asChild = false, parentId = null) => {
     const newElement = {
       id: uuidv4(),
       type,
       content: defaultContent[type] || 'New element',
-      description: ['ul', 'ol'].includes(type) ? "Follow the instructions mentioned in List description" : null,
+      description: ['ul', 'ol'].includes(type) ? 'Follow the instructions mentioned in List description' : null,
       isDynamic: false,
       listItemDescription: null,
       hasDescription: ['ul', 'ol'].includes(type),
-      children: []
+      children: [],
     };
 
     if (asChild && parentId) {
-      setElements((prev) => 
-        prev.map((el) => el.id === parentId ? { ...el, children: [...el.children, newElement] } : el)
+      setElements((prev) =>
+        prev.map((el) => (el.id === parentId ? { ...el, children: [...el.children, newElement] } : el))
       );
     } else {
       setElements((prev) => [...prev, newElement]);
@@ -411,44 +415,30 @@ const JsonTemplateBuilderRevert = () => {
     addElement(ElementTypes.PARAGRAPH, true, parentId);
   }, [addElement]);
 
-  const handleDragEnd = (result) => {
-    const { destination, source, draggableId } = result;
-
-    if (!destination) return;
-
-    if (source.droppableId === 'sidebar') {
-      if (destination.droppableId === 'elements') {
-        addElement(draggableId);
-      } else if (destination.droppableId.startsWith('children-')) {
-        const parentId = destination.droppableId.replace('children-', '');
-        addElement(draggableId, true, parentId);
-      }
-    } else {
-      // Rearranging within the main builder
-      // (For simplicity, we're ignoring internal reordering in this implementation)
-    }
-  };
-
+  /**
+   * Converts the current template elements to a JSON schema.
+   */
   const convertToJsonSchema = () => ({
     schema: {
-      description: "Ensure that only the required data fields specified in the template are generated.",
+      description:
+        'Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements.',
       properties: {
         tag: { enum: ['body'] },
-        children: elements.map((element) => convertElementToSchema(element))
-      }
-    }
+        children: elements.map((element) => convertElementToSchema(element)),
+      },
+    },
   });
 
   const convertElementToSchema = (element) => {
     const baseProps = { tag: { enum: [element.type] } };
 
-    if (element.children.length > 0) {
+    if (element.children && element.children.length > 0) {
       return {
         properties: {
           ...baseProps,
           content: element.content.trim() !== '' ? { enum: [element.content] } : undefined,
-          children: element.children.map((child) => convertElementToSchema(child))
-        }
+          children: element.children.map((child) => convertElementToSchema(child)),
+        },
       };
     }
 
@@ -456,33 +446,8 @@ const JsonTemplateBuilderRevert = () => {
       properties: {
         ...baseProps,
         content: element.content.trim() !== '' ? { enum: [element.content] } : undefined,
-        children: null
-      }
-    };
-  };
-
-  const updateElementsFromSchema = (updatedSchema) => {
-    try {
-      const parsedSchema = JSON.parse(updatedSchema);
-      if (parsedSchema.schema && parsedSchema.schema.properties && parsedSchema.schema.properties.children) {
-        const newElements = parsedSchema.schema.properties.children.map((child) => parseSchemaElement(child));
-        setElements(newElements);
-        alert('Template updated successfully!');
-      } else {
-        throw new Error("Invalid schema structure");
-      }
-    } catch (error) {
-      alert(`Error parsing schema: ${error.message}`);
-    }
-  };
-
-  const parseSchemaElement = (element) => {
-    const type = element.properties.tag.enum[0];
-    return {
-      id: uuidv4(),
-      type,
-      content: element.properties.content?.enum?.[0] || '',
-      children: element.properties.children ? element.properties.children.map((child) => parseSchemaElement(child)) : []
+        children: null,
+      },
     };
   };
 
@@ -490,10 +455,10 @@ const JsonTemplateBuilderRevert = () => {
     <div className="font-sans p-8 bg-gray-100 min-h-screen">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-800 mb-8">JSON Template Builder with Nested Elements</h1>
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="flex flex-col md:flex-row gap-8">
-            <AddElementSidebar addElement={addElement} />
-            <div className="flex-1">
+        <div className="flex flex-col md:flex-row gap-8">
+          <AddElementSidebar addElement={addElement} />
+          <div className="flex-1">
+            <DragDropContext onDragEnd={() => {}}>
               <Droppable droppableId="elements" type="ELEMENT">
                 {(provided) => (
                   <div ref={provided.innerRef} {...provided.droppableProps}>
@@ -505,19 +470,19 @@ const JsonTemplateBuilderRevert = () => {
                         updateElement={updateElement}
                         removeElement={removeElement}
                         addChildElement={addChildElement}
-                        modifyListItem={updateElement}
-                        addNestedSpan={updateElement}
-                        updateNestedSpan={updateElement}
-                        removeNestedSpan={updateElement}
+                        modifyListItem={() => {}}
+                        addNestedSpan={() => {}}
+                        updateNestedSpan={() => {}}
+                        removeNestedSpan={() => {}}
                       />
                     ))}
                     {provided.placeholder}
                   </div>
                 )}
               </Droppable>
-            </div>
+            </DragDropContext>
           </div>
-        </DragDropContext>
+        </div>
 
         <div className="bg-white shadow-md rounded-lg p-6 mt-8">
           <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">JSON Schema</h2>
@@ -526,12 +491,6 @@ const JsonTemplateBuilderRevert = () => {
             onChange={(e) => setJsonSchema(e.target.value)}
             className="w-full h-[300px] p-2 font-mono text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <button
-            onClick={() => updateElementsFromSchema(jsonSchema)}
-            className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors duration-200"
-          >
-            Update Template
-          </button>
         </div>
       </div>
     </div>
