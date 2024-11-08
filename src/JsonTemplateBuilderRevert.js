@@ -1,29 +1,27 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { PlusIcon, MinusIcon, TrashIcon, VariableIcon, MenuIcon } from '@heroicons/react/solid';
+import { PlusIcon, MinusIcon, TrashIcon, MenuIcon } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { v4 as uuidv4 } from 'uuid';
 
-/**
- * Utility function to map HTML tag types to readable names.
- */
+// Utility function to generate unique IDs
+const generateId = () => Math.random().toString(36).substr(2, 9);
+
+// Utility function to map HTML tag types to readable names
 const getElementTypeName = (type) => {
   const typeNames = {
     h1: 'Heading 1',
     h2: 'Heading 2',
     h3: 'Heading 3',
     p: 'Paragraph',
-    ul: 'Unordered List (Bullet Points)',
-    ol: 'Ordered List (Numbered List)',
-    span: 'Span (Continuous Text)',
-    strong: 'Strong (Bold Text)',
+    ul: 'Unordered List',
+    ol: 'Ordered List',
+    span: 'Span',
+    strong: 'Strong',
     br: 'Line Break'
   };
   return typeNames[type] || type.toUpperCase();
 };
 
-/**
- * Enumeration of supported element types.
- */
+// Element types enumeration
 const ElementTypes = {
   HEADING1: 'h1',
   HEADING2: 'h2',
@@ -36,12 +34,10 @@ const ElementTypes = {
   BREAK: 'br'
 };
 
-/**
- * Default content for each element type.
- */
+// Default content for new elements
 const defaultContent = {
-  ul: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
-  ol: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
+  ul: [{ id: generateId(), content: 'List item 1', description: null, nestedSpans: [] }],
+  ol: [{ id: generateId(), content: 'List item 1', description: null, nestedSpans: [] }],
   br: '',
   h1: 'Heading 1',
   h2: 'Heading 2',
@@ -51,27 +47,7 @@ const defaultContent = {
   span: 'Span text'
 };
 
-/**
- * Sidebar component to add new elements to the template.
- */
-const AddElementSidebar = ({ addElement }) => (
-  <div className="w-full md:w-64 bg-white shadow-md rounded-lg p-6">
-    <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Add Elements</h2>
-    {Object.entries(ElementTypes).map(([key, value]) => (
-      <button
-        key={key}
-        onClick={() => addElement(value)}
-        className="block w-full mb-2 text-left text-blue-500 hover:text-blue-700 transition-colors duration-200"
-      >
-        Add {key.replace(/_/g, ' ')}
-      </button>
-    ))}
-  </div>
-);
-
-/**
- * Component for formatted input with options like bold, italic, line break, and variables.
- */
+// Formatted Input Component with rich text controls
 const FormattedInput = ({
   value,
   onChange,
@@ -81,70 +57,92 @@ const FormattedInput = ({
   onRemoveNestedSpan,
   onAddDescription
 }) => {
-  const [selectionStart, setSelectionStart] = useState(0);
-  const [selectionEnd, setSelectionEnd] = useState(0);
+  const [selection, setSelection] = useState({ start: 0, end: 0 });
 
   const handleSelect = (e) => {
-    setSelectionStart(e.target.selectionStart);
-    setSelectionEnd(e.target.selectionEnd);
+    setSelection({
+      start: e.target.selectionStart,
+      end: e.target.selectionEnd
+    });
   };
 
   const insertTag = (tag) => {
-    const before = value.substring(0, selectionStart);
-    const selection = value.substring(selectionStart, selectionEnd);
-    const after = value.substring(selectionEnd);
-    const newValue = `${before}<${tag}>${selection}</${tag}>${after}`;
+    const { start, end } = selection;
+    const before = value.substring(0, start);
+    const selected = value.substring(start, end);
+    const after = value.substring(end);
+    const newValue = `${before}<${tag}>${selected}</${tag}>${after}`;
     onChange(newValue);
   };
 
-  const insertBreak = () => {
-    const newValue = `${value}<br>`;
-    onChange(newValue);
+  const insertVariable = () => {
+    onChange(`${value} {{Group//Variable Name}}`);
   };
 
   return (
-    <div className="relative">
+    <div className="space-y-2">
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onSelect={handleSelect}
-        className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2 h-16"
         placeholder={placeholder}
+        className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2 h-16"
       />
-      <div className="flex space-x-2 mb-2">
-        <button onClick={() => insertTag('strong')} className="p-1 text-blue-500 hover:text-blue-700">
-          <span className="font-bold">B</span>
-        </button>
-        <button onClick={() => insertTag('em')} className="p-1 text-blue-500 hover:text-blue-700">
-          <span className="italic">I</span>
-        </button>
-        <button onClick={insertBreak} className="p-1 text-blue-500 hover:text-blue-700">
-          <span>BR</span>
-        </button>
-        <button
-          onClick={() => onChange(value + ' {{Group//Variable Name}}')}
-          className="p-1 text-green-500 hover:text-green-700"
+      <div className="flex space-x-2">
+        <button 
+          onClick={() => insertTag('strong')}
+          className="p-2 border rounded hover:bg-gray-100"
         >
-          <VariableIcon className="h-5 w-5" />
+          <strong>B</strong>
+        </button>
+        <button 
+          onClick={() => insertTag('em')}
+          className="p-2 border rounded hover:bg-gray-100"
+        >
+          <em>I</em>
+        </button>
+        <button 
+          onClick={() => onChange(value + '<br>')}
+          className="p-2 border rounded hover:bg-gray-100"
+        >
+          BR
+        </button>
+        <button 
+          onClick={insertVariable}
+          className="p-2 border rounded hover:bg-gray-100 text-green-600"
+        >
+          VAR
         </button>
         {onAddDescription && (
-          <button onClick={onAddDescription} className="p-1 text-green-500 hover:text-green-700">
-            Add Description
+          <button 
+            onClick={onAddDescription}
+            className="p-2 border rounded hover:bg-gray-100 text-green-600"
+          >
+            DESC
           </button>
         )}
         {onRemove && (
-          <button onClick={onRemove} className="p-1 text-red-500 hover:text-red-700">
-            <TrashIcon className="h-5 w-5" />
+          <button 
+            onClick={onRemove}
+            className="p-2 border rounded hover:bg-gray-100 text-red-600"
+          >
+            <TrashIcon className="h-4 w-4" />
           </button>
         )}
         {onAddNestedSpan && (
-          <button onClick={onAddNestedSpan} className="p-1 text-purple-500 hover:text-purple-700">
-            <PlusIcon className="h-5 w-5" />
+          <button 
+            onClick={onAddNestedSpan}
+            className="p-2 border rounded hover:bg-gray-100 text-purple-600"
+          >
+            <PlusIcon className="h-4 w-4" />
           </button>
         )}
         {onRemoveNestedSpan && (
-          <button onClick={onRemoveNestedSpan} className="p-1 text-red-500 hover:text-red-700">
-            <MinusIcon className="h-5 w-5" />
+          <button 
+            onClick={onRemoveNestedSpan}
+            className="p-2 border rounded hover:bg-gray-100 text-red-600"
+          >
+            <MinusIcon className="h-4 w-4" />
           </button>
         )}
       </div>
@@ -152,9 +150,7 @@ const FormattedInput = ({
   );
 };
 
-/**
- * Component representing an individual list item within a list.
- */
+// ListItem Component
 const ListItem = ({
   item,
   index,
@@ -165,67 +161,60 @@ const ListItem = ({
   updateNestedSpan,
   removeNestedSpan
 }) => (
-  <Draggable draggableId={item.id} index={index} key={item.id}>
+  <Draggable draggableId={item.id} index={index}>
     {(provided) => (
       <li
-        className="mb-4 p-4 bg-gray-50 rounded-md flex items-start"
         ref={provided.innerRef}
         {...provided.draggableProps}
+        className="mb-4 p-4 bg-gray-50 rounded-md"
       >
-        <div {...provided.dragHandleProps} className="mr-2 cursor-grab">
-          <MenuIcon className="h-5 w-5 text-gray-500" />
-        </div>
-        <div className="flex-1">
-          <div className="flex flex-col mb-2">
+        <div className="flex items-start gap-2">
+          <div {...provided.dragHandleProps} className="mt-2">
+            <MenuIcon className="h-5 w-5 text-gray-400" />
+          </div>
+          <div className="flex-1 space-y-4">
             <FormattedInput
               value={item.content}
               onChange={(value) => modifyListItem(elementId, item.id, 'content', value)}
               placeholder="List item content"
-              onRemove={() => modifyListItem(elementId, item.id, 'removeContent')}
               onAddNestedSpan={() => addNestedSpan(elementId, item.id)}
             />
             <input
               value={item.description || ''}
               onChange={(e) => modifyListItem(elementId, item.id, 'description', e.target.value)}
-              className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2 h-8"
               placeholder="Item description"
+              className="w-full p-2 text-sm border rounded"
             />
+            {item.nestedSpans.map((span) => (
+              <div key={span.id} className="ml-4 p-4 bg-gray-100 rounded">
+                <FormattedInput
+                  value={span.content}
+                  onChange={(value) => updateNestedSpan(elementId, item.id, span.id, 'content', value)}
+                  placeholder="Nested span content"
+                  onRemoveNestedSpan={() => removeNestedSpan(elementId, item.id, span.id)}
+                />
+                <input
+                  value={span.description || ''}
+                  onChange={(e) => updateNestedSpan(elementId, item.id, span.id, 'description', e.target.value)}
+                  placeholder="Nested span description"
+                  className="w-full mt-2 p-2 text-sm border rounded"
+                />
+              </div>
+            ))}
+            <button
+              onClick={() => modifyListItem(elementId, item.id, 'remove')}
+              className="text-red-600 hover:text-red-700"
+            >
+              <TrashIcon className="h-5 w-5" />
+            </button>
           </div>
-          {item.nestedSpans.map((span) => (
-            <div key={span.id} className="mt-2 ml-4 p-2 bg-gray-100 rounded">
-              <FormattedInput
-                value={span.content}
-                onChange={(value) =>
-                  updateNestedSpan(elementId, item.id, span.id, 'content', value)
-                }
-                placeholder="Nested span content"
-                onRemoveNestedSpan={() => removeNestedSpan(elementId, item.id, span.id)}
-              />
-              <input
-                value={span.description || ''}
-                onChange={(e) =>
-                  updateNestedSpan(elementId, item.id, span.id, 'description', e.target.value)
-                }
-                className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2 h-8"
-                placeholder="Nested span description"
-              />
-            </div>
-          ))}
-          <button
-            onClick={() => modifyListItem(elementId, item.id, 'remove')}
-            className="mt-2 p-1 text-red-500 hover:text-red-700"
-          >
-            <TrashIcon className="h-5 w-5" /> Remove Item
-          </button>
         </div>
       </li>
     )}
   </Draggable>
 );
 
-/**
- * Component representing a single element in the template.
- */
+// Element Component
 const Element = ({
   element,
   index,
@@ -240,145 +229,127 @@ const Element = ({
 }) => {
   const [showDescription, setShowDescription] = useState(!!element.description);
 
-  const toggleDescription = () => {
-    if (!element.description) {
-      updateElement(element.id, { description: '' });
-    }
-    setShowDescription(!showDescription);
-  };
-
-  useEffect(() => {
-    if (element.description) {
-      setShowDescription(true);
-    }
-  }, [element.description]);
-
   return (
     <Draggable draggableId={element.id} index={index}>
       {(provided) => (
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          className={`mb-6 p-6 border rounded-lg bg-white shadow-sm transition-all duration-200 hover:shadow-md ${
-            level > 0 ? 'ml-8' : ''
-          }`}
+          className={`
+            mb-6 p-6 border rounded-lg bg-white shadow-sm
+            ${level > 0 ? 'ml-8 border-l-4 border-l-blue-200' : ''}
+          `}
         >
-          <div className="flex justify-between items-center mb-4" {...provided.dragHandleProps}>
-            <h3 className="text-lg font-semibold text-gray-700">
-              {getElementTypeName(element.type)}
-            </h3>
+          <div className="flex items-center justify-between mb-4" {...provided.dragHandleProps}>
+            <div className="flex items-center gap-2">
+              <MenuIcon className="h-5 w-5 text-gray-400" />
+              <h3 className="font-semibold">{getElementTypeName(element.type)}</h3>
+            </div>
             <button
               onClick={() => removeElement(element.id)}
-              className="p-1 text-red-500 hover:text-red-700"
+              className="text-red-600 hover:text-red-700"
             >
               <TrashIcon className="h-5 w-5" />
             </button>
           </div>
 
-          {['ul', 'ol'].includes(element.type) && (
+          {['ul', 'ol'].includes(element.type) ? (
             <>
-              <label className="flex items-center mb-4 text-sm text-gray-600">
+              <label className="flex items-center gap-2 mb-4">
                 <input
                   type="checkbox"
                   checked={element.isDynamic}
                   onChange={(e) => updateElement(element.id, { isDynamic: e.target.checked })}
-                  className="mr-2"
                 />
-                <span>Dynamic List</span>
+                <span className="text-sm text-gray-600">Dynamic List</span>
               </label>
               {!element.isDynamic && (
                 <>
                   <textarea
                     value={element.description || ''}
                     onChange={(e) => updateElement(element.id, { description: e.target.value })}
-                    className="w-full p-2 mb-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
                     placeholder="List Description"
+                    className="w-full p-2 mb-4 border rounded"
                   />
                   <Droppable droppableId={element.id} type="LIST">
-                    {(listProvided) => {
-                      const ListTag = element.type === 'ul' ? 'ul' : 'ol';
-                      return (
-                        <ListTag
-                          ref={listProvided.innerRef}
-                          {...listProvided.droppableProps}
-                          className={`pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}
-                        >
-                          {element.content.map((item, idx) => (
-                            <ListItem
-                              key={item.id}
-                              item={item}
-                              index={idx}
-                              elementId={element.id}
-                              modifyListItem={modifyListItem}
-                              insertVariable={insertVariable}
-                              addNestedSpan={addNestedSpan}
-                              updateNestedSpan={updateNestedSpan}
-                              removeNestedSpan={removeNestedSpan}
-                            />
-                          ))}
-                          {listProvided.placeholder}
-                        </ListTag>
-                      );
-                    }}
+                    {(droppableProvided) => (
+                      <div
+                        ref={droppableProvided.innerRef}
+                        {...droppableProvided.droppableProps}
+                        className="space-y-4"
+                      >
+                        {element.content.map((item, idx) => (
+                          <ListItem
+                            key={item.id}
+                            item={item}
+                            index={idx}
+                            elementId={element.id}
+                            modifyListItem={modifyListItem}
+                            insertVariable={insertVariable}
+                            addNestedSpan={addNestedSpan}
+                            updateNestedSpan={updateNestedSpan}
+                            removeNestedSpan={removeNestedSpan}
+                          />
+                        ))}
+                        {droppableProvided.placeholder}
+                      </div>
+                    )}
                   </Droppable>
-                  <div className="mt-4">
-                    <button
-                      onClick={() => modifyListItem(element.id, null, 'add')}
-                      className="flex items-center p-1 text-green-500 hover:text-green-700"
-                    >
-                      <PlusIcon className="h-5 w-5 mr-1" /> Add Item
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => modifyListItem(element.id, null, 'add')}
+                    className="mt-4 text-green-600 hover:text-green-700 flex items-center gap-1"
+                  >
+                    <PlusIcon className="h-5 w-5" />
+                    <span>Add Item</span>
+                  </button>
                 </>
               )}
             </>
-          )}
-
-          {element.type === 'br' ? (
+          ) : element.type === 'br' ? (
             <hr className="my-4 border-t border-gray-300" />
-          ) : !['ul', 'ol', 'br'].includes(element.type) ? (
+          ) : (
             <>
               <FormattedInput
                 value={element.content}
                 onChange={(value) => updateElement(element.id, { content: value })}
                 placeholder={`${getElementTypeName(element.type)} content`}
-                onAddDescription={toggleDescription}
+                onAddDescription={() => setShowDescription(!showDescription)}
               />
-              {(showDescription || element.description) && (
+              {showDescription && (
                 <textarea
                   value={element.description || ''}
                   onChange={(e) => updateElement(element.id, { description: e.target.value })}
                   placeholder="Description/Instructions for AI"
-                  className="w-full p-2 mt-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
+                  className="w-full mt-4 p-2 border rounded"
                 />
               )}
             </>
-          ) : null}
+          )}
 
-          {/* Droppable area for nested elements */}
+          {/* Nested elements droppable area */}
           <Droppable droppableId={element.id} type="ELEMENT">
-            {(droppableProvided) => (
+            {(nestedDroppableProvided) => (
               <div
-                ref={droppableProvided.innerRef}
-                {...droppableProvided.droppableProps}
-                className={`mt-4 ${element.children.length > 0 ? 'p-4 border-l-2 border-blue-200' : ''}`}
+                ref={nestedDroppableProvided.innerRef}
+                {...nestedDroppableProvided.droppableProps}
+                className={`mt-4 ${element.children?.length > 0 ? 'p-4 border-l-2 border-blue-200' : ''}`}
               >
-                {element.children.map((childElement, childIndex) => (
-  <Element
-    key={childElement.id}
-    element={childElement}
-    index={childIndex}
-    updateElement={updateElement}
-    removeElement={removeElement}
-    modifyListItem={modifyListItem}
-    insertVariable={insertVariable}
-    addNestedSpan={addNestedSpan}
-    updateNestedSpan={updateNestedSpan}
-    removeNestedSpan={removeNestedSpan}
-    level={level + 1}
-  />
-))}
-{droppableProvided.placeholder}
+                {element.children?.map((childElement, childIndex) => (
+                  <Element
+                    key={childElement.id}
+                    element={childElement}
+                    index={childIndex}
+                    updateElement={updateElement}
+                    removeElement={removeElement}
+                    modifyListItem={modifyListItem}
+                    insertVariable={insertVariable}
+                    addNestedSpan={addNestedSpan}
+                    updateNestedSpan={updateNestedSpan}
+                    removeNestedSpan={removeNestedSpan}
+                    level={level + 1}
+                  />
+                ))}
+                {nestedDroppableProvided.placeholder}
               </div>
             )}
           </Droppable>
@@ -388,12 +359,35 @@ const Element = ({
   );
 };
 
-/**
- * Main component for building the JSON template with drag-and-drop functionality.
- */
-const JsonTemplateBuilderRevert = () => {
+// Sidebar Component
+const AddElementSidebar = ({ addElement }) => (
+  <div className="w-64 bg-white p-6 rounded-lg shadow">
+    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Add Elements</h2>
+    <div className="space-y-2">
+      {Object.entries(ElementTypes).map(([key, value]) => (
+        <button
+          key={key}
+          onClick={() => addElement(value)}
+          className="w-full text-left px-4 py-2 text-blue-600 hover:bg-blue-50 rounded"
+        >
+          {key.replace(/_/g, ' ')}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
+// Main Component
+const JsonTemplateBuilder = () => {
   const [elements, setElements] = useState([]);
-  const [jsonSchema, setJsonSchema] = useState(JSON.stringify({ schema: { properties: { tag: { enum: ['body'] }, children: [] } } }, null, 2));
+  const [jsonSchema, setJsonSchema] = useState(JSON.stringify({
+    schema: {
+      properties: {
+        tag: { enum: ['body'] },
+        children: []
+      }
+    }
+  }, null, 2));
 
   useEffect(() => {
     setJsonSchema(JSON.stringify(convertToJsonSchema(), null, 2));
@@ -403,22 +397,21 @@ const JsonTemplateBuilderRevert = () => {
     setElements((prev) => [
       ...prev,
       {
-        id: uuidv4(),
+        id: generateId(),
         type,
         content: defaultContent[type] || 'New element',
         description: ['ul', 'ol'].includes(type) ? "Follow the instructions mentioned in List description" : null,
         isDynamic: false,
         listItemDescription: null,
         hasDescription: ['ul', 'ol'].includes(type),
-        children: [], // Add children array to support nesting
-        parentId: null // Add parentId to track parent relationship
+        children: [],
+        parentId: null
       }
     ]);
   }, []);
 
   const removeElement = useCallback((id) => {
     setElements((prev) => {
-      // First, collect all child IDs recursively
       const getChildIds = (elementId) => {
         const children = prev.filter(el => el.parentId === elementId);
         return [
@@ -427,6 +420,7 @@ const JsonTemplateBuilderRevert = () => {
         ];
       };
       
+      // Get all ids that need to be removed (including nested children)
       const idsToRemove = getChildIds(id);
       return prev.filter(el => !idsToRemove.includes(el.id));
     });
@@ -437,10 +431,8 @@ const JsonTemplateBuilderRevert = () => {
       prev.map((el) => {
         if (el.id === id) {
           const updatedElement = { ...el, ...updates };
-          if (['ul', 'ol'].includes(updatedElement.type)) {
-            if (updatedElement.isDynamic) {
-              updatedElement.content = [];
-            }
+          if (['ul', 'ol'].includes(updatedElement.type) && updatedElement.isDynamic) {
+            updatedElement.content = [];
           }
           return updatedElement;
         }
@@ -454,17 +446,38 @@ const JsonTemplateBuilderRevert = () => {
       prev.map((el) => {
         if (el.id === elementId) {
           let newContent = [...el.content];
-          if (action === 'add') {
-            newContent.push({ id: uuidv4(), content: '', description: null, nestedSpans: [] });
-          } else if (action === 'remove') {
-            newContent = newContent.filter(item => item.id !== itemId);
-          } else if (action === 'removeContent') {
-            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
-          } else if (action === 'content') {
-            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: value } : item));
-          } else if (action === 'description') {
-            newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value.trim() === '' ? null : value } : item));
+          
+          switch (action) {
+            case 'add':
+              newContent.push({
+                id: generateId(),
+                content: '',
+                description: null,
+                nestedSpans: []
+              });
+              break;
+            case 'remove':
+              newContent = newContent.filter(item => item.id !== itemId);
+              break;
+            case 'removeContent':
+              newContent = newContent.map(item =>
+                item.id === itemId ? { ...item, content: '' } : item
+              );
+              break;
+            case 'content':
+              newContent = newContent.map(item =>
+                item.id === itemId ? { ...item, content: value } : item
+              );
+              break;
+            case 'description':
+              newContent = newContent.map(item =>
+                item.id === itemId ? { ...item, description: value.trim() === '' ? null : value } : item
+              );
+              break;
+            default:
+              break;
           }
+          
           return { ...el, content: newContent };
         }
         return el;
@@ -480,7 +493,10 @@ const JsonTemplateBuilderRevert = () => {
             if (item.id === itemId) {
               return {
                 ...item,
-                nestedSpans: [...item.nestedSpans, { id: uuidv4(), content: '', description: null }]
+                nestedSpans: [
+                  ...item.nestedSpans,
+                  { id: generateId(), content: '', description: null }
+                ]
               };
             }
             return item;
@@ -526,7 +542,7 @@ const JsonTemplateBuilderRevert = () => {
             if (item.id === itemId) {
               return {
                 ...item,
-                nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId)
+                nestedSpans: item.nestedSpans.filter(span => span.id !== spanId)
               };
             }
             return item;
@@ -543,7 +559,6 @@ const JsonTemplateBuilderRevert = () => {
 
     if (!destination) return;
 
-    // If dropping into the same location, do nothing
     if (
       destination.droppableId === source.droppableId &&
       destination.index === source.index
@@ -560,42 +575,59 @@ const JsonTemplateBuilderRevert = () => {
         const targetElement = newElements.find(el => el.id === destination.droppableId);
         
         if (draggedElement && targetElement) {
-          // Remove element from its current position
-          const sourceIndex = newElements.findIndex(el => el.id === draggableId);
-          newElements.splice(sourceIndex, 1);
+          // Remove element from its previous position
+          if (draggedElement.parentId) {
+            // Remove from previous parent's children
+            const oldParent = newElements.find(el => el.id === draggedElement.parentId);
+            if (oldParent) {
+              oldParent.children = oldParent.children.filter(child => child.id !== draggedElement.id);
+            }
+          }
           
           // Update parent-child relationships
           draggedElement.parentId = targetElement.id;
-          targetElement.children.push(draggedElement);
+          if (!targetElement.children) targetElement.children = [];
+          targetElement.children.splice(destination.index, 0, draggedElement);
+          
+          // Remove from root level if it was there
+          const rootIndex = newElements.findIndex(el => el.id === draggableId);
+          if (rootIndex !== -1) {
+            newElements.splice(rootIndex, 1);
+          }
         }
         return newElements;
       }
       
       // Handle reordering at root level
-      if (type === 'ELEMENT' && destination.droppableId === 'elements') {
+      if (type === 'ELEMENT') {
         const element = newElements.find(el => el.id === draggableId);
-        if (element.parentId) {
-          // Remove from parent's children
-          const parent = newElements.find(el => el.id === element.parentId);
-          if (parent) {
-            parent.children = parent.children.filter(child => child.id !== element.id);
+        if (element) {
+          if (element.parentId) {
+            // Remove from parent's children
+            const parent = newElements.find(el => el.id === element.parentId);
+            if (parent) {
+              parent.children = parent.children.filter(child => child.id !== element.id);
+            }
+            element.parentId = null;
           }
-          element.parentId = null;
+          
+          // Reorder at root level
+          const elementIndex = newElements.findIndex(el => el.id === draggableId);
+          if (elementIndex !== -1) {
+            const [removed] = newElements.splice(elementIndex, 1);
+            newElements.splice(destination.index, 0, removed);
+          }
         }
-        
-        const [reorderedItem] = newElements.splice(source.index, 1);
-        newElements.splice(destination.index, 0, reorderedItem);
       }
       
       // Handle list item reordering
       if (type === 'LIST') {
-        const elementId = source.droppableId;
         return newElements.map((element) => {
-          if (element.id === elementId) {
-            const reorderedItems = Array.from(element.content);
-            const [movedItem] = reorderedItems.splice(source.index, 1);
-            reorderedItems.splice(destination.index, 0, movedItem);
-            return { ...element, content: reorderedItems };
+          if (element.id === source.droppableId) {
+            const newContent = [...element.content];
+            const [removed] = newContent.splice(source.index, 1);
+            newContent.splice(destination.index, 0, removed);
+            return { ...element, content: newContent };
           }
           return element;
         });
@@ -605,21 +637,155 @@ const JsonTemplateBuilderRevert = () => {
     });
   };
 
-  // Rest of your existing code including convertToJsonSchema, renderPreview, etc.
-  // ...
+  const convertToJsonSchema = useCallback(() => {
+    const convertElement = (element) => {
+      const baseProps = { tag: { enum: [element.type] } };
+      
+      if (element.type === 'br') {
+        return { properties: baseProps };
+      }
+
+      let schema = {
+        properties: {
+          ...baseProps,
+          content: element.content.trim() !== ''
+            ? { enum: [element.content] }
+            : (element.description ? { description: element.description } : undefined)
+        }
+      };
+
+      if (['ul', 'ol'].includes(element.type)) {
+        if (element.isDynamic) {
+          schema.properties.children = [{
+            type: 'array',
+            items: {
+              properties: {
+                tag: { enum: ['li'] },
+                content: element.listItemDescription 
+                  ? { description: element.listItemDescription }
+                  : undefined,
+                children: null
+              }
+            }
+          }];
+        } else {
+          schema.properties.children = element.content.map(item => ({
+            properties: {
+              tag: { enum: ['li'] },
+              content: item.content.trim() !== ''
+                ? { enum: [item.content] }
+                : (item.description ? { description: item.description } : undefined),
+              children: item.nestedSpans.length > 0
+                ? item.nestedSpans.map(span => ({
+                    properties: {
+                      tag: { enum: ['span'] },
+                      content: span.content.trim() !== ''
+                        ? { enum: [span.content] }
+                        : (span.description ? { description: span.description } : undefined)
+                    }
+                  }))
+                : null
+            }
+          }));
+        }
+      } else if (element.children?.length > 0) {
+        schema.properties.children = element.children.map(convertElement);
+      } else {
+        schema.properties.children = null;
+      }
+
+      return schema;
+    };
+
+    return {
+      schema: {
+        description: "Ensure that only the required data fields specified in the template are generated...",
+        properties: {
+          tag: { enum: ['body'] },
+          children: elements
+            .filter(element => !element.parentId)
+            .map(convertElement)
+        }
+      }
+    };
+  }, [elements]);
+
+  const renderPreview = () => {
+    const renderElement = (element) => {
+      if (element.type === 'br') {
+        return <hr key={element.id} className="my-4 border-t border-gray-300" />;
+      }
+
+      const Component = {
+        h1: 'h1',
+        h2: 'h2',
+        h3: 'h3',
+        p: 'p',
+        strong: 'strong',
+        span: 'span',
+        ul: 'ul',
+        ol: 'ol'
+      }[element.type] || 'div';
+
+      if (['ul', 'ol'].includes(element.type)) {
+        return (
+          <div key={element.id} className="mb-4">
+            {element.description && (
+              <p className="text-gray-600 italic mb-2">{element.description}</p>
+            )}
+            <Component className="pl-5 list-inside">
+              {element.content.map(item => (
+                <li key={item.id} className="mb-2">
+                  {item.content || (item.description && 
+                    <span className="italic text-gray-600">{item.description}</span>
+                  )}
+                  {item.nestedSpans.map(span => (
+                    <span key={span.id} className="ml-2">
+                      {span.content || (span.description &&
+                        <span className="italic text-gray-600">{span.description}</span>
+                      )}
+                    </span>
+                  ))}
+                </li>
+              ))}
+            </Component>
+          </div>
+        );
+      }
+
+      return (
+        <Component key={element.id} className="mb-4">
+          {element.content || (element.description && 
+            <span className="italic text-gray-600">{element.description}</span>
+          )}
+          {element.children?.length > 0 && (
+            <div className="pl-4 border-l-2 border-gray-200 mt-2">
+              {element.children.map(renderElement)}
+            </div>
+          )}
+        </Component>
+      );
+    };
+
+    return (
+      <div className="space-y-4">
+        {elements
+          .filter(element => !element.parentId)
+          .map(renderElement)}
+      </div>
+    );
+  };
 
   return (
-    <div className="font-sans p-8 bg-gray-100 min-h-screen">
+    <div className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-800 mb-8">JSON Template Builder</h1>
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="flex flex-col md:flex-row gap-8">
+          <div className="flex gap-8">
             <AddElementSidebar addElement={addElement} />
             <div className="flex-1">
-              <div className="bg-white shadow-md rounded-lg p-6 mb-8">
-                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">
-                  Template Builder
-                </h2>
+              <div className="bg-white rounded-lg shadow p-6 mb-8">
+                <h2 className="text-xl font-semibold mb-6">Template Builder</h2>
                 <Droppable droppableId="elements" type="ELEMENT">
                   {(provided) => (
                     <div ref={provided.innerRef} {...provided.droppableProps}>
@@ -633,7 +799,6 @@ const JsonTemplateBuilderRevert = () => {
                             updateElement={updateElement}
                             removeElement={removeElement}
                             modifyListItem={modifyListItem}
-                            insertVariable={(id) => updateElement(id, { content: `${element.content} {{Group//Variable Name}}` })}
                             addNestedSpan={addNestedSpan}
                             updateNestedSpan={updateNestedSpan}
                             removeNestedSpan={removeNestedSpan}
@@ -645,30 +810,18 @@ const JsonTemplateBuilderRevert = () => {
                 </Droppable>
               </div>
 
-              {/* Preview Section */}
-              <div className="bg-white shadow-md rounded-lg p-6 mb-8">
-                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">
-                  Preview
-                </h2>
+              <div className="bg-white rounded-lg shadow p-6 mb-8">
+                <h2 className="text-xl font-semibold mb-6">Preview</h2>
                 {renderPreview()}
               </div>
 
-              {/* JSON Schema Section */}
-              <div className="bg-white shadow-md rounded-lg p-6">
-                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">
-                  JSON Schema
-                </h2>
+              <div className="bg-white rounded-lg shadow p-6">
+                <h2 className="text-xl font-semibold mb-6">JSON Schema</h2>
                 <textarea
                   value={jsonSchema}
                   onChange={(e) => setJsonSchema(e.target.value)}
-                  className="w-full h-[300px] p-2 font-mono text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full h-[300px] font-mono text-sm p-4 border rounded"
                 />
-                <button
-                  onClick={updateElementsFromSchema}
-                  className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors duration-200"
-                >
-                  Update Template
-                </button>
               </div>
             </div>
           </div>
@@ -678,4 +831,4 @@ const JsonTemplateBuilderRevert = () => {
   );
 };
 
-export default JsonTemplateBuilderRevert;
+export default JsonTemplateBuilder;
