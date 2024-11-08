@@ -144,6 +144,65 @@ const FormattedInput = ({ value, onChange, placeholder, onRemove, onAddNestedSpa
 };
 
 /**
+ * Component representing an individual list item within a list.
+ */
+const ListItem = ({ item, index, elementId, modifyListItem, addNestedSpan, updateNestedSpan, removeNestedSpan }) => (
+  <Draggable draggableId={item.id} index={index} key={item.id}>
+    {(provided) => (
+      <li
+        className="mb-4 p-4 bg-gray-50 rounded-md flex items-start"
+        ref={provided.innerRef}
+        {...provided.draggableProps}
+      >
+        {/* Optional Drag Handle */}
+        <div {...provided.dragHandleProps} className="mr-2 cursor-grab">
+          <MenuIcon className="h-5 w-5 text-gray-500" />
+        </div>
+        <div className="flex-1">
+          <div className="flex flex-col mb-2">
+            <FormattedInput
+              value={item.content}
+              onChange={(value) => modifyListItem(elementId, item.id, 'content', value)}
+              placeholder="List item content"
+              onRemove={() => modifyListItem(elementId, item.id, 'removeContent')}
+              onAddNestedSpan={() => addNestedSpan(elementId, item.id)}
+            />
+            <input
+              value={item.description || ''}
+              onChange={(e) => modifyListItem(elementId, item.id, 'description', e.target.value)}
+              className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2 h-8"
+              placeholder="Item description"
+            />
+          </div>
+          {item.nestedSpans.map((span, spanIdx) => (
+            <div key={span.id} className="mt-2 ml-4 p-2 bg-gray-100 rounded">
+              <FormattedInput
+                value={span.content}
+                onChange={(value) => updateNestedSpan(elementId, item.id, span.id, 'content', value)}
+                placeholder="Nested span content"
+                onRemoveNestedSpan={() => removeNestedSpan(elementId, item.id, span.id)}
+              />
+              <input
+                value={span.description || ''}
+                onChange={(e) => updateNestedSpan(elementId, item.id, span.id, 'description', e.target.value)}
+                className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2 h-8"
+                placeholder="Nested span description"
+              />
+            </div>
+          ))}
+          <button
+            onClick={() => modifyListItem(elementId, item.id, 'remove')}
+            className="mt-2 p-1 text-red-500 hover:text-red-700"
+          >
+            <TrashIcon className="h-5 w-5" /> Remove Item
+          </button>
+        </div>
+      </li>
+    )}
+  </Draggable>
+);
+
+/**
  * Component representing a single element (e.g., heading, paragraph, list) in the template.
  */
 const Element = ({
