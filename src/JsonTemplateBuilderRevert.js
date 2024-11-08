@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { PlusIcon, TrashIcon, MenuIcon } from '@heroicons/react/solid';
+import { PlusIcon, MinusIcon, TrashIcon, VariableIcon, MenuIcon } from '@heroicons/react/solid';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -52,11 +52,167 @@ const defaultContent = {
 };
 
 /**
+ * Component for formatted input with options like bold, italic, line break, and variables.
+ */
+const FormattedInput = ({
+  value,
+  onChange,
+  placeholder,
+  onRemove,
+  onAddNestedSpan,
+  onRemoveNestedSpan,
+  onAddDescription
+}) => {
+  const [selectionStart, setSelectionStart] = useState(0);
+  const [selectionEnd, setSelectionEnd] = useState(0);
+
+  const handleSelect = (e) => {
+    setSelectionStart(e.target.selectionStart);
+    setSelectionEnd(e.target.selectionEnd);
+  };
+
+  const insertTag = (tag) => {
+    const before = value.substring(0, selectionStart);
+    const selection = value.substring(selectionStart, selectionEnd);
+    const after = value.substring(selectionEnd);
+    const newValue = `${before}<${tag}>${selection}</${tag}>${after}`;
+    onChange(newValue);
+  };
+
+  const insertBreak = () => {
+    const newValue = `${value}<br>`;
+    onChange(newValue);
+  };
+
+  return (
+    <div className="relative">
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onSelect={handleSelect}
+        className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2 h-16"
+        placeholder={placeholder}
+      />
+      <div className="flex space-x-2 mb-2">
+        <button onClick={() => insertTag('strong')} className="p-1 text-blue-500 hover:text-blue-700">
+          <span className="font-bold">B</span>
+        </button>
+        <button onClick={() => insertTag('em')} className="p-1 text-blue-500 hover:text-blue-700">
+          <span className="italic">I</span>
+        </button>
+        <button onClick={insertBreak} className="p-1 text-blue-500 hover:text-blue-700">
+          <span>BR</span>
+        </button>
+        <button
+          onClick={() => onChange(value + ' {{Group//Variable Name}}')}
+          className="p-1 text-green-500 hover:text-green-700"
+        >
+          <VariableIcon className="h-5 w-5" />
+        </button>
+        {onAddDescription && (
+          <button onClick={onAddDescription} className="p-1 text-green-500 hover:text-green-700">
+            Add Description
+          </button>
+        )}
+        {onRemove && (
+          <button onClick={onRemove} className="p-1 text-red-500 hover:text-red-700">
+            <TrashIcon className="h-5 w-5" />
+          </button>
+        )}
+        {onAddNestedSpan && (
+          <button onClick={onAddNestedSpan} className="p-1 text-purple-500 hover:text-purple-700">
+            <PlusIcon className="h-5 w-5" />
+          </button>
+        )}
+        {onRemoveNestedSpan && (
+          <button onClick={onRemoveNestedSpan} className="p-1 text-red-500 hover:text-red-700">
+            <MinusIcon className="h-5 w-5" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Component representing an individual list item within a list.
+ */
+const ListItem = ({
+  item,
+  index,
+  elementId,
+  modifyListItem,
+  insertVariable,
+  addNestedSpan,
+  updateNestedSpan,
+  removeNestedSpan
+}) => (
+  <Draggable draggableId={item.id} index={index} key={item.id}>
+    {(provided) => (
+      <li
+        className="mb-4 p-4 bg-gray-50 rounded-md flex items-start"
+        ref={provided.innerRef}
+        {...provided.draggableProps}
+      >
+        <div {...provided.dragHandleProps} className="mr-2 cursor-grab">
+          <MenuIcon className="h-5 w-5 text-gray-500" />
+        </div>
+        <div className="flex-1">
+          <div className="flex flex-col mb-2">
+            <FormattedInput
+              value={item.content}
+              onChange={(value) => modifyListItem(elementId, item.id, 'content', value)}
+              placeholder="List item content"
+              onRemove={() => modifyListItem(elementId, item.id, 'removeContent')}
+              onAddNestedSpan={() => addNestedSpan(elementId, item.id)}
+            />
+            <input
+              value={item.description || ''}
+              onChange={(e) => modifyListItem(elementId, item.id, 'description', e.target.value)}
+              className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2 h-8"
+              placeholder="Item description"
+            />
+          </div>
+          {item.nestedSpans.map((span) => (
+            <div key={span.id} className="mt-2 ml-4 p-2 bg-gray-100 rounded">
+              <FormattedInput
+                value={span.content}
+                onChange={(value) =>
+                  updateNestedSpan(elementId, item.id, span.id, 'content', value)
+                }
+                placeholder="Nested span content"
+                onRemoveNestedSpan={() => removeNestedSpan(elementId, item.id, span.id)}
+              />
+              <input
+                value={span.description || ''}
+                onChange={(e) =>
+                  updateNestedSpan(elementId, item.id, span.id, 'description', e.target.value)
+                }
+                className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2 h-8"
+                placeholder="Nested span description"
+              />
+            </div>
+          ))}
+          <button
+            onClick={() => modifyListItem(elementId, item.id, 'remove')}
+            className="mt-2 p-1 text-red-500 hover:text-red-700"
+          >
+            <TrashIcon className="h-5 w-5" /> Remove Item
+          </button>
+        </div>
+      </li>
+    )}
+  </Draggable>
+);
+
+/**
  * Sidebar component to add new elements to the template.
  */
 const AddElementSidebar = ({ addElement }) => (
   <div className="w-full md:w-64 bg-white shadow-md rounded-lg p-6">
-    <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Add Elements</h2>
+    <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">
+      Add Elements
+    </h2>
     {Object.entries(ElementTypes).map(([key, value]) => (
       <button
         key={key}
@@ -70,79 +226,164 @@ const AddElementSidebar = ({ addElement }) => (
 );
 
 /**
- * Component for formatted input.
- */
-const FormattedInput = ({ value, onChange, placeholder, onRemove }) => (
-  <div className="relative">
-    <textarea
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2 h-16"
-      placeholder={placeholder}
-    />
-    <div className="flex space-x-2 mb-2">
-      {onRemove && (
-        <button onClick={onRemove} className="p-1 text-red-500 hover:text-red-700">
-          <TrashIcon className="h-5 w-5" />
-        </button>
-      )}
-    </div>
-  </div>
-);
-
-/**
- * Component representing a single element (e.g., heading, paragraph, list) in the template.
+ * Component representing a single element in the template.
  */
 const Element = ({
   element,
   index,
   updateElement,
-  removeElement
+  removeElement,
+  modifyListItem,
+  insertVariable,
+  addNestedSpan,
+  updateNestedSpan,
+  removeNestedSpan,
+  level = 0
 }) => {
+  const [showDescription, setShowDescription] = useState(!!element.description);
+
+  const toggleDescription = () => {
+    if (!element.description) {
+      updateElement(element.id, { description: '' });
+    }
+    setShowDescription(!showDescription);
+  };
+
+  useEffect(() => {
+    if (element.description) {
+      setShowDescription(true);
+    }
+  }, [element.description]);
+
   return (
-    <Draggable draggableId={element.id} index={index} key={element.id}>
+    <Draggable draggableId={element.id} index={index}>
       {(provided) => (
         <div
-          className="mb-6 p-6 border rounded-lg bg-white shadow-sm transition-all duration-200 hover:shadow-md"
           ref={provided.innerRef}
           {...provided.draggableProps}
-          {...provided.dragHandleProps}
+          className={`mb-6 p-6 border rounded-lg bg-white shadow-sm transition-all duration-200 hover:shadow-md ${
+            level > 0 ? 'ml-8' : ''
+          }`}
         >
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-700">{getElementTypeName(element.type)}</h3>
-            <button onClick={() => removeElement(element.id)} className="p-1 text-red-500 hover:text-red-700">
+          <div className="flex justify-between items-center mb-4" {...provided.dragHandleProps}>
+            <h3 className="text-lg font-semibold text-gray-700">
+              {getElementTypeName(element.type)}
+            </h3>
+            <button
+              onClick={() => removeElement(element.id)}
+              className="p-1 text-red-500 hover:text-red-700"
+            >
               <TrashIcon className="h-5 w-5" />
             </button>
           </div>
-          <FormattedInput
-            value={element.content}
-            onChange={(value) => updateElement(element.id, { content: value })}
-            placeholder={`${getElementTypeName(element.type)} content`}
-          />
-          {/* Render Nested Children */}
-          {element.children && element.children.length > 0 && (
-            <div className="ml-4 mt-4">
-              {element.children.map((child, idx) => (
-                <Element
-                  key={child.id}
-                  element={child}
-                  index={idx}
-                  updateElement={(childId, updates) => {
-                    updateElement(element.id, {
-                      children: element.children.map((childEl) =>
-                        childEl.id === childId ? { ...childEl, ...updates } : childEl
-                      ),
-                    });
-                  }}
-                  removeElement={(childId) => {
-                    updateElement(element.id, {
-                      children: element.children.filter((childEl) => childEl.id !== childId),
-                    });
-                  }}
+
+          {['ul', 'ol'].includes(element.type) && (
+            <>
+              <label className="flex items-center mb-4 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={element.isDynamic}
+                  onChange={(e) => updateElement(element.id, { isDynamic: e.target.checked })}
+                  className="mr-2"
                 />
-              ))}
-            </div>
+                <span>Dynamic List</span>
+              </label>
+              {!element.isDynamic && (
+                <>
+                  <textarea
+                    value={element.description || ''}
+                    onChange={(e) => updateElement(element.id, { description: e.target.value })}
+                    className="w-full p-2 mb-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
+                    placeholder="List Description"
+                  />
+                  <Droppable droppableId={element.id} type="LIST">
+                    {(listProvided) => {
+                      const ListTag = element.type === 'ul' ? 'ul' : 'ol';
+                      return (
+                        <ListTag
+                          ref={listProvided.innerRef}
+                          {...listProvided.droppableProps}
+                          className={`pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}
+                        >
+                          {element.content.map((item, idx) => (
+                            <ListItem
+                              key={item.id}
+                              item={item}
+                              index={idx}
+                              elementId={element.id}
+                              modifyListItem={modifyListItem}
+                              insertVariable={insertVariable}
+                              addNestedSpan={addNestedSpan}
+                              updateNestedSpan={updateNestedSpan}
+                              removeNestedSpan={removeNestedSpan}
+                            />
+                          ))}
+                          {listProvided.placeholder}
+                        </ListTag>
+                      );
+                    }}
+                  </Droppable>
+                  <div className="mt-4">
+                    <button
+                      onClick={() => modifyListItem(element.id, null, 'add')}
+                      className="flex items-center p-1 text-green-500 hover:text-green-700"
+                    >
+                      <PlusIcon className="h-5 w-5 mr-1" /> Add Item
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
           )}
+
+          {element.type === 'br' ? (
+            <hr className="my-4 border-t border-gray-300" />
+          ) : !['ul', 'ol', 'br'].includes(element.type) ? (
+            <>
+              <FormattedInput
+                value={element.content}
+                onChange={(value) => updateElement(element.id, { content: value })}
+                placeholder={`${getElementTypeName(element.type)} content`}
+                onAddDescription={toggleDescription}
+              />
+              {(showDescription || element.description) && (
+                <textarea
+                  value={element.description || ''}
+                  onChange={(e) => updateElement(element.id, { description: e.target.value })}
+                  placeholder="Description/Instructions for AI"
+                  className="w-full p-2 mt-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
+                />
+              )}
+            </>
+          ) : null}
+
+          {/* Droppable area for nested elements */}
+          <Droppable droppableId={element.id} type="ELEMENT">
+            {(droppableProvided) => (
+              <div
+                ref={droppableProvided.innerRef}
+                {...droppableProvided.droppableProps}
+                className={`mt-4 ${element.children.length > 0 ? 'p-4 border-l-2 border-blue-200' : ''}`}
+              >
+                {element.children.map((childElement, childIndex) => (
+  <Element
+    key={childElement.id}
+    element={childElement}
+    index={childIndex}
+    updateElement={updateElement}
+    removeElement={removeElement}
+    modifyListItem={modifyListItem}
+    insertVariable={insertVariable}
+    addNestedSpan={addNestedSpan}
+    updateNestedSpan={updateNestedSpan}
+    removeNestedSpan={removeNestedSpan}
+    level={level + 1}
+  />
+))}
+{droppableProvided.placeholder}
+              </div>
+            )}
+          </Droppable>
         </div>
       )}
     </Draggable>
@@ -154,20 +395,12 @@ const Element = ({
  */
 const JsonTemplateBuilderRevert = () => {
   const [elements, setElements] = useState([]);
-  const [jsonSchema, setJsonSchema] = useState(
-    JSON.stringify({ schema: { properties: { tag: { enum: ['body'] }, children: [] } } }, null, 2)
-  );
+  const [jsonSchema, setJsonSchema] = useState(JSON.stringify({ schema: { properties: { tag: { enum: ['body'] }, children: [] } } }, null, 2));
 
-  /**
-   * Update the JSON schema whenever the elements state changes.
-   */
   useEffect(() => {
     setJsonSchema(JSON.stringify(convertToJsonSchema(), null, 2));
   }, [elements]);
 
-  /**
-   * Adds a new element to the template.
-   */
   const addElement = useCallback((type) => {
     setElements((prev) => [
       ...prev,
@@ -175,84 +408,182 @@ const JsonTemplateBuilderRevert = () => {
         id: uuidv4(),
         type,
         content: defaultContent[type] || 'New element',
-        description: null,
-        children: [],
+        description: ['ul', 'ol'].includes(type) ? "Follow the instructions mentioned in List description" : null,
+        isDynamic: false,
+        listItemDescription: null,
+        hasDescription: ['ul', 'ol'].includes(type),
+        children: [], // Add children array to support nesting
+        parentId: null // Add parentId to track parent relationship
       }
     ]);
   }, []);
 
-  /**
-   * Removes an element from the template.
-   */
   const removeElement = useCallback((id) => {
-    setElements((prev) => prev.filter((el) => el.id !== id));
+    setElements((prev) => {
+      const newElements = prev.filter(el => el.id !== id);
+      // Also remove any children of the deleted element
+      return newElements.filter(el => el.parentId !== id);
+    });
   }, []);
 
-  /**
-   * Updates properties of a specific element.
-   */
   const updateElement = useCallback((id, updates) => {
     setElements((prev) =>
-      prev.map((el) => (el.id === id ? { ...el, ...updates } : el))
+      prev.map((el) => {
+        if (el.id === id) {
+          const updatedElement = { ...el, ...updates };
+          if (['ul', 'ol'].includes(updatedElement.type)) {
+            if (updatedElement.isDynamic) {
+              updatedElement.content = [];
+            }
+          }
+          return updatedElement;
+        }
+        return el;
+      })
     );
   }, []);
 
-  /**
-   * Handles the drag-and-drop events.
-   */
   const handleDragEnd = (result) => {
-    const { destination, source } = result;
+    const { destination, source, type, draggableId } = result;
 
     if (!destination) return;
 
-    const newElements = Array.from(elements);
-    const [movedElement] = newElements.splice(source.index, 1);
-
-    // If the destination is at a different index within the same level, reorder
-    if (destination.index !== source.index) {
-      newElements.splice(destination.index, 0, movedElement);
-    } else if (destination.droppableId !== source.droppableId) {
-      // If dropping onto another element, make it a child
-      const parentElementIndex = newElements.findIndex(el => el.id === destination.droppableId);
-      newElements[parentElementIndex].children.push(movedElement);
+    // If dropping into the same location, do nothing
+    if (
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
+    ) {
+      return;
     }
 
-    setElements(newElements);
+    setElements((prevElements) => {
+      const newElements = [...prevElements];
+      
+      // Handle dropping element into another element
+      if (destination.droppableId !== 'elements') {
+        const draggedElement = newElements.find(el => el.id === draggableId);
+        const targetElement = newElements.find(el => el.id === destination.droppableId);
+        
+        if (draggedElement && targetElement) {
+          // Remove element from its current position
+          const sourceIndex = newElements.findIndex(el => el.id === draggableId);
+          newElements.splice(sourceIndex, 1);
+          
+          // Update parent-child relationships
+          draggedElement.parentId = targetElement.id;
+          targetElement.children.push(draggedElement);
+        }
+        return newElements;
+      }
+      
+      // Handle reordering at root level
+      if (type === 'ELEMENT' && destination.droppableId === 'elements') {
+        const element = newElements.find(el => el.id === draggableId);
+        if (element.parentId) {
+          // Remove from parent's children
+          const parent = newElements.find(el => el.id === element.parentId);
+          if (parent) {
+            parent.children = parent.children.filter(child => child.id !== element.id);
+          }
+          element.parentId = null;
+        }
+        
+        const [reorderedItem] = newElements.splice(source.index, 1);
+        newElements.splice(destination.index, 0, reorderedItem);
+      }
+      
+      // Handle list item reordering
+      if (type === 'LIST') {
+        const elementId = source.droppableId;
+        return newElements.map((element) => {
+          if (element.id === elementId) {
+            const reorderedItems = Array.from(element.content);
+            const [movedItem] = reorderedItems.splice(source.index, 1);
+            reorderedItems.splice(destination.index, 0, movedItem);
+            return { ...element, content: reorderedItems };
+          }
+          return element;
+        });
+      }
+      
+      return newElements;
+    });
   };
 
-  /**
-   * Converts the current template elements to a JSON schema.
-   */
-  const convertToJsonSchema = () => ({
-    schema: {
-      description:
-        'Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements.',
-      properties: {
-        tag: { enum: ['body'] },
-        children: elements.map((element) => convertElementToSchema(element)),
-      },
-    },
-  });
+  const convertToJsonSchema = () => {
+    const convertElement = (element) => {
+      const baseProps = { tag: { enum: [element.type] } };
+      let baseSchema = {};
 
-  const convertElementToSchema = (element) => {
-    const baseProps = { tag: { enum: [element.type] } };
+      if (element.type === 'br') {
+        return { properties: baseProps };
+      }
 
-    if (element.children && element.children.length > 0) {
-      return {
-        properties: {
-          ...baseProps,
-          content: element.content.trim() !== '' ? { enum: [element.content] } : undefined,
-          children: element.children.map((child) => convertElementToSchema(child)),
-        },
-      };
-    }
+      if (['ul', 'ol'].includes(element.type)) {
+        baseSchema = element.description !== null 
+          ? { description: element.description, properties: { ...baseProps } }
+          : { properties: { ...baseProps } };
+        
+        if (element.isDynamic) {
+          baseSchema.properties.children = [
+            {
+              type: 'array',
+              items: {
+                properties: {
+                  tag: { enum: ['li'] },
+                  content: element.listItemDescription ? { description: element.listItemDescription } : undefined,
+                  children: null
+                }
+              }
+            }
+          ];
+        } else {
+          baseSchema.properties.children = element.content.map((item) => ({
+            properties: {
+              tag: { enum: ['li'] },
+              content: item.content.trim() !== '' 
+                ? { enum: [item.content] }
+                : (item.description ? { description: item.description } : undefined),
+              children: item.nestedSpans.length > 0
+                ? item.nestedSpans.map((span) => ({
+                    properties: {
+                      tag: { enum: ['span'] },
+                      content: span.content.trim() !== ''
+                        ? { enum: [span.content] }
+                        : (span.description ? { description: span.description } : undefined)
+                    }
+                  }))
+                : null
+            }
+          }));
+        }
+      } else {
+        baseSchema = {
+          properties: {
+            ...baseProps,
+            content: element.content.trim() !== ''
+              ? { enum: [element.content] }
+              : (element.description ? { description: element.description } : undefined),
+            children: element.children.length > 0
+              ? element.children.map(convertElement)
+              : null
+          }
+        };
+      }
+
+      return baseSchema;
+    };
 
     return {
-      properties: {
-        ...baseProps,
-        content: element.content.trim() !== '' ? { enum: [element.content] } : undefined,
-        children: null,
-      },
+      schema: {
+        description: "Ensure that only the required data fields specified in the template are generated...",
+        properties: {
+          tag: { enum: ['body'] },
+          children: elements
+            .filter(element => !element.parentId) // Only include root-level elements
+            .map(convertElement)
+        }
+      }
     };
   };
 
@@ -260,38 +591,67 @@ const JsonTemplateBuilderRevert = () => {
     <div className="font-sans p-8 bg-gray-100 min-h-screen">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-800 mb-8">JSON Template Builder</h1>
-        <div className="flex flex-col md:flex-row gap-8">
-          <AddElementSidebar addElement={addElement} />
-          <div className="flex-1">
-            <DragDropContext onDragEnd={handleDragEnd}>
-              <Droppable droppableId="elements" type="ELEMENT">
-                {(provided) => (
-                  <div ref={provided.innerRef} {...provided.droppableProps}>
-                    {elements.map((element, index) => (
-                      <Element
-                        key={element.id}
-                        element={element}
-                        index={index}
-                        updateElement={updateElement}
-                        removeElement={removeElement}
-                      />
-                    ))}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            </DragDropContext>
-          </div>
-        </div>
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="flex flex-col md:flex-row gap-8">
+            <AddElementSidebar addElement={addElement} />
+            <div className="flex-1">
+              <div className="bg-white shadow-md rounded-lg p-6 mb-8">
+                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">
+                  Template Builder
+                </h2>
+                <Droppable droppableId="elements" type="ELEMENT">
+                  {(provided) => (
+                    <div ref={provided.innerRef} {...provided.droppableProps}>
+                      {elements
+                        .filter(element => !element.parentId) // Only render root-level elements
+                        .map((element, index) => (
+                          <Element
+                            key={element.id}
+                            element={element}
+                            index={index}
+                            updateElement={updateElement}
+                            removeElement={removeElement}
+                            modifyListItem={modifyListItem}
+                            insertVariable={insertVariable}
+                            addNestedSpan={addNestedSpan}
+                            updateNestedSpan={updateNestedSpan}
+                            removeNestedSpan={removeNestedSpan}
+                          />
+                        ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </div>
 
-        <div className="bg-white shadow-md rounded-lg p-6 mt-8">
-          <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">JSON Schema</h2>
-          <textarea
-            value={jsonSchema}
-            onChange={(e) => setJsonSchema(e.target.value)}
-            className="w-full h-[300px] p-2 font-mono text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+              {/* Preview Section */}
+              <div className="bg-white shadow-md rounded-lg p-6 mb-8">
+                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">
+                  Preview
+                </h2>
+                {renderPreview()}
+              </div>
+
+              {/* JSON Schema Section */}
+              <div className="bg-white shadow-md rounded-lg p-6">
+                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">
+                  JSON Schema
+                </h2>
+                <textarea
+                  value={jsonSchema}
+                  onChange={(e) => setJsonSchema(e.target.value)}
+                  className="w-full h-[300px] p-2 font-mono text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={updateElementsFromSchema}
+                  className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors duration-200"
+                >
+                  Update Template
+                </button>
+              </div>
+            </div>
+          </div>
+        </DragDropContext>
       </div>
     </div>
   );
