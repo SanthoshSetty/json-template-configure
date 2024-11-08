@@ -463,24 +463,13 @@ const insertElementAt = (elements, index, element) => {
 // Main Component
 const JsonTemplateBuilder = () => {
   const [elements, setElements] = useState([]);
-  const [jsonSchema, setJsonSchema] = useState(
-    JSON.stringify(
-      {
-        schema: {
-          properties: {
-            tag: { enum: ['body'] },
-            children: [],
-          },
-        },
-      },
-      null,
-      2
-    )
-  );
-  const [pastedJson, setPastedJson] = useState('');
+  const [jsonSchema, setJsonSchema] = useState('');
+  const [jsonTextarea, setJsonTextarea] = useState('');
 
   useEffect(() => {
-    setJsonSchema(JSON.stringify(convertToJsonSchema(), null, 2));
+    const schema = JSON.stringify(convertToJsonSchema(), null, 2);
+    setJsonSchema(schema);
+    setJsonTextarea(schema);
   }, [elements]);
 
   const addElement = useCallback((type) => {
@@ -850,14 +839,14 @@ const JsonTemplateBuilder = () => {
       }
 
       const Component = {
-        h1: 'h1',
-        h2: 'h2',
-        h3: 'h3',
+        h1: (props) => <h1 {...props} className="text-4xl font-bold mb-4" />,
+        h2: (props) => <h2 {...props} className="text-3xl font-bold mb-3" />,
+        h3: (props) => <h3 {...props} className="text-2xl font-bold mb-2" />,
         p: 'p',
         strong: 'strong',
         span: 'span',
-        ul: 'ul',
-        ol: 'ol',
+        ul: (props) => <ul {...props} className="list-disc pl-6 mb-4" />,
+        ol: (props) => <ol {...props} className="list-decimal pl-6 mb-4" />,
       }[element.type] || 'div';
 
       const content =
@@ -876,7 +865,7 @@ const JsonTemplateBuilder = () => {
             {element.description && (
               <p className="text-gray-600 italic mb-2">{element.description}</p>
             )}
-            <Component className="pl-5 list-inside">
+            <Component>
               {element.content.map((item) => (
                 <li key={item.id} className="mb-2">
                   {item.content || (item.description && <em>{item.description}</em>)}
@@ -893,7 +882,7 @@ const JsonTemplateBuilder = () => {
       }
 
       return (
-        <Component key={element.id} className="mb-4">
+        <Component key={element.id}>
           {content}
           {childrenContent}
         </Component>
@@ -907,30 +896,43 @@ const JsonTemplateBuilder = () => {
     );
   };
 
-  const loadTemplateFromJson = () => {
+  const updateTemplateFromJson = () => {
     try {
-      const parsedJson = JSON.parse(pastedJson);
-      const convertJsonToElements = (jsonElements) => {
-        return jsonElements.map((el) => {
+      const parsedJson = JSON.parse(jsonTextarea);
+      const convertJsonToElements = (json) => {
+        // Implement the conversion logic based on your JSON structure
+        // For simplicity, assuming the JSON schema has an 'elements' array
+        // Adjust the logic according to your actual JSON schema format
+
+        const convertElement = (el) => {
           const newElement = {
             id: generateId(),
-            type: el.type,
-            content: el.content || '',
-            description: el.description || null,
-            isDynamic: el.isDynamic || false,
-            listItemDescription: el.listItemDescription || null,
-            hasDescription: ['ul', 'ol'].includes(el.type),
-            children: el.children ? convertJsonToElements(el.children) : [],
-            parentId: el.parentId || null,
+            type: el.properties.tag.enum[0],
+            content: el.properties.content ? el.properties.content.enum[0] : '',
+            description: el.properties.content?.description || null,
+            isDynamic: false,
+            listItemDescription: null,
+            hasDescription: ['ul', 'ol'].includes(el.properties.tag.enum[0]),
+            children: [],
+            parentId: null,
           };
-          if (['ul', 'ol'].includes(el.type)) {
-            newElement.content = el.content || [];
+
+          if (el.properties.children) {
+            if (Array.isArray(el.properties.children.items)) {
+              newElement.children = el.properties.children.items.map(convertElement);
+            } else {
+              newElement.children = [convertElement(el.properties.children.items)];
+            }
           }
+
           return newElement;
-        });
+        };
+
+        const newElements = parsedJson.schema.properties.children.map(convertElement);
+        setElements(newElements);
       };
-      const newElements = convertJsonToElements(parsedJson);
-      setElements(newElements);
+
+      convertJsonToElements(parsedJson);
     } catch (error) {
       alert('Invalid JSON format.');
     }
@@ -976,29 +978,21 @@ const JsonTemplateBuilder = () => {
                 {renderPreview()}
               </div>
 
-              <div className="bg-white rounded-lg shadow p-6 mb-8">
+              <div className="bg-white rounded-lg shadow p-6">
                 <h2 className="text-xl font-semibold mb-6">JSON Schema</h2>
                 <textarea
-                  value={jsonSchema}
-                  onChange={(e) => setJsonSchema(e.target.value)}
-                  className="w-full h-[300px] font-mono text-sm p-4 border rounded"
+                  value={jsonTextarea}
+                  onChange={(e) => setJsonTextarea(e.target.value)}
+                  className="w-full h-[300px] font-mono text-sm p-4 border rounded mb-4"
                 />
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-xl font-semibold mb-6">Load Template from JSON</h2>
-                <textarea
-                  value={pastedJson}
-                  onChange={(e) => setPastedJson(e.target.value)}
-                  placeholder="Paste your JSON code here"
-                  className="w-full h-[200px] font-mono text-sm p-4 border rounded mb-4"
-                />
-                <button
-                  onClick={loadTemplateFromJson}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  Load Template
-                </button>
+                <div className="flex justify-end">
+                  <button
+                    onClick={updateTemplateFromJson}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Update Template from JSON
+                  </button>
+                </div>
               </div>
             </div>
           </div>
