@@ -138,21 +138,6 @@ const getElementTypeName = (type) => {
 };
 
 /**
- * Default content for each element type.
- */
-const defaultContent = {
-  ul: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
-  ol: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
-  br: '', 
-  h1: 'Heading 1',
-  h2: 'Heading 2',
-  h3: 'Heading 3',
-  p: 'Title',
-  strong: 'Bold text',
-  span: 'Span text'
-};
-
-/**
  * Helper function to parse and render HTML content in preview
  */
 const renderFormattedContent = (content) => {
@@ -224,9 +209,6 @@ const Element = ({
   updateElement,
   removeElement,
   modifyListItem,
-  addNestedSpan,
-  updateNestedSpan,
-  removeNestedSpan,
   onTextareaFocus
 }) => {
   const [showDescription, setShowDescription] = useState(!!element.childDescription);
@@ -339,14 +321,19 @@ const Element = ({
                 />
                 <span>Dynamic List</span>
               </label>
-              {!element.isDynamic && (
+
+              {element.isDynamic ? (
                 <>
+                  {/* Dynamic List Description Field */}
                   <textarea
-                    value={element.description || ''}
-                    onChange={(e) => updateElement(element.id, { description: e.target.value })}
+                    value={element.dynamicListDescription || ''}
+                    onChange={(e) => updateElement(element.id, { dynamicListDescription: e.target.value })}
                     className="w-full p-2 mb-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
-                    placeholder="List Description"
+                    placeholder="Dynamic List Description"
                   />
+                </>
+              ) : (
+                <>
                   <Droppable droppableId={element.id} type="LIST">
                     {(provided) => {
                       const ListTag = element.type === 'ul' ? 'ul' : 'ol';
@@ -363,9 +350,6 @@ const Element = ({
                               index={idx}
                               elementId={element.id}
                               modifyListItem={modifyListItem}
-                              addNestedSpan={addNestedSpan}
-                              updateNestedSpan={updateNestedSpan}
-                              removeNestedSpan={removeNestedSpan}
                               onTextareaFocus={onTextareaFocus}
                             />
                           ))}
@@ -409,7 +393,7 @@ const Element = ({
 /**
  * Component representing an individual list item within a list.
  */
-const ListItem = ({ item, index, elementId, modifyListItem, addNestedSpan, updateNestedSpan, removeNestedSpan, onTextareaFocus }) => (
+const ListItem = ({ item, index, elementId, modifyListItem, onTextareaFocus }) => (
   <Draggable draggableId={item.id} index={index} key={item.id}>
     {(provided) => (
       <li
@@ -430,38 +414,16 @@ const ListItem = ({ item, index, elementId, modifyListItem, addNestedSpan, updat
               fieldName="content"
               elementId={elementId}
             />
-            <input
+            <FormattedInput
               value={item.description || ''}
-              onChange={(e) => modifyListItem(elementId, item.id, 'description', e.target.value)}
-              className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2 h-8"
+              onChange={(value) => modifyListItem(elementId, item.id, 'description', value)}
               placeholder="Item description"
+              onFocus={onTextareaFocus}
+              fieldName="description"
+              elementId={elementId}
             />
           </div>
-          {item.nestedSpans.map((span, spanIdx) => (
-            <div key={span.id} className="mt-2 ml-4 p-2 bg-gray-100 rounded">
-              <FormattedInput
-                value={span.content}
-                onChange={(value) => updateNestedSpan(elementId, item.id, span.id, 'content', value)}
-                placeholder="Nested span content"
-                onFocus={onTextareaFocus}
-                fieldName="content"
-                elementId={elementId}
-              />
-              <input
-                value={span.description || ''}
-                onChange={(e) => updateNestedSpan(elementId, item.id, span.id, 'description', e.target.value)}
-                className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2 h-8"
-                placeholder="Nested span description"
-              />
-            </div>
-          ))}
           <div className="flex space-x-2 mt-2">
-            <button
-              onClick={() => addNestedSpan(elementId, item.id)}
-              className="p-1 text-purple-500 hover:text-purple-700"
-            >
-              <PlusIcon className="h-5 w-5" /> Add Nested Span
-            </button>
             <button
               onClick={() => modifyListItem(elementId, item.id, 'remove')}
               className="p-1 text-red-500 hover:text-red-700"
@@ -525,42 +487,36 @@ const convertToJsonSchema = (elements) => ({
               content: element.content
                 ? { enum: [element.content] }
                 : undefined,
-              children: element.isDynamic
-                ? {
-                    type: 'array',
-                    items: {
-                      properties: {
-                        tag: { enum: ['li'] },
-                        content: element.listItemDescription
-                          ? { description: element.listItemDescription }
-                          : {},
-                      },
-                    },
-                  }
-                : element.contentItems.map((item) => ({
-                    properties: {
-                      tag: { enum: ['li'] },
-                      content: item.content.trim() !== ''
-                        ? { enum: [item.content] }
-                        : item.description
-                        ? { description: item.description }
-                        : undefined,
-                      children: item.nestedSpans.length > 0
-                        ? item.nestedSpans.map((span) => ({
-                            properties: {
-                              tag: { enum: ['span'] },
-                              content: span.content.trim() !== ''
-                                ? { enum: [span.content] }
-                                : span.description
-                                ? { description: span.description }
-                                : undefined,
-                            },
-                          }))
-                        : undefined,
-                    },
-                  })),
+              children: []
             },
           };
+
+          if (element.isDynamic) {
+            baseSchema.children = [
+              {
+                type: 'array',
+                items: {
+                  properties: {
+                    tag: { enum: ['li'] },
+                    content: element.dynamicListDescription
+                      ? { description: element.dynamicListDescription }
+                      : {},
+                  },
+                },
+              },
+            ];
+          } else {
+            baseSchema.children = element.contentItems.map((item) => ({
+              properties: {
+                tag: { enum: ['li'] },
+                content: item.content.trim() !== ''
+                  ? { enum: [item.content] }
+                  : item.description
+                  ? { description: item.description }
+                  : undefined,
+              },
+            }));
+          }
           return baseSchema;
         }
 
@@ -606,6 +562,8 @@ const JsonTemplateBuilderRevert = () => {
       updateElement(elementId, { content: newValue });
     } else if (fieldName === 'childContent') {
       updateElement(elementId, { childContent: newValue });
+    } else if (fieldName === 'description') {
+      modifyListItem(elementId, activeTextarea.dataset.itemId, 'description', newValue);
     }
   };
 
@@ -620,7 +578,8 @@ const JsonTemplateBuilderRevert = () => {
         childContent: type === 'p' ? '' : undefined,
         childDescription: null,
         description: ['ul', 'ol'].includes(type) ? '' : null,
-        isDynamic: false,
+        isDynamic: ['ul', 'ol'].includes(type) ? true : false,
+        dynamicListDescription: '',
         listItemDescription: null,
         hasDescription: ['ul', 'ol'].includes(type)
       }
@@ -654,82 +613,14 @@ const JsonTemplateBuilderRevert = () => {
         if (el.id === elementId) {
           let newContentItems = [...el.contentItems];
           if (action === 'add') {
-            newContentItems.push({ id: uuidv4(), content: '', description: null, nestedSpans: [] });
+            newContentItems.push({ id: uuidv4(), content: '', description: '' });
           } else if (action === 'remove') {
             newContentItems = newContentItems.filter(item => item.id !== itemId);
-          } else if (action === 'removeContent') {
-            newContentItems = newContentItems.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
           } else if (action === 'content') {
             newContentItems = newContentItems.map((item) => (item.id === itemId ? { ...item, content: value } : item));
           } else if (action === 'description') {
-            newContentItems = newContentItems.map((item) => (item.id === itemId ? { ...item, description: value.trim() === '' ? null : value } : item));
+            newContentItems = newContentItems.map((item) => (item.id === itemId ? { ...item, description: value } : item));
           }
-          return { ...el, contentItems: newContentItems };
-        }
-        return el;
-      })
-    );
-  }, []);
-
-  const addNestedSpan = useCallback((elementId, itemId) => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === elementId) {
-          const newContentItems = el.contentItems.map((item) => {
-            if (item.id === itemId) {
-              return {
-                ...item,
-                nestedSpans: [...item.nestedSpans, { id: uuidv4(), content: '', description: null }]
-              };
-            }
-            return item;
-          });
-          return { ...el, contentItems: newContentItems };
-        }
-        return el;
-      })
-    );
-  }, []);
-
-  const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === elementId) {
-          const newContentItems = el.contentItems.map((item) => {
-            if (item.id === itemId) {
-              const updatedSpans = item.nestedSpans.map((span) => {
-                if (span.id === spanId) {
-                  if (field === 'description') {
-                    return { ...span, [field]: value.trim() === '' ? null : value };
-                  }
-                  return { ...span, [field]: value };
-                }
-                return span;
-              });
-              return { ...item, nestedSpans: updatedSpans };
-            }
-            return item;
-          });
-          return { ...el, contentItems: newContentItems };
-        }
-        return el;
-      })
-    );
-  }, []);
-
-  const removeNestedSpan = useCallback((elementId, itemId, spanId) => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === elementId) {
-          const newContentItems = el.contentItems.map((item) => {
-            if (item.id === itemId) {
-              return {
-                ...item,
-                nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId)
-              };
-            }
-            return item;
-          });
           return { ...el, contentItems: newContentItems };
         }
         return el;
@@ -766,86 +657,84 @@ const JsonTemplateBuilderRevert = () => {
     }
   };
 
-const renderPreview = () => (
-  <div className="bg-white shadow-md rounded-lg p-6 mb-8">
-    <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Preview</h2>
-    <div className="space-y-4">
-      {elements.map((element, index) => {
-        if (element.type === 'p') {
-          return (
-            <div key={index} className="mb-6">
-              <div className="font-semibold">
-                {renderFormattedContent(element.content)}
-              </div>
-              <div className="mt-2 ml-4">
-                {element.childContent ? (
-                  renderFormattedContent(element.childContent)
-                ) : element.childDescription ? (
-                  <span className="text-gray-600 italic">
-                    Generated content for Prompt: "{element.childDescription}"
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          );
-        }
-
-        if (element.type === 'br') {
-          return <hr key={index} className="my-4 border-t border-gray-300" />;
-        }
-
-        if (['ul', 'ol'].includes(element.type)) {
-          const ListTag = element.type === 'ul' ? 'ul' : 'ol';
-          return (
-            <div key={index} className="mb-6">
-              {element.content && (
+  const renderPreview = () => (
+    <div className="bg-white shadow-md rounded-lg p-6 mb-8">
+      <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Preview</h2>
+      <div className="space-y-4">
+        {elements.map((element, index) => {
+          if (element.type === 'p') {
+            return (
+              <div key={index} className="mb-6">
                 <div className="font-semibold">
                   {renderFormattedContent(element.content)}
                 </div>
-              )}
-              <ListTag className={`pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
-                {element.contentItems.map((item, itemIndex) => (
-                  <li key={itemIndex}>
-                    {item.content ? (
-                      renderFormattedContent(item.content)
-                    ) : item.description ? (
-                      <span className="text-gray-600 italic">
-                        Generated content for Prompt: "{item.description}"
-                      </span>
-                    ) : null}
-                    {item.nestedSpans.map((span, spanIndex) => (
-                      <span key={spanIndex} className="ml-2">
-                        {span.content ? (
-                          renderFormattedContent(span.content)
-                        ) : span.description ? (
+                <div className="mt-2 ml-4">
+                  {element.childContent ? (
+                    renderFormattedContent(element.childContent)
+                  ) : element.childDescription ? (
+                    <span className="text-gray-600 italic">
+                      Generated content for Prompt: "{element.childDescription}"
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            );
+          }
+
+          if (element.type === 'br') {
+            return <hr key={index} className="my-4 border-t border-gray-300" />;
+          }
+
+          if (['ul', 'ol'].includes(element.type)) {
+            const ListTag = element.type === 'ul' ? 'ul' : 'ol';
+            return (
+              <div key={index} className="mb-6">
+                {element.content && (
+                  <div className="font-semibold">
+                    {renderFormattedContent(element.content)}
+                  </div>
+                )}
+                {element.isDynamic ? (
+                  <div className="mt-2 ml-4">
+                    <span className="text-gray-600 italic">
+                      Generated dynamic list for Prompt: "{element.dynamicListDescription}"
+                    </span>
+                  </div>
+                ) : (
+                  <ListTag className={`pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
+                    {element.contentItems.map((item, itemIndex) => (
+                      <li key={itemIndex}>
+                        {item.content ? (
+                          renderFormattedContent(item.content)
+                        ) : item.description ? (
                           <span className="text-gray-600 italic">
-                            Generated content for Prompt: "{span.description}"
+                            Generated content for Prompt: "{item.description}"
                           </span>
                         ) : null}
-                      </span>
+                      </li>
                     ))}
-                  </li>
-                ))}
-              </ListTag>
+                  </ListTag>
+                )}
+              </div>
+            );
+          }
+
+          return (
+            <div key={index}>
+              {element.content ? (
+                renderFormattedContent(element.content)
+              ) : element.description ? (
+                <span className="text-gray-600 italic">
+                  Generated content for Prompt: "{element.description}"
+                </span>
+              ) : null}
             </div>
           );
-        }
-
-        return (
-          <div key={index}>
-            {element.content ? (
-              renderFormattedContent(element.content)
-            ) : element.description ? (
-              <span className="text-gray-600 italic">
-                Generated content for Prompt: "{element.description}"
-              </span>
-            ) : null}
-          </div>
-        );
-      })}
+        })}
+      </div>
     </div>
-  </div>
-);
+  );
+
   return (
     <div className="font-sans p-8 pb-32 bg-gray-100 min-h-screen">
       <div className="max-w-7xl mx-auto">
@@ -870,9 +759,6 @@ const renderPreview = () => (
                           updateElement={updateElement}
                           removeElement={removeElement}
                           modifyListItem={modifyListItem}
-                          addNestedSpan={addNestedSpan}
-                          updateNestedSpan={updateNestedSpan}
-                          removeNestedSpan={removeNestedSpan}
                           onTextareaFocus={handleTextareaFocus}
                         />
                       ))}
