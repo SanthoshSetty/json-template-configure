@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { PlusIcon, MinusIcon, TrashIcon, VariableIcon, MenuIcon } from '@heroicons/react/solid';
+import { PlusIcon, TrashIcon, VariableIcon, MenuIcon } from '@heroicons/react/solid';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -480,114 +480,102 @@ const ListItem = ({ item, index, elementId, modifyListItem, addNestedSpan, updat
  */
 const convertToJsonSchema = (elements) => ({
   schema: {
-    type: 'object',
-    description: "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements. Avoid generating any introductory text, section titles, or descriptive elements unless explicitly requested. Focus solely on the required data in the format provided, and ensure no content is generated outside the template's structural elements.Do not mention product name or any details about the product outside the ul,ol,p,span,strong elements",
+    description: "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure.",
     properties: {
-      tag: { type: 'string', enum: ['body'] },
-      children: {
-        type: 'array',
-        items: elements.map((element) => {
-          // Special handling for paragraphs with parent-child structure
-          if (element.type === 'p') {
-            return {
-              type: 'object',
-              properties: {
-                tag: { type: 'string', enum: ['p'] },
-                content: element.content
-                  ? { type: 'string', enum: [element.content] }
-                  : undefined,
-                children: element.childContent || element.childDescription
-                  ? [
-                      {
-                        type: 'object',
-                        properties: {
-                          tag: { type: 'string', enum: ['p'] },
-                          content: element.childContent
-                            ? { type: 'string', enum: [element.childContent] }
-                            : element.childDescription
-                            ? { type: 'string', description: element.childDescription }
-                            : undefined,
-                        },
-                      },
-                    ]
-                  : undefined,
-              },
-            };
-          }
-
-          // Handle line breaks
-          if (element.type === 'br') {
-            return {
-              type: 'object',
-              properties: { tag: { type: 'string', enum: [element.type] } }
-            };
-          }
-
-          // Handle lists
-          if (['ul', 'ol'].includes(element.type)) {
-            const baseSchema = {
-              type: 'object',
-              properties: {
-                tag: { type: 'string', enum: [element.type] },
-                content: element.content
-                  ? { type: 'string', enum: [element.content] }
-                  : undefined,
-                children: {
-                  type: 'array',
-                  items: element.isDynamic
-                    ? {
-                        type: 'object',
-                        properties: {
-                          tag: { type: 'string', enum: ['li'] },
-                          content: element.listItemDescription
-                            ? { type: 'string', description: element.listItemDescription }
-                            : { type: 'string' },
-                        },
-                      }
-                    : element.contentItems.map((item) => ({
-                        type: 'object',
-                        properties: {
-                          tag: { type: 'string', enum: ['li'] },
-                          content: item.content.trim() !== ''
-                            ? { type: 'string', enum: [item.content] }
-                            : item.description
-                            ? { type: 'string', description: item.description }
-                            : { type: 'string' },
-                          children: item.nestedSpans.length > 0
-                            ? item.nestedSpans.map((span) => ({
-                                type: 'object',
-                                properties: {
-                                  tag: { type: 'string', enum: ['span'] },
-                                  content: span.content.trim() !== ''
-                                    ? { type: 'string', enum: [span.content] }
-                                    : span.description
-                                    ? { type: 'string', description: span.description }
-                                    : { type: 'string' },
-                                },
-                              }))
-                            : undefined,
-                        },
-                      })),
-                },
-              },
-            };
-            return baseSchema;
-          }
-
-          // Handle other elements
+      tag: { enum: ['body'] },
+      children: elements.map((element) => {
+        // Special handling for paragraphs with parent-child structure
+        if (element.type === 'p') {
           return {
-            type: 'object',
             properties: {
-              tag: { type: 'string', enum: [element.type] },
-              content: element.content.trim() !== ''
-                ? { type: 'string', enum: [element.content] }
-                : element.description
-                ? { type: 'string', description: element.description }
+              tag: { enum: ['p'] },
+              content: element.content
+                ? { enum: [element.content] }
+                : undefined,
+              children: element.childContent || element.childDescription
+                ? [
+                    {
+                      properties: {
+                        tag: { enum: ['p'] },
+                        content: element.childContent
+                          ? { enum: [element.childContent] }
+                          : element.childDescription
+                          ? { description: element.childDescription }
+                          : undefined,
+                      },
+                    },
+                  ]
                 : undefined,
             },
           };
-        }),
-      },
+        }
+
+        // Handle line breaks
+        if (element.type === 'br') {
+          return {
+            properties: { tag: { enum: [element.type] } }
+          };
+        }
+
+        // Handle lists
+        if (['ul', 'ol'].includes(element.type)) {
+          const baseSchema = {
+            properties: {
+              tag: { enum: [element.type] },
+              content: element.content
+                ? { enum: [element.content] }
+                : undefined,
+              children: element.isDynamic
+                ? {
+                    type: 'array',
+                    items: {
+                      properties: {
+                        tag: { enum: ['li'] },
+                        content: element.listItemDescription
+                          ? { description: element.listItemDescription }
+                          : {},
+                      },
+                    },
+                  }
+                : element.contentItems.map((item) => ({
+                    properties: {
+                      tag: { enum: ['li'] },
+                      content: item.content.trim() !== ''
+                        ? { enum: [item.content] }
+                        : item.description
+                        ? { description: item.description }
+                        : undefined,
+                      children: item.nestedSpans.length > 0
+                        ? item.nestedSpans.map((span) => ({
+                            properties: {
+                              tag: { enum: ['span'] },
+                              content: span.content.trim() !== ''
+                                ? { enum: [span.content] }
+                                : span.description
+                                ? { description: span.description }
+                                : undefined,
+                            },
+                          }))
+                        : undefined,
+                    },
+                  })),
+            },
+          };
+          return baseSchema;
+        }
+
+        // Handle other elements
+        return {
+          properties: {
+            tag: { enum: [element.type] },
+            content: element.content.trim() !== ''
+              ? { enum: [element.content] }
+              : element.description
+              ? { description: element.description }
+              : undefined,
+          },
+        };
+      }),
     },
   },
 });
@@ -597,7 +585,7 @@ const convertToJsonSchema = (elements) => ({
  */
 const JsonTemplateBuilderRevert = () => {
   const [elements, setElements] = useState([]);
-  const [jsonSchema, setJsonSchema] = useState(JSON.stringify({ schema: { type: 'object', properties: { tag: { type: 'string', enum: ['body'] }, children: [] } } }, null, 2));
+  const [jsonSchema, setJsonSchema] = useState(JSON.stringify({ schema: { properties: { tag: { enum: ['body'] }, children: [] } } }, null, 2));
   const [activeTextarea, setActiveTextarea] = useState(null);
 
   useEffect(() => {
@@ -627,11 +615,11 @@ const JsonTemplateBuilderRevert = () => {
       {
         id: uuidv4(),
         type,
-        content: type === 'p' ? '' : '',
-        contentItems: ['ul', 'ol'].includes(type) ? defaultContent[type] : undefined,
+        content: '',
+        contentItems: ['ul', 'ol'].includes(type) ? [] : undefined,
         childContent: type === 'p' ? '' : undefined,
         childDescription: null,
-        description: ['ul', 'ol'].includes(type) ? "Follow the instructions mentioned in List description" : null,
+        description: ['ul', 'ol'].includes(type) ? '' : null,
         isDynamic: false,
         listItemDescription: null,
         hasDescription: ['ul', 'ol'].includes(type)
