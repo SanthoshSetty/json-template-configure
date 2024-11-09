@@ -30,15 +30,30 @@ const defaultContent = {
 const AddElementSidebar = ({ addElement }) => (
   <div className="w-full md:w-64 bg-white shadow-md rounded-lg p-6">
     <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Add Elements</h2>
-    {Object.entries(ElementTypes).map(([key, value]) => (
-      <button
-        key={key}
-        onClick={() => addElement(value)}
-        className="block w-full mb-2 text-left text-blue-500 hover:text-blue-700 transition-colors duration-200"
-      >
-        Add {key.replace(/_/g, ' ')}
-      </button>
-    ))}
+    <button
+      onClick={() => addElement(ElementTypes.PARAGRAPH)}
+      className="block w-full mb-2 text-left text-blue-500 hover:text-blue-700 transition-colors duration-200"
+    >
+      Add Paragraph
+    </button>
+    <button
+      onClick={() => addElement(ElementTypes.UNORDERED_LIST)}
+      className="block w-full mb-2 text-left text-blue-500 hover:text-blue-700 transition-colors duration-200"
+    >
+      Add Unordered List
+    </button>
+    <button
+      onClick={() => addElement(ElementTypes.ORDERED_LIST)}
+      className="block w-full mb-2 text-left text-blue-500 hover:text-blue-700 transition-colors duration-200"
+    >
+      Add Ordered List
+    </button>
+    <button
+      onClick={() => addElement(ElementTypes.BREAK)}
+      className="block w-full text-left text-blue-500 hover:text-blue-700 transition-colors duration-200"
+    >
+      Add Break
+    </button>
   </div>
 );
 
@@ -126,7 +141,9 @@ const Element = ({ element, index, updateElement, removeElement, modifyListItem 
 
 const JsonTemplateBuilderRevert = () => {
   const [elements, setElements] = useState([]);
-  const [jsonSchema, setJsonSchema] = useState(JSON.stringify({ schema: { properties: { tag: { enum: ['body'] }, children: [] } } }, null, 2));
+  const [jsonSchema, setJsonSchema] = useState(
+    JSON.stringify({ schema: { properties: { tag: { enum: ['body'] }, children: [] } } }, null, 2)
+  );
 
   useEffect(() => {
     setJsonSchema(JSON.stringify(convertToJsonSchema(), null, 2));
