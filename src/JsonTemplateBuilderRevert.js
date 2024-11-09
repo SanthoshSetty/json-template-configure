@@ -4,6 +4,75 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
+ * Utility function to map HTML tag types to readable names.
+ */
+const getElementTypeName = (type) => {
+  const typeNames = {
+    h1: 'Heading 1',
+    h2: 'Heading 2',
+    h3: 'Heading 3',
+    p: 'Paragraph',
+    ul: 'Unordered List (Bullet Points)',
+    ol: 'Ordered List (Numbered List)',
+    span: 'Span (Continuous Text)',
+    strong: 'Strong (Bold Text)',
+    br: 'Line Break'
+  };
+  return typeNames[type] || type.toUpperCase();
+};
+
+/**
+ * Default content for each element type.
+ */
+const defaultContent = {
+  ul: [],  // Empty array for list items
+  ol: [],  // Empty array for list items
+  br: '', 
+  h1: 'Heading 1',
+  h2: 'Heading 2',
+  h3: 'Heading 3',
+  p: '',
+  strong: 'Bold text',
+  span: 'Span text'
+};
+
+/**
+ * Helper function to parse and render HTML content in preview
+ */
+const renderFormattedContent = (content) => {
+  if (!content) return null;
+  
+  const temp = document.createElement('div');
+  temp.innerHTML = content;
+  
+  const convertNode = (node) => {
+    if (node.nodeType === 3) return node.textContent;
+    if (node.nodeType !== 1) return null;
+    
+    const children = Array.from(node.childNodes).map(convertNode);
+    
+    switch (node.tagName.toLowerCase()) {
+      case 'h1':
+        return <h1 className="text-4xl font-bold">{children}</h1>;
+      case 'h2':
+        return <h2 className="text-3xl font-bold">{children}</h2>;
+      case 'h3':
+        return <h3 className="text-2xl font-bold">{children}</h3>;
+      case 'strong':
+        return <strong>{children}</strong>;
+      case 'em':
+        return <em>{children}</em>;
+      default:
+        return <>{children}</>;
+    }
+  };
+  
+  return Array.from(temp.childNodes).map((node, index) => 
+    <React.Fragment key={index}>{convertNode(node)}</React.Fragment>
+  );
+};
+
+/**
  * Common formatting toolbar component
  */
 const FormattingToolbar = ({ onFormatText, activeTextarea }) => {
@@ -119,56 +188,6 @@ const FormattedInput = ({ value, onChange, placeholder, onAddDescription, onFocu
   );
 };
 
-/**
- * Helper function to parse and render HTML content in preview
- */
-const renderFormattedContent = (content) => {
-  if (!content) return null;
-  
-  const temp = document.createElement('div');
-  temp.innerHTML = content;
-  
-  const convertNode = (node) => {
-    if (node.nodeType === 3) return node.textContent;
-    if (node.nodeType !== 1) return null;
-    
-    const children = Array.from(node.childNodes).map(convertNode);
-    
-    switch (node.tagName.toLowerCase()) {
-      case 'h1':
-        return <h1 className="text-4xl font-bold">{children}</h1>;
-      case 'h2':
-        return <h2 className="text-3xl font-bold">{children}</h2>;
-      case 'h3':
-        return <h3 className="text-2xl font-bold">{children}</h3>;
-      case 'strong':
-        return <strong>{children}</strong>;
-      case 'em':
-        return <em>{children}</em>;
-      default:
-        return <>{children}</>;
-    }
-  };
-  
-  return Array.from(temp.childNodes).map((node, index) => 
-    <React.Fragment key={index}>{convertNode(node)}</React.Fragment>
-  );
-};
-
-/**
- * Default content for each element type.
- */
-const defaultContent = {
-  ul: [{ id: uuidv4(), content: '', description: null, nestedSpans: [] }],
-  ol: [{ id: uuidv4(), content: '', description: null, nestedSpans: [] }],
-  br: '', 
-  h1: 'Heading 1',
-  h2: 'Heading 2',
-  h3: 'Heading 3',
-  p: 'Title',
-  strong: 'Bold text',
-  span: 'Span text'
-};
 /**
  * Sidebar component to add new elements to the template.
  */
@@ -298,11 +317,11 @@ const Element = ({
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">List Title</label>
               <FormattedInput
-                value={element.content || ''}
-                onChange={(value) => updateElement(element.id, { content: value })}
+                value={element.title || ''}
+                onChange={(value) => updateElement(element.id, { title: value })}
                 placeholder="Enter list title"
                 onFocus={onTextareaFocus}
-                fieldName="content"
+                fieldName="title"
                 elementId={element.id}
               />
             </div>
@@ -417,31 +436,7 @@ const ListItem = ({ item, index, elementId, modifyListItem, addNestedSpan, updat
               placeholder="Item description"
             />
           </div>
-          {item.nestedSpans.map((span, spanIdx) => (
-            <div key={span.id} className="mt-2 ml-4 p-2 bg-gray-100 rounded">
-              <FormattedInput
-                value={span.content}
-                onChange={(value) => updateNestedSpan(elementId, item.id, span.id, 'content', value)}
-                placeholder="Nested span content"
-                onFocus={onTextareaFocus}
-                fieldName="content"
-                elementId={elementId}
-              />
-              <input
-                value={span.description || ''}
-                onChange={(e) => updateNestedSpan(elementId, item.id, span.id, 'description', e.target.value)}
-                className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2 h-8"
-                placeholder="Nested span description"
-              />
-            </div>
-          ))}
           <div className="flex space-x-2 mt-2">
-            <button
-              onClick={() => addNestedSpan(elementId, item.id)}
-              className="p-1 text-purple-500 hover:text-purple-700"
-            >
-              <PlusIcon className="h-5 w-5" /> Add Nested Span
-            </button>
             <button
               onClick={() => modifyListItem(elementId, item.id, 'remove')}
               className="p-1 text-red-500 hover:text-red-700"
@@ -499,7 +494,7 @@ const convertToJsonSchema = (elements) => ({
           const baseSchema = {
             properties: {
               tag: { enum: [element.type] },
-              content: element.content ? { enum: [element.content] } : undefined,
+              content: element.title ? { enum: [element.title] } : undefined,
               children: element.isDynamic ? 
                 [
                   {
@@ -507,9 +502,8 @@ const convertToJsonSchema = (elements) => ({
                     items: {
                       properties: {
                         tag: { enum: ['li'] },
-                        content: element.listItemDescription ? 
-                          { description: element.listItemDescription } : 
-                          undefined,
+                        content: element.description ? 
+                          { description: element.description } : undefined,
                         children: null
                       }
                     }
@@ -521,24 +515,11 @@ const convertToJsonSchema = (elements) => ({
                     content: item.content.trim() !== '' 
                       ? { enum: [item.content] }
                       : (item.description ? { description: item.description } : undefined),
-                    children: item.nestedSpans.length > 0
-                      ? item.nestedSpans.map((span) => ({
-                          properties: {
-                            tag: { enum: ['span'] },
-                            content: span.content.trim() !== ''
-                              ? { enum: [span.content] }
-                              : (span.description ? { description: span.description } : undefined)
-                          }
-                        }))
-                      : null
+                    children: null
                   }
                 }))
             }
           };
-          
-          if (element.description) {
-            baseSchema.description = element.description;
-          }
           
           return baseSchema;
         }
@@ -580,26 +561,28 @@ const JsonTemplateBuilderRevert = () => {
     
     if (!elementId || !fieldName) return;
 
-    if (fieldName === 'content') {
+    if (fieldName === 'title') {
+      updateElement(elementId, { title: newValue });
+    } else if (fieldName === 'content') {
       updateElement(elementId, { content: newValue });
     } else if (fieldName === 'childContent') {
       updateElement(elementId, { childContent: newValue });
     }
   };
-const addElement = useCallback((type) => {
+
+  const addElement = useCallback((type) => {
     setElements((prev) => [
       ...prev,
       {
         id: uuidv4(),
         type,
-        content: '',  // Empty content by default for all types
+        content: '',
+        title: '',  // For lists
         childContent: type === 'p' ? '' : undefined,
         childDescription: null,
         description: null,
         isDynamic: false,
-        listItemDescription: null,
-        hasDescription: ['ul', 'ol'].includes(type),
-        content: type === 'ul' || type === 'ol' ? [] : ''
+        content: ['ul', 'ol'].includes(type) ? [] : ''
       }
     ]);
   }, []);
@@ -613,10 +596,8 @@ const addElement = useCallback((type) => {
       prev.map((el) => {
         if (el.id === id) {
           const updatedElement = { ...el, ...updates };
-          if (['ul', 'ol'].includes(updatedElement.type)) {
-            if (updatedElement.isDynamic) {
-              updatedElement.content = [];
-            }
+          if (['ul', 'ol'].includes(updatedElement.type) && updatedElement.isDynamic) {
+            updatedElement.content = [];
           }
           return updatedElement;
         }
@@ -631,7 +612,7 @@ const addElement = useCallback((type) => {
         if (el.id === elementId) {
           let newContent = [...(el.content || [])];
           if (action === 'add') {
-            newContent.push({ id: uuidv4(), content: '', description: null, nestedSpans: [] });
+            newContent.push({ id: uuidv4(), content: '', description: null });
           } else if (action === 'remove') {
             newContent = newContent.filter(item => item.id !== itemId);
           } else if (action === 'removeContent') {
@@ -641,72 +622,6 @@ const addElement = useCallback((type) => {
           } else if (action === 'description') {
             newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value.trim() === '' ? null : value } : item));
           }
-          return { ...el, content: newContent };
-        }
-        return el;
-      })
-    );
-  }, []);
-
-  const addNestedSpan = useCallback((elementId, itemId) => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === elementId) {
-          const newContent = el.content.map((item) => {
-            if (item.id === itemId) {
-              return {
-                ...item,
-                nestedSpans: [...item.nestedSpans, { id: uuidv4(), content: '', description: null }]
-              };
-            }
-            return item;
-          });
-          return { ...el, content: newContent };
-        }
-        return el;
-      })
-    );
-  }, []);
-
-  const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === elementId) {
-          const newContent = el.content.map((item) => {
-            if (item.id === itemId) {
-              const updatedSpans = item.nestedSpans.map((span) => {
-                if (span.id === spanId) {
-                  if (field === 'description') {
-                    return { ...span, [field]: value.trim() === '' ? null : value };
-                  }
-                  return { ...span, [field]: value };
-                }
-                return span;
-              });
-              return { ...item, nestedSpans: updatedSpans };
-            }
-            return item;
-          });
-          return { ...el, content: newContent };
-        }
-        return el;
-      })
-    );
-  }, []);
-
-  const removeNestedSpan = useCallback((elementId, itemId, spanId) => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === elementId) {
-          const newContent = el.content.map((item) => {
-            if (item.id === itemId) {
-              return {
-                ...item,
-                nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId)
-              };
-            }
-            return item;
-          });
           return { ...el, content: newContent };
         }
         return el;
@@ -775,13 +690,13 @@ const addElement = useCallback((type) => {
             const ListTag = element.type === 'ul' ? 'ul' : 'ol';
             return (
               <div key={index} className="mb-4">
-                {element.content && typeof element.content === 'string' && (
+                {element.title && (
                   <div className="font-semibold mb-2">
-                    {renderFormattedContent(element.content)}
+                    {renderFormattedContent(element.title)}
                   </div>
                 )}
                 <ListTag className={`pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
-                  {Array.isArray(element.content) && element.content.map((item, itemIndex) => (
+                  {element.content.map((item, itemIndex) => (
                     <li key={itemIndex}>
                       {item.content ? (
                         renderFormattedContent(item.content)
@@ -790,17 +705,6 @@ const addElement = useCallback((type) => {
                           Generated content for Prompt: "{item.description}"
                         </span>
                       ) : null}
-                      {item.nestedSpans?.map((span, spanIndex) => (
-                        <span key={spanIndex} className="ml-2">
-                          {span.content ? (
-                            renderFormattedContent(span.content)
-                          ) : span.description ? (
-                            <span className="text-gray-600 italic">
-                              Generated content for Prompt: "{span.description}"
-                            </span>
-                          ) : null}
-                        </span>
-                      ))}
                     </li>
                   ))}
                 </ListTag>
@@ -822,7 +726,6 @@ const addElement = useCallback((type) => {
           <div className="flex flex-col md:flex-row gap-8">
             <AddElementSidebar addElement={addElement} />
             <div className="flex-1">
-              {/* Template Builder Section */}
               <div className="bg-white shadow-md rounded-lg p-6 mb-8">
                 <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">
                   Template Builder
@@ -850,10 +753,8 @@ const addElement = useCallback((type) => {
                 </Droppable>
               </div>
 
-              {/* Preview Section */}
               {renderPreview()}
 
-              {/* JSON Schema Section */}
               <div className="bg-white shadow-md rounded-lg p-6">
                 <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">
                   JSON Schema
@@ -869,7 +770,6 @@ const addElement = useCallback((type) => {
         </DragDropContext>
       </div>
 
-      {/* Formatting Toolbar */}
       <FormattingToolbar
         onFormatText={handleFormatText}
         activeTextarea={activeTextarea}
