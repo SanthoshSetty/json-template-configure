@@ -303,23 +303,90 @@ const Element = ({
               <TrashIcon className="h-5 w-5" />
             </button>
           </div>
-          {/* Rest of your original element rendering code */}
+          
           {['ul', 'ol'].includes(element.type) && (
-            // Your existing list rendering code
-            // ... keep this part unchanged
+            <>
+              <label className="flex items-center mb-4 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={element.isDynamic}
+                  onChange={(e) => updateElement(element.id, { isDynamic: e.target.checked })}
+                  className="mr-2"
+                />
+                <span>Dynamic List</span>
+              </label>
+              {!element.isDynamic && (
+                <>
+                  <textarea
+                    value={element.description || ''}
+                    onChange={(e) => updateElement(element.id, { description: e.target.value })}
+                    className="w-full p-2 mb-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
+                    placeholder="List Description"
+                  />
+                  <Droppable droppableId={element.id} type="LIST">
+                    {(provided) => {
+                      const ListTag = element.type === 'ul' ? 'ul' : 'ol';
+                      return (
+                        <ListTag
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                          className={`pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}
+                        >
+                          {element.content.map((item, idx) => (
+                            <ListItem
+                              key={item.id}
+                              item={item}
+                              index={idx}
+                              elementId={element.id}
+                              modifyListItem={modifyListItem}
+                              insertVariable={insertVariable}
+                              addNestedSpan={addNestedSpan}
+                              updateNestedSpan={updateNestedSpan}
+                              removeNestedSpan={removeNestedSpan}
+                            />
+                          ))}
+                          {provided.placeholder}
+                        </ListTag>
+                      );
+                    }}
+                  </Droppable>
+                  <div className="mt-4">
+                    <button
+                      onClick={() => modifyListItem(element.id, null, 'add')}
+                      className="flex items-center p-1 text-green-500 hover:text-green-700"
+                    >
+                      <PlusIcon className="h-5 w-5 mr-1" /> Add Item
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
           )}
           {element.type === 'br' ? (
             <hr className="my-4 border-t border-gray-300" />
           ) : !['ul', 'ol', 'br'].includes(element.type) && (
-            // Your existing non-list element rendering code
-            // ... keep this part unchanged
+            <>
+              <FormattedInput
+                value={element.content}
+                onChange={(value) => updateElement(element.id, { content: value })}
+                placeholder={`${getElementTypeName(element.type)} content`}
+                onAddDescription={() => setShowDescription(!showDescription)}
+              />
+              {(showDescription || element.description) && (
+                <textarea
+                  value={element.description || ''}
+                  onChange={(e) => updateElement(element.id, { description: e.target.value })}
+                  placeholder="Description/Instructions for AI"
+                  className="w-full p-2 mt-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
+                />
+              )}
+            </>
           )}
         </div>
       )}
     </Draggable>
   );
 };
-
 
 /**
  * Component representing an individual list item within a list.
@@ -383,7 +450,7 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addN
 /**
  * Modified schema conversion function
  */
-const convertToJsonSchema = () => ({
+const convertToJsonSchema = (elements) => ({
   schema: {
     description: "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements. Avoid generating any introductory text, section titles, or descriptive elements unless explicitly requested. Focus solely on the required data in the format provided, and ensure no content is generated outside the template's structural elements.Do not mention product name or any details about the product outside the ul,ol,p,span,strong elements",
     properties: {
@@ -487,7 +554,7 @@ const JsonTemplateBuilderRevert = () => {
    * Update the JSON schema whenever the elements state changes.
    */
   useEffect(() => {
-    setJsonSchema(JSON.stringify(convertToJsonSchema(), null, 2));
+    setJsonSchema(JSON.stringify(convertToJsonSchema(elements), null, 2));
   }, [elements]);
 
   /**
@@ -556,6 +623,75 @@ const JsonTemplateBuilderRevert = () => {
           } else if (action === 'description') {
             newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value.trim() === '' ? null : value } : item));
           }
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  /**
+   * Functions for nested spans
+   */
+  const addNestedSpan = useCallback((elementId, itemId) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          const newContent = el.content.map((item) => {
+            if (item.id === itemId) {
+              return {
+                ...item,
+                nestedSpans: [...item.nestedSpans, { id: uuidv4(), content: '', description: null }]
+              };
+            }
+            return item;
+          });
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          const newContent = el.content.map((item) => {
+            if (item.id === itemId) {
+              const updatedSpans = item.nestedSpans.map((span) => {
+                if (span.id === spanId) {
+                  if (field === 'description') {
+                    return { ...span, [field]: value.trim() === '' ? null : value };
+                  }
+                  return { ...span, [field]: value };
+                }
+                return span;
+              });
+              return { ...item, nestedSpans: updatedSpans };
+            }
+            return item;
+          });
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  const removeNestedSpan = useCallback((elementId, itemId, spanId) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          const newContent = el.content.map((item) => {
+            if (item.id === itemId) {
+              return {
+                ...item,
+                nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId)
+              };
+            }
+            return item;
+          });
           return { ...el, content: newContent };
         }
         return el;
