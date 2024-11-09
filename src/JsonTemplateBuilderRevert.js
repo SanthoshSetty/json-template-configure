@@ -314,10 +314,23 @@ const Element = ({
               <TrashIcon className="h-5 w-5" />
             </button>
           </div>
-          
+
           {['ul', 'ol'].includes(element.type) && (
             <>
-              <label className="flex items-center mb-4 text-sm text-gray-600">
+              {/* Title Field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                <FormattedInput
+                  value={element.content || ''}
+                  onChange={(value) => updateElement(element.id, { content: value })}
+                  placeholder="Enter title"
+                  onFocus={onTextareaFocus}
+                  fieldName="content"
+                  elementId={element.id}
+                />
+              </div>
+
+              <label className="flex items-center mb-4 text-sm text-gray-600 mt-4">
                 <input
                   type="checkbox"
                   checked={element.isDynamic}
@@ -343,7 +356,7 @@ const Element = ({
                           {...provided.droppableProps}
                           className={`pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}
                         >
-                          {element.content.map((item, idx) => (
+                          {element.contentItems.map((item, idx) => (
                             <ListItem
                               key={item.id}
                               item={item}
@@ -467,95 +480,116 @@ const ListItem = ({ item, index, elementId, modifyListItem, addNestedSpan, updat
  */
 const convertToJsonSchema = (elements) => ({
   schema: {
+    type: 'object',
     description: "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements. Avoid generating any introductory text, section titles, or descriptive elements unless explicitly requested. Focus solely on the required data in the format provided, and ensure no content is generated outside the template's structural elements.Do not mention product name or any details about the product outside the ul,ol,p,span,strong elements",
     properties: {
-      tag: { enum: ['body'] },
-      children: elements.map((element) => {
-        // Special handling for paragraphs with parent-child structure
-        if (element.type === 'p') {
-          return {
-            properties: {
-              tag: { enum: ['p'] },
-              content: {
-                enum: [element.content || '']
-              },
-              children: [
-                {
-                  properties: {
-                    tag: { enum: ['p'] },
-                    content: element.childContent ? 
-                      { enum: [element.childContent] } : 
-                      (element.childDescription ? { description: element.childDescription } : undefined),
-                    children: null
-                  }
-                }
-              ]
-            }
-          };
-        }
-
-        // Handle line breaks
-        if (element.type === 'br') {
-          return {
-            properties: { tag: { enum: [element.type] } }
-          };
-        }
-
-        // Handle lists
-        if (['ul', 'ol'].includes(element.type)) {
-          const baseSchema = element.description !== null 
-            ? { description: element.description, properties: { tag: { enum: [element.type] } } }
-            : { properties: { tag: { enum: [element.type] } } };
-          
-          if (element.isDynamic) {
-            baseSchema.properties.children = [
-              {
-                type: 'array',
-                items: {
-                  properties: {
-                    tag: { enum: ['li'] },
-                    content: element.listItemDescription ? { description: element.listItemDescription } : undefined,
-                    children: null
-                  }
-                }
-              }
-            ];
-          } else {
-            baseSchema.properties.children = element.content.map((item) => ({
+      tag: { type: 'string', enum: ['body'] },
+      children: {
+        type: 'array',
+        items: elements.map((element) => {
+          // Special handling for paragraphs with parent-child structure
+          if (element.type === 'p') {
+            return {
+              type: 'object',
               properties: {
-                tag: { enum: ['li'] },
-                content: item.content.trim() !== '' 
-                  ? { enum: [item.content] }
-                  : (item.description ? { description: item.description } : undefined),
-                children: item.nestedSpans.length > 0
-                  ? item.nestedSpans.map((span) => ({
-                      properties: {
-                        tag: { enum: ['span'] },
-                        content: span.content.trim() !== ''
-                          ? { enum: [span.content] }
-                          : (span.description ? { description: span.description } : undefined)
-                      }
-                    }))
-                  : null
-              }
-            }));
+                tag: { type: 'string', enum: ['p'] },
+                content: element.content
+                  ? { type: 'string', enum: [element.content] }
+                  : undefined,
+                children: element.childContent || element.childDescription
+                  ? [
+                      {
+                        type: 'object',
+                        properties: {
+                          tag: { type: 'string', enum: ['p'] },
+                          content: element.childContent
+                            ? { type: 'string', enum: [element.childContent] }
+                            : element.childDescription
+                            ? { type: 'string', description: element.childDescription }
+                            : undefined,
+                        },
+                      },
+                    ]
+                  : undefined,
+              },
+            };
           }
-          return baseSchema;
-        }
 
-        // Handle other elements
-        return {
-          properties: {
-            tag: { enum: [element.type] },
-            content: element.content.trim() !== ''
-              ? { enum: [element.content] }
-              : (element.description ? { description: element.description } : undefined),
-            children: null
+          // Handle line breaks
+          if (element.type === 'br') {
+            return {
+              type: 'object',
+              properties: { tag: { type: 'string', enum: [element.type] } }
+            };
           }
-        };
-      })
-    }
-  }
+
+          // Handle lists
+          if (['ul', 'ol'].includes(element.type)) {
+            const baseSchema = {
+              type: 'object',
+              properties: {
+                tag: { type: 'string', enum: [element.type] },
+                content: element.content
+                  ? { type: 'string', enum: [element.content] }
+                  : undefined,
+                children: {
+                  type: 'array',
+                  items: element.isDynamic
+                    ? {
+                        type: 'object',
+                        properties: {
+                          tag: { type: 'string', enum: ['li'] },
+                          content: element.listItemDescription
+                            ? { type: 'string', description: element.listItemDescription }
+                            : { type: 'string' },
+                        },
+                      }
+                    : element.contentItems.map((item) => ({
+                        type: 'object',
+                        properties: {
+                          tag: { type: 'string', enum: ['li'] },
+                          content: item.content.trim() !== ''
+                            ? { type: 'string', enum: [item.content] }
+                            : item.description
+                            ? { type: 'string', description: item.description }
+                            : { type: 'string' },
+                          children: item.nestedSpans.length > 0
+                            ? item.nestedSpans.map((span) => ({
+                                type: 'object',
+                                properties: {
+                                  tag: { type: 'string', enum: ['span'] },
+                                  content: span.content.trim() !== ''
+                                    ? { type: 'string', enum: [span.content] }
+                                    : span.description
+                                    ? { type: 'string', description: span.description }
+                                    : { type: 'string' },
+                                },
+                              }))
+                            : undefined,
+                        },
+                      })),
+                },
+              },
+            };
+            return baseSchema;
+          }
+
+          // Handle other elements
+          return {
+            type: 'object',
+            properties: {
+              tag: { type: 'string', enum: [element.type] },
+              content: element.content.trim() !== ''
+                ? { type: 'string', enum: [element.content] }
+                : element.description
+                ? { type: 'string', description: element.description }
+                : undefined,
+            },
+          };
+        }),
+      },
+    },
+  },
 });
 
 /**
@@ -563,7 +597,7 @@ const convertToJsonSchema = (elements) => ({
  */
 const JsonTemplateBuilderRevert = () => {
   const [elements, setElements] = useState([]);
-  const [jsonSchema, setJsonSchema] = useState(JSON.stringify({ schema: { properties: { tag: { enum: ['body'] }, children: [] } } }, null, 2));
+  const [jsonSchema, setJsonSchema] = useState(JSON.stringify({ schema: { type: 'object', properties: { tag: { type: 'string', enum: ['body'] }, children: [] } } }, null, 2));
   const [activeTextarea, setActiveTextarea] = useState(null);
 
   useEffect(() => {
@@ -593,7 +627,8 @@ const JsonTemplateBuilderRevert = () => {
       {
         id: uuidv4(),
         type,
-        content: type === 'p' ? '' : defaultContent[type],
+        content: type === 'p' ? '' : '',
+        contentItems: ['ul', 'ol'].includes(type) ? defaultContent[type] : undefined,
         childContent: type === 'p' ? '' : undefined,
         childDescription: null,
         description: ['ul', 'ol'].includes(type) ? "Follow the instructions mentioned in List description" : null,
@@ -615,7 +650,7 @@ const JsonTemplateBuilderRevert = () => {
           const updatedElement = { ...el, ...updates };
           if (['ul', 'ol'].includes(updatedElement.type)) {
             if (updatedElement.isDynamic) {
-              updatedElement.content = [];
+              updatedElement.contentItems = [];
             }
           }
           return updatedElement;
@@ -629,19 +664,19 @@ const JsonTemplateBuilderRevert = () => {
     setElements((prev) =>
       prev.map((el) => {
         if (el.id === elementId) {
-          let newContent = [...el.content];
+          let newContentItems = [...el.contentItems];
           if (action === 'add') {
-            newContent.push({ id: uuidv4(), content: '', description: null, nestedSpans: [] });
+            newContentItems.push({ id: uuidv4(), content: '', description: null, nestedSpans: [] });
           } else if (action === 'remove') {
-            newContent = newContent.filter(item => item.id !== itemId);
+            newContentItems = newContentItems.filter(item => item.id !== itemId);
           } else if (action === 'removeContent') {
-            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
+            newContentItems = newContentItems.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
           } else if (action === 'content') {
-            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: value } : item));
+            newContentItems = newContentItems.map((item) => (item.id === itemId ? { ...item, content: value } : item));
           } else if (action === 'description') {
-            newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value.trim() === '' ? null : value } : item));
+            newContentItems = newContentItems.map((item) => (item.id === itemId ? { ...item, description: value.trim() === '' ? null : value } : item));
           }
-          return { ...el, content: newContent };
+          return { ...el, contentItems: newContentItems };
         }
         return el;
       })
@@ -652,7 +687,7 @@ const JsonTemplateBuilderRevert = () => {
     setElements((prev) =>
       prev.map((el) => {
         if (el.id === elementId) {
-          const newContent = el.content.map((item) => {
+          const newContentItems = el.contentItems.map((item) => {
             if (item.id === itemId) {
               return {
                 ...item,
@@ -661,7 +696,7 @@ const JsonTemplateBuilderRevert = () => {
             }
             return item;
           });
-          return { ...el, content: newContent };
+          return { ...el, contentItems: newContentItems };
         }
         return el;
       })
@@ -672,7 +707,7 @@ const JsonTemplateBuilderRevert = () => {
     setElements((prev) =>
       prev.map((el) => {
         if (el.id === elementId) {
-          const newContent = el.content.map((item) => {
+          const newContentItems = el.contentItems.map((item) => {
             if (item.id === itemId) {
               const updatedSpans = item.nestedSpans.map((span) => {
                 if (span.id === spanId) {
@@ -687,7 +722,7 @@ const JsonTemplateBuilderRevert = () => {
             }
             return item;
           });
-          return { ...el, content: newContent };
+          return { ...el, contentItems: newContentItems };
         }
         return el;
       })
@@ -698,7 +733,7 @@ const JsonTemplateBuilderRevert = () => {
     setElements((prev) =>
       prev.map((el) => {
         if (el.id === elementId) {
-          const newContent = el.content.map((item) => {
+          const newContentItems = el.contentItems.map((item) => {
             if (item.id === itemId) {
               return {
                 ...item,
@@ -707,7 +742,7 @@ const JsonTemplateBuilderRevert = () => {
             }
             return item;
           });
-          return { ...el, content: newContent };
+          return { ...el, contentItems: newContentItems };
         }
         return el;
       })
@@ -732,10 +767,10 @@ const JsonTemplateBuilderRevert = () => {
       setElements((prevElements) =>
         prevElements.map((element) => {
           if (element.id === elementId) {
-            const reorderedItems = Array.from(element.content);
+            const reorderedItems = Array.from(element.contentItems);
             const [movedItem] = reorderedItems.splice(source.index, 1);
             reorderedItems.splice(destination.index, 0, movedItem);
-            return { ...element, content: reorderedItems };
+            return { ...element, contentItems: reorderedItems };
           }
           return element;
         })
@@ -774,30 +809,37 @@ const renderPreview = () => (
         if (['ul', 'ol'].includes(element.type)) {
           const ListTag = element.type === 'ul' ? 'ul' : 'ol';
           return (
-            <ListTag key={index} className={`pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
-              {element.content.map((item, itemIndex) => (
-                <li key={itemIndex}>
-                  {item.content ? (
-                    renderFormattedContent(item.content)
-                  ) : item.description ? (
-                    <span className="text-gray-600 italic">
-                      Generated content for Prompt: "{item.description}"
-                    </span>
-                  ) : null}
-                  {item.nestedSpans.map((span, spanIndex) => (
-                    <span key={spanIndex} className="ml-2">
-                      {span.content ? (
-                        renderFormattedContent(span.content)
-                      ) : span.description ? (
-                        <span className="text-gray-600 italic">
-                          Generated content for Prompt: "{span.description}"
-                        </span>
-                      ) : null}
-                    </span>
-                  ))}
-                </li>
-              ))}
-            </ListTag>
+            <div key={index} className="mb-6">
+              {element.content && (
+                <div className="font-semibold">
+                  {renderFormattedContent(element.content)}
+                </div>
+              )}
+              <ListTag className={`pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
+                {element.contentItems.map((item, itemIndex) => (
+                  <li key={itemIndex}>
+                    {item.content ? (
+                      renderFormattedContent(item.content)
+                    ) : item.description ? (
+                      <span className="text-gray-600 italic">
+                        Generated content for Prompt: "{item.description}"
+                      </span>
+                    ) : null}
+                    {item.nestedSpans.map((span, spanIndex) => (
+                      <span key={spanIndex} className="ml-2">
+                        {span.content ? (
+                          renderFormattedContent(span.content)
+                        ) : span.description ? (
+                          <span className="text-gray-600 italic">
+                            Generated content for Prompt: "{span.description}"
+                          </span>
+                        ) : null}
+                      </span>
+                    ))}
+                  </li>
+                ))}
+              </ListTag>
+            </div>
           );
         }
 
