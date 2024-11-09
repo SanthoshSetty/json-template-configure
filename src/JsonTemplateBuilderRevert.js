@@ -120,39 +120,6 @@ const FormattedInput = ({ value, onChange, placeholder, onAddDescription, onFocu
 };
 
 /**
- * Utility function to map HTML tag types to readable names.
- */
-const getElementTypeName = (type) => {
-  const typeNames = {
-    h1: 'Heading 1',
-    h2: 'Heading 2',
-    h3: 'Heading 3',
-    p: 'Paragraph',
-    ul: 'Unordered List (Bullet Points)',
-    ol: 'Ordered List (Numbered List)',
-    span: 'Span (Continuous Text)',
-    strong: 'Strong (Bold Text)',
-    br: 'Line Break'
-  };
-  return typeNames[type] || type.toUpperCase();
-};
-
-/**
- * Default content for each element type.
- */
-const defaultContent = {
-  ul: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
-  ol: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
-  br: '', 
-  h1: 'Heading 1',
-  h2: 'Heading 2',
-  h3: 'Heading 3',
-  p: 'Title',
-  strong: 'Bold text',
-  span: 'Span text'
-};
-
-/**
  * Helper function to parse and render HTML content in preview
  */
 const renderFormattedContent = (content) => {
@@ -188,6 +155,20 @@ const renderFormattedContent = (content) => {
   );
 };
 
+/**
+ * Default content for each element type.
+ */
+const defaultContent = {
+  ul: [{ id: uuidv4(), content: '', description: null, nestedSpans: [] }],
+  ol: [{ id: uuidv4(), content: '', description: null, nestedSpans: [] }],
+  br: '', 
+  h1: 'Heading 1',
+  h2: 'Heading 2',
+  h3: 'Heading 3',
+  p: 'Title',
+  strong: 'Bold text',
+  span: 'Span text'
+};
 /**
  * Sidebar component to add new elements to the template.
  */
@@ -254,7 +235,6 @@ const Element = ({
             </div>
             
             <div className="space-y-4">
-              {/* Title (Parent paragraph) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
                 <FormattedInput
@@ -267,7 +247,6 @@ const Element = ({
                 />
               </div>
               
-              {/* Content (Child paragraph) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Content</label>
                 <FormattedInput
@@ -281,7 +260,6 @@ const Element = ({
                 />
               </div>
               
-              {/* Description for child paragraph */}
               {showDescription && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Description (for AI)</label>
@@ -300,97 +278,112 @@ const Element = ({
     );
   }
 
-  return (
-    <Draggable draggableId={element.id} index={index}>
-      {(provided) => (
-        <div
-          className="mb-6 p-6 border rounded-lg bg-white shadow-sm transition-all duration-200 hover:shadow-md"
-          ref={provided.innerRef}
-          {...provided.draggableProps}
-        >
-          <div className="flex justify-between items-center mb-4" {...provided.dragHandleProps}>
-            <h3 className="text-lg font-semibold text-gray-700">{getElementTypeName(element.type)}</h3>
-            <button onClick={() => removeElement(element.id)} className="p-1 text-red-500 hover:text-red-700">
-              <TrashIcon className="h-5 w-5" />
-            </button>
-          </div>
-          
-          {['ul', 'ol'].includes(element.type) && (
-            <>
-              <label className="flex items-center mb-4 text-sm text-gray-600">
-                <input
-                  type="checkbox"
-                  checked={element.isDynamic}
-                  onChange={(e) => updateElement(element.id, { isDynamic: e.target.checked })}
-                  className="mr-2"
-                />
-                <span>Dynamic List</span>
-              </label>
-              {!element.isDynamic && (
-                <>
-                  <textarea
-                    value={element.description || ''}
-                    onChange={(e) => updateElement(element.id, { description: e.target.value })}
-                    className="w-full p-2 mb-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
-                    placeholder="List Description"
-                  />
-                  <Droppable droppableId={element.id} type="LIST">
-                    {(provided) => {
-                      const ListTag = element.type === 'ul' ? 'ul' : 'ol';
-                      return (
-                        <ListTag
-                          ref={provided.innerRef}
-                          {...provided.droppableProps}
-                          className={`pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}
-                        >
-                          {element.content.map((item, idx) => (
-                            <ListItem
-                              key={item.id}
-                              item={item}
-                              index={idx}
-                              elementId={element.id}
-                              modifyListItem={modifyListItem}
-                              addNestedSpan={addNestedSpan}
-                              updateNestedSpan={updateNestedSpan}
-                              removeNestedSpan={removeNestedSpan}
-                              onTextareaFocus={onTextareaFocus}
-                            />
-                          ))}
-                          {provided.placeholder}
-                        </ListTag>
-                      );
-                    }}
-                  </Droppable>
-                  <div className="mt-4">
-                    <button
-                      onClick={() => modifyListItem(element.id, null, 'add')}
-                      className="flex items-center p-1 text-green-500 hover:text-green-700"
-                    >
-                      <PlusIcon className="h-5 w-5 mr-1" /> Add Item
-                    </button>
-                  </div>
-                </>
-              )}
-            </>
-          )}
-          {element.type === 'br' ? (
-            <hr className="my-4 border-t border-gray-300" />
-          ) : !['ul', 'ol', 'br'].includes(element.type) && (
-            <>
+  if (['ul', 'ol'].includes(element.type)) {
+    return (
+      <Draggable draggableId={element.id} index={index}>
+        {(provided) => (
+          <div
+            className="mb-6 p-6 border rounded-lg bg-white shadow-sm transition-all duration-200 hover:shadow-md"
+            ref={provided.innerRef}
+            {...provided.draggableProps}
+          >
+            <div className="flex justify-between items-center mb-4" {...provided.dragHandleProps}>
+              <h3 className="text-lg font-semibold text-gray-700">{getElementTypeName(element.type)}</h3>
+              <button onClick={() => removeElement(element.id)} className="p-1 text-red-500 hover:text-red-700">
+                <TrashIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Title for list */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">List Title</label>
               <FormattedInput
-                value={element.content}
+                value={element.content || ''}
                 onChange={(value) => updateElement(element.id, { content: value })}
-                placeholder={`${getElementTypeName(element.type)} content`}
+                placeholder="Enter list title"
                 onFocus={onTextareaFocus}
                 fieldName="content"
                 elementId={element.id}
               />
-            </>
-          )}
-        </div>
-      )}
-    </Draggable>
-  );
+            </div>
+
+            <label className="flex items-center mb-4 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={element.isDynamic}
+                onChange={(e) => updateElement(element.id, { isDynamic: e.target.checked })}
+                className="mr-2"
+              />
+              <span>Dynamic List</span>
+            </label>
+
+            {!element.isDynamic && (
+              <>
+                <Droppable droppableId={element.id} type="LIST">
+                  {(provided) => {
+                    const ListTag = element.type === 'ul' ? 'ul' : 'ol';
+                    return (
+                      <ListTag
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}
+                      >
+                        {element.content.map((item, idx) => (
+                          <ListItem
+                            key={item.id}
+                            item={item}
+                            index={idx}
+                            elementId={element.id}
+                            modifyListItem={modifyListItem}
+                            addNestedSpan={addNestedSpan}
+                            updateNestedSpan={updateNestedSpan}
+                            removeNestedSpan={removeNestedSpan}
+                            onTextareaFocus={onTextareaFocus}
+                          />
+                        ))}
+                        {provided.placeholder}
+                      </ListTag>
+                    );
+                  }}
+                </Droppable>
+                <div className="mt-4">
+                  <button
+                    onClick={() => modifyListItem(element.id, null, 'add')}
+                    className="flex items-center p-1 text-green-500 hover:text-green-700"
+                  >
+                    <PlusIcon className="h-5 w-5 mr-1" /> Add Item
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </Draggable>
+    );
+  }
+
+  if (element.type === 'br') {
+    return (
+      <Draggable draggableId={element.id} index={index}>
+        {(provided) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.draggableProps}
+            {...provided.dragHandleProps}
+            className="mb-6 p-6 border rounded-lg bg-white shadow-sm transition-all duration-200 hover:shadow-md"
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-700">Line Break</h3>
+              <button onClick={() => removeElement(element.id)} className="p-1 text-red-500 hover:text-red-700">
+                <TrashIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <hr className="my-4 border-t border-gray-300" />
+          </div>
+        )}
+      </Draggable>
+    );
+  }
 };
 
 /**
@@ -503,43 +496,50 @@ const convertToJsonSchema = (elements) => ({
 
         // Handle lists
         if (['ul', 'ol'].includes(element.type)) {
-          const baseSchema = element.description !== null 
-            ? { description: element.description, properties: { tag: { enum: [element.type] } } }
-            : { properties: { tag: { enum: [element.type] } } };
-          
-          if (element.isDynamic) {
-            baseSchema.properties.children = [
-              {
-                type: 'array',
-                items: {
+          const baseSchema = {
+            properties: {
+              tag: { enum: [element.type] },
+              content: element.content ? { enum: [element.content] } : undefined,
+              children: element.isDynamic ? 
+                [
+                  {
+                    type: 'array',
+                    items: {
+                      properties: {
+                        tag: { enum: ['li'] },
+                        content: element.listItemDescription ? 
+                          { description: element.listItemDescription } : 
+                          undefined,
+                        children: null
+                      }
+                    }
+                  }
+                ] : 
+                element.content.map((item) => ({
                   properties: {
                     tag: { enum: ['li'] },
-                    content: element.listItemDescription ? { description: element.listItemDescription } : undefined,
-                    children: null
+                    content: item.content.trim() !== '' 
+                      ? { enum: [item.content] }
+                      : (item.description ? { description: item.description } : undefined),
+                    children: item.nestedSpans.length > 0
+                      ? item.nestedSpans.map((span) => ({
+                          properties: {
+                            tag: { enum: ['span'] },
+                            content: span.content.trim() !== ''
+                              ? { enum: [span.content] }
+                              : (span.description ? { description: span.description } : undefined)
+                          }
+                        }))
+                      : null
                   }
-                }
-              }
-            ];
-          } else {
-            baseSchema.properties.children = element.content.map((item) => ({
-              properties: {
-                tag: { enum: ['li'] },
-                content: item.content.trim() !== '' 
-                  ? { enum: [item.content] }
-                  : (item.description ? { description: item.description } : undefined),
-                children: item.nestedSpans.length > 0
-                  ? item.nestedSpans.map((span) => ({
-                      properties: {
-                        tag: { enum: ['span'] },
-                        content: span.content.trim() !== ''
-                          ? { enum: [span.content] }
-                          : (span.description ? { description: span.description } : undefined)
-                      }
-                    }))
-                  : null
-              }
-            }));
+                }))
+            }
+          };
+          
+          if (element.description) {
+            baseSchema.description = element.description;
           }
+          
           return baseSchema;
         }
 
@@ -586,20 +586,20 @@ const JsonTemplateBuilderRevert = () => {
       updateElement(elementId, { childContent: newValue });
     }
   };
-
-  const addElement = useCallback((type) => {
+const addElement = useCallback((type) => {
     setElements((prev) => [
       ...prev,
       {
         id: uuidv4(),
         type,
-        content: type === 'p' ? '' : defaultContent[type],
+        content: '',  // Empty content by default for all types
         childContent: type === 'p' ? '' : undefined,
         childDescription: null,
-        description: ['ul', 'ol'].includes(type) ? "Follow the instructions mentioned in List description" : null,
+        description: null,
         isDynamic: false,
         listItemDescription: null,
-        hasDescription: ['ul', 'ol'].includes(type)
+        hasDescription: ['ul', 'ol'].includes(type),
+        content: type === 'ul' || type === 'ol' ? [] : ''
       }
     ]);
   }, []);
@@ -629,7 +629,7 @@ const JsonTemplateBuilderRevert = () => {
     setElements((prev) =>
       prev.map((el) => {
         if (el.id === elementId) {
-          let newContent = [...el.content];
+          let newContent = [...(el.content || [])];
           if (action === 'add') {
             newContent.push({ id: uuidv4(), content: '', description: null, nestedSpans: [] });
           } else if (action === 'remove') {
@@ -743,79 +743,77 @@ const JsonTemplateBuilderRevert = () => {
     }
   };
 
-const renderPreview = () => (
-  <div className="bg-white shadow-md rounded-lg p-6 mb-8">
-    <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Preview</h2>
-    <div className="space-y-4">
-      {elements.map((element, index) => {
-        if (element.type === 'p') {
-          return (
-            <div key={index} className="mb-6">
-              <div className="font-semibold">
-                {renderFormattedContent(element.content)}
-              </div>
-              <div className="mt-2 ml-4">
-                {element.childContent ? (
-                  renderFormattedContent(element.childContent)
-                ) : element.childDescription ? (
-                  <span className="text-gray-600 italic">
-                    Generated content for Prompt: "{element.childDescription}"
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          );
-        }
-
-        if (element.type === 'br') {
-          return <hr key={index} className="my-4 border-t border-gray-300" />;
-        }
-
-        if (['ul', 'ol'].includes(element.type)) {
-          const ListTag = element.type === 'ul' ? 'ul' : 'ol';
-          return (
-            <ListTag key={index} className={`pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
-              {element.content.map((item, itemIndex) => (
-                <li key={itemIndex}>
-                  {item.content ? (
-                    renderFormattedContent(item.content)
-                  ) : item.description ? (
+  const renderPreview = () => (
+    <div className="bg-white shadow-md rounded-lg p-6 mb-8">
+      <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Preview</h2>
+      <div className="space-y-4">
+        {elements.map((element, index) => {
+          if (element.type === 'p') {
+            return (
+              <div key={index} className="mb-4">
+                <div className="font-semibold">
+                  {renderFormattedContent(element.content)}
+                </div>
+                <div className="mt-2 ml-4">
+                  {element.childContent ? (
+                    renderFormattedContent(element.childContent)
+                  ) : element.childDescription ? (
                     <span className="text-gray-600 italic">
-                      Generated content for Prompt: "{item.description}"
+                      Generated content for Prompt: "{element.childDescription}"
                     </span>
                   ) : null}
-                  {item.nestedSpans.map((span, spanIndex) => (
-                    <span key={spanIndex} className="ml-2">
-                      {span.content ? (
-                        renderFormattedContent(span.content)
-                      ) : span.description ? (
+                </div>
+              </div>
+            );
+          }
+
+          if (element.type === 'br') {
+            return <hr key={index} className="my-4 border-t border-gray-300" />;
+          }
+
+          if (['ul', 'ol'].includes(element.type)) {
+            const ListTag = element.type === 'ul' ? 'ul' : 'ol';
+            return (
+              <div key={index} className="mb-4">
+                {element.content && typeof element.content === 'string' && (
+                  <div className="font-semibold mb-2">
+                    {renderFormattedContent(element.content)}
+                  </div>
+                )}
+                <ListTag className={`pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
+                  {Array.isArray(element.content) && element.content.map((item, itemIndex) => (
+                    <li key={itemIndex}>
+                      {item.content ? (
+                        renderFormattedContent(item.content)
+                      ) : item.description ? (
                         <span className="text-gray-600 italic">
-                          Generated content for Prompt: "{span.description}"
+                          Generated content for Prompt: "{item.description}"
                         </span>
                       ) : null}
-                    </span>
+                      {item.nestedSpans?.map((span, spanIndex) => (
+                        <span key={spanIndex} className="ml-2">
+                          {span.content ? (
+                            renderFormattedContent(span.content)
+                          ) : span.description ? (
+                            <span className="text-gray-600 italic">
+                              Generated content for Prompt: "{span.description}"
+                            </span>
+                          ) : null}
+                        </span>
+                      ))}
+                    </li>
                   ))}
-                </li>
-              ))}
-            </ListTag>
-          );
-        }
+                </ListTag>
+              </div>
+            );
+          }
 
-        return (
-          <div key={index}>
-            {element.content ? (
-              renderFormattedContent(element.content)
-            ) : element.description ? (
-              <span className="text-gray-600 italic">
-                Generated content for Prompt: "{element.description}"
-              </span>
-            ) : null}
-          </div>
-        );
-      })}
+          return <div key={index}>{renderFormattedContent(element.content)}</div>;
+        })}
+      </div>
     </div>
-  </div>
-);
+  );
+
   return (
     <div className="font-sans p-8 pb-32 bg-gray-100 min-h-screen">
       <div className="max-w-7xl mx-auto">
