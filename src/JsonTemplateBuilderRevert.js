@@ -1,27 +1,29 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { FaPlus, FaMinus, FaTrash, FaBars } from 'react-icons/fa';
+import { PlusIcon, MinusIcon, TrashIcon, VariableIcon, MenuIcon } from '@heroicons/react/solid';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { v4 as uuidv4 } from 'uuid';
 
-// Utility function to generate unique IDs
-const generateId = () => Math.random().toString(36).substr(2, 9);
-
-// Utility function to map HTML tag types to readable names
+/**
+ * Utility function to map HTML tag types to readable names.
+ */
 const getElementTypeName = (type) => {
   const typeNames = {
     h1: 'Heading 1',
     h2: 'Heading 2',
     h3: 'Heading 3',
     p: 'Paragraph',
-    ul: 'Unordered List',
-    ol: 'Ordered List',
-    span: 'Span',
-    strong: 'Strong',
-    br: 'Line Break',
+    ul: 'Unordered List (Bullet Points)',
+    ol: 'Ordered List (Numbered List)',
+    span: 'Span (Continuous Text)',
+    strong: 'Strong (Bold Text)',
+    br: 'Line Break'
   };
   return typeNames[type] || type.toUpperCase();
 };
 
-// Element types enumeration
+/**
+ * Enumeration of supported element types.
+ */
 const ElementTypes = {
   HEADING1: 'h1',
   HEADING2: 'h2',
@@ -31,118 +33,107 @@ const ElementTypes = {
   ORDERED_LIST: 'ol',
   SPAN: 'span',
   STRONG: 'strong',
-  BREAK: 'br',
+  BREAK: 'br'
 };
 
-// Default content for new elements
+/**
+ * Default content for each element type.
+ */
 const defaultContent = {
-  ul: [],
-  ol: [],
-  br: '',
+  ul: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
+  ol: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
+  br: '', 
   h1: 'Heading 1',
   h2: 'Heading 2',
   h3: 'Heading 3',
   p: 'Paragraph text',
   strong: 'Bold text',
-  span: 'Span text',
+  span: 'Span text'
 };
 
-// Formatted Input Component with rich text controls
-const FormattedInput = ({
-  value,
-  onChange,
-  placeholder,
-  onRemove,
-  onAddNestedSpan,
-  onRemoveNestedSpan,
-  onAddDescription,
-}) => {
-  const [selection, setSelection] = useState({ start: 0, end: 0 });
+/**
+ * Sidebar component to add new elements to the template.
+ */
+const AddElementSidebar = ({ addElement }) => (
+  <div className="w-full md:w-64 bg-white shadow-md rounded-lg p-6">
+    <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Add Elements</h2>
+    {Object.entries(ElementTypes).map(([key, value]) => (
+      <button
+        key={key}
+        onClick={() => addElement(value)}
+        className="block w-full mb-2 text-left text-blue-500 hover:text-blue-700 transition-colors duration-200"
+      >
+        Add {key.replace(/_/g, ' ')}
+      </button>
+    ))}
+  </div>
+);
+
+/**
+ * Component for formatted input with options like bold, italic, line break, and variables.
+ */
+const FormattedInput = ({ value, onChange, placeholder, onRemove, onAddNestedSpan, onRemoveNestedSpan, onAddDescription }) => {
+  const [selectionStart, setSelectionStart] = useState(0);
+  const [selectionEnd, setSelectionEnd] = useState(0);
 
   const handleSelect = (e) => {
-    setSelection({
-      start: e.target.selectionStart,
-      end: e.target.selectionEnd,
-    });
+    setSelectionStart(e.target.selectionStart);
+    setSelectionEnd(e.target.selectionEnd);
   };
 
   const insertTag = (tag) => {
-    const { start, end } = selection;
-    const before = value.substring(0, start);
-    const selected = value.substring(start, end);
-    const after = value.substring(end);
-    const newValue = `${before}<${tag}>${selected}</${tag}>${after}`;
+    const before = value.substring(0, selectionStart);
+    const selection = value.substring(selectionStart, selectionEnd);
+    const after = value.substring(selectionEnd);
+    const newValue = `${before}<${tag}>${selection}</${tag}>${after}`;
     onChange(newValue);
   };
 
-  const insertVariable = () => {
-    onChange(`${value} {{Group//Variable Name}}`);
+  const insertBreak = () => {
+    const newValue = `${value}<br>`;
+    onChange(newValue);
   };
 
   return (
-    <div className="space-y-2">
+    <div className="relative">
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onSelect={handleSelect}
-        placeholder={placeholder}
         className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2 h-16"
+        placeholder={placeholder}
       />
-      <div className="flex space-x-2">
-        <button
-          onClick={() => insertTag('strong')}
-          className="p-2 border rounded hover:bg-gray-100"
-        >
-          <strong>B</strong>
+      <div className="flex space-x-2 mb-2">
+        <button onClick={() => insertTag('strong')} className="p-1 text-blue-500 hover:text-blue-700">
+          <span className="font-bold">B</span>
         </button>
-        <button
-          onClick={() => insertTag('em')}
-          className="p-2 border rounded hover:bg-gray-100"
-        >
-          <em>I</em>
+        <button onClick={() => insertTag('em')} className="p-1 text-blue-500 hover:text-blue-700">
+          <span className="italic">I</span>
         </button>
-        <button
-          onClick={() => onChange(value + '<br>')}
-          className="p-2 border rounded hover:bg-gray-100"
-        >
-          BR
+        <button onClick={insertBreak} className="p-1 text-blue-500 hover:text-blue-700">
+          <span>BR</span>
         </button>
-        <button
-          onClick={insertVariable}
-          className="p-2 border rounded hover:bg-gray-100 text-green-600"
-        >
-          VAR
+        <button onClick={() => onChange(value + ' {{Group//Variable Name}}')} className="p-1 text-green-500 hover:text-green-700">
+          <VariableIcon className="h-5 w-5" />
         </button>
         {onAddDescription && (
-          <button
-            onClick={onAddDescription}
-            className="p-2 border rounded hover:bg-gray-100 text-green-600"
-          >
-            DESC
+          <button onClick={onAddDescription} className="p-1 text-green-500 hover:text-green-700">
+            Add Description
           </button>
         )}
         {onRemove && (
-          <button
-            onClick={onRemove}
-            className="p-2 border rounded hover:bg-gray-100 text-red-600"
-          >
-            <FaTrash className="h-4 w-4" />
+          <button onClick={onRemove} className="p-1 text-red-500 hover:text-red-700">
+            <TrashIcon className="h-5 w-5" />
           </button>
         )}
         {onAddNestedSpan && (
-          <button
-            onClick={onAddNestedSpan}
-            className="p-2 border rounded hover:bg-gray-100 text-purple-600"
-          >
-            <FaPlus className="h-4 w-4" />
+          <button onClick={onAddNestedSpan} className="p-1 text-purple-500 hover:text-purple-700">
+            <PlusIcon className="h-5 w-5" />
           </button>
         )}
         {onRemoveNestedSpan && (
-          <button
-            onClick={onRemoveNestedSpan}
-            className="p-2 border rounded hover:bg-gray-100 text-red-600"
-          >
-            <FaMinus className="h-4 w-4" />
+          <button onClick={onRemoveNestedSpan} className="p-1 text-red-500 hover:text-red-700">
+            <MinusIcon className="h-5 w-5" />
           </button>
         )}
       </div>
@@ -150,487 +141,306 @@ const FormattedInput = ({
   );
 };
 
-// ListItem Component
-const ListItem = ({
-  item,
-  index,
-  elementId,
-  modifyListItem,
-  addNestedSpan,
-  updateNestedSpan,
-  removeNestedSpan,
-}) => (
-  <Draggable draggableId={item.id} index={index} type="LIST_ITEM">
+/**
+ * Component representing an individual list item within a list.
+ * Rendered as an <li> element to maintain semantic HTML structure.
+ */
+const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addNestedSpan, updateNestedSpan, removeNestedSpan }) => (
+  <Draggable draggableId={item.id} index={index} key={item.id}>
     {(provided) => (
       <li
+        className="mb-4 p-4 bg-gray-50 rounded-md flex items-start"
         ref={provided.innerRef}
         {...provided.draggableProps}
-        className="mb-4 p-4 bg-gray-50 rounded-md"
       >
-        <div className="flex items-start gap-2">
-          <div {...provided.dragHandleProps} className="mt-2">
-            <FaBars className="h-5 w-5 text-gray-400" />
-          </div>
-          <div className="flex-1 space-y-4">
+        {/* Optional Drag Handle */}
+        <div {...provided.dragHandleProps} className="mr-2 cursor-grab">
+          <MenuIcon className="h-5 w-5 text-gray-500" />
+        </div>
+        <div className="flex-1">
+          <div className="flex flex-col mb-2">
             <FormattedInput
               value={item.content}
               onChange={(value) => modifyListItem(elementId, item.id, 'content', value)}
               placeholder="List item content"
+              onRemove={() => modifyListItem(elementId, item.id, 'removeContent')}
               onAddNestedSpan={() => addNestedSpan(elementId, item.id)}
             />
             <input
               value={item.description || ''}
-              onChange={(e) =>
-                modifyListItem(elementId, item.id, 'description', e.target.value)
-              }
+              onChange={(e) => modifyListItem(elementId, item.id, 'description', e.target.value)}
+              className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2 h-8"
               placeholder="Item description"
-              className="w-full p-2 text-sm border rounded"
             />
-            {item.nestedSpans.map((span) => (
-              <div key={span.id} className="ml-4 p-4 bg-gray-100 rounded">
-                <FormattedInput
-                  value={span.content}
-                  onChange={(value) =>
-                    updateNestedSpan(elementId, item.id, span.id, 'content', value)
-                  }
-                  placeholder="Nested span content"
-                  onRemoveNestedSpan={() => removeNestedSpan(elementId, item.id, span.id)}
-                />
-                <input
-                  value={span.description || ''}
-                  onChange={(e) =>
-                    updateNestedSpan(
-                      elementId,
-                      item.id,
-                      span.id,
-                      'description',
-                      e.target.value
-                    )
-                  }
-                  placeholder="Nested span description"
-                  className="w-full mt-2 p-2 text-sm border rounded"
-                />
-              </div>
-            ))}
-            <button
-              onClick={() => modifyListItem(elementId, item.id, 'remove')}
-              className="text-red-600 hover:text-red-700"
-            >
-              <FaTrash className="h-5 w-5" />
-            </button>
           </div>
+          {item.nestedSpans.map((span, spanIdx) => (
+            <div key={span.id} className="mt-2 ml-4 p-2 bg-gray-100 rounded">
+              <FormattedInput
+                value={span.content}
+                onChange={(value) => updateNestedSpan(elementId, item.id, span.id, 'content', value)}
+                placeholder="Nested span content"
+                onRemoveNestedSpan={() => removeNestedSpan(elementId, item.id, span.id)}
+              />
+              <input
+                value={span.description || ''}
+                onChange={(e) => updateNestedSpan(elementId, item.id, span.id, 'description', e.target.value)}
+                className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2 h-8"
+                placeholder="Nested span description"
+              />
+            </div>
+          ))}
+          <button
+            onClick={() => modifyListItem(elementId, item.id, 'remove')}
+            className="mt-2 p-1 text-red-500 hover:text-red-700"
+          >
+            <TrashIcon className="h-5 w-5" /> Remove Item
+          </button>
         </div>
       </li>
     )}
   </Draggable>
 );
 
-// Element Component
+/**
+ * Component representing a single element (e.g., heading, paragraph, list) in the template.
+ */
 const Element = ({
   element,
   index,
   updateElement,
   removeElement,
   modifyListItem,
+  insertVariable,
   addNestedSpan,
   updateNestedSpan,
-  removeNestedSpan,
-  addChildElement,
-  level = 0,
+  removeNestedSpan
 }) => {
   const [showDescription, setShowDescription] = useState(!!element.description);
-  const [showDropdown, setShowDropdown] = useState(false);
+
+  const toggleDescription = () => {
+    if (!element.description) {
+      updateElement(element.id, { description: '' });
+    }
+    setShowDescription(!showDescription);
+  };
+
+  useEffect(() => {
+    if (element.description) {
+      setShowDescription(true);
+    }
+  }, [element.description]);
 
   return (
-    <Draggable draggableId={element.id} index={index} type="ELEMENT">
+    <Draggable draggableId={element.id} index={index} key={element.id}>
       {(provided) => (
         <div
+          className="mb-6 p-6 border rounded-lg bg-white shadow-sm transition-all duration-200 hover:shadow-md"
           ref={provided.innerRef}
           {...provided.draggableProps}
-          className={`
-            mb-6 p-6 border rounded-lg bg-white shadow-sm
-            ${level > 0 ? 'ml-8 border-l-4 border-l-blue-200' : ''}
-          `}
         >
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2" {...provided.dragHandleProps}>
-              <FaBars className="h-5 w-5 text-gray-400" />
-              <h3 className="font-semibold">{getElementTypeName(element.type)}</h3>
-            </div>
-            <button
-              onClick={() => removeElement(element.id)}
-              className="text-red-600 hover:text-red-700"
-            >
-              <FaTrash className="h-5 w-5" />
+          <div className="flex justify-between items-center mb-4" {...provided.dragHandleProps}>
+            <h3 className="text-lg font-semibold text-gray-700">{getElementTypeName(element.type)}</h3>
+            <button onClick={() => removeElement(element.id)} className="p-1 text-red-500 hover:text-red-700">
+              <TrashIcon className="h-5 w-5" />
             </button>
           </div>
-
-          {/* Element Content */}
-          {['ul', 'ol'].includes(element.type) ? (
+          {['ul', 'ol'].includes(element.type) && (
             <>
-              <label className="flex items-center gap-2 mb-4">
+              <label className="flex items-center mb-4 text-sm text-gray-600">
                 <input
                   type="checkbox"
                   checked={element.isDynamic}
                   onChange={(e) => updateElement(element.id, { isDynamic: e.target.checked })}
+                  className="mr-2"
                 />
-                <span className="text-sm text-gray-600">Dynamic List</span>
+                <span>Dynamic List</span>
               </label>
               {!element.isDynamic && (
                 <>
                   <textarea
                     value={element.description || ''}
                     onChange={(e) => updateElement(element.id, { description: e.target.value })}
+                    className="w-full p-2 mb-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
                     placeholder="List Description"
-                    className="w-full p-2 mb-4 border rounded"
                   />
-                  <Droppable droppableId={`${element.id}-list`} type="LIST_ITEM">
-                    {(droppableProvided) => (
-                      <ul
-                        ref={droppableProvided.innerRef}
-                        {...droppableProvided.droppableProps}
-                        className="space-y-4"
-                      >
-                        {element.content.map((item, idx) => (
-                          <ListItem
-                            key={item.id}
-                            item={item}
-                            index={idx}
-                            elementId={element.id}
-                            modifyListItem={modifyListItem}
-                            addNestedSpan={addNestedSpan}
-                            updateNestedSpan={updateNestedSpan}
-                            removeNestedSpan={removeNestedSpan}
-                          />
-                        ))}
-                        {droppableProvided.placeholder}
-                      </ul>
-                    )}
+                  <Droppable droppableId={element.id} type="LIST">
+                    {(provided) => {
+                      const ListTag = element.type === 'ul' ? 'ul' : 'ol';
+                      return (
+                        <ListTag
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                          className={`pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}
+                        >
+                          {element.content.map((item, idx) => (
+                            <ListItem
+                              key={item.id}
+                              item={item}
+                              index={idx}
+                              elementId={element.id}
+                              modifyListItem={modifyListItem}
+                              insertVariable={insertVariable}
+                              addNestedSpan={addNestedSpan}
+                              updateNestedSpan={updateNestedSpan}
+                              removeNestedSpan={removeNestedSpan}
+                            />
+                          ))}
+                          {provided.placeholder}
+                        </ListTag>
+                      );
+                    }}
                   </Droppable>
-                  <button
-                    onClick={() => modifyListItem(element.id, null, 'add')}
-                    className="mt-4 text-green-600 hover:text-green-700 flex items-center gap-1"
-                  >
-                    <FaPlus className="h-5 w-5" />
-                    <span>Add Item</span>
-                  </button>
+                  <div className="mt-4">
+                    <button
+                      onClick={() => modifyListItem(element.id, null, 'add')}
+                      className="flex items-center p-1 text-green-500 hover:text-green-700"
+                    >
+                      <PlusIcon className="h-5 w-5 mr-1" /> Add Item
+                    </button>
+                  </div>
                 </>
               )}
             </>
-          ) : element.type === 'br' ? (
+          )}
+          {element.type === 'br' ? (
             <hr className="my-4 border-t border-gray-300" />
-          ) : (
+          ) : !['ul', 'ol', 'br'].includes(element.type) ? (
             <>
               <FormattedInput
                 value={element.content}
                 onChange={(value) => updateElement(element.id, { content: value })}
                 placeholder={`${getElementTypeName(element.type)} content`}
-                onAddDescription={() => setShowDescription(!showDescription)}
+                onAddDescription={toggleDescription}
               />
-              {showDescription && (
+              {(showDescription || element.description) && (
                 <textarea
                   value={element.description || ''}
                   onChange={(e) => updateElement(element.id, { description: e.target.value })}
                   placeholder="Description/Instructions for AI"
-                  className="w-full mt-4 p-2 border rounded"
+                  className="w-full p-2 mt-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
                 />
               )}
             </>
-          )}
-
-          {/* Render child elements */}
-          {element.children && element.children.length > 0 && (
-            <Droppable droppableId={`${element.id}-children`} type="ELEMENT">
-              {(provided) => (
-                <div ref={provided.innerRef} {...provided.droppableProps}>
-                  {element.children.map((childElement, childIndex) => (
-                    <Element
-                      key={childElement.id}
-                      element={childElement}
-                      index={childIndex}
-                      updateElement={updateElement}
-                      removeElement={removeElement}
-                      modifyListItem={modifyListItem}
-                      addNestedSpan={addNestedSpan}
-                      updateNestedSpan={updateNestedSpan}
-                      removeNestedSpan={removeNestedSpan}
-                      addChildElement={addChildElement}
-                      level={level + 1}
-                    />
-                  ))}
-                  {provided.placeholder}
-                </div>
-              )}
-            </Droppable>
-          )}
-
-          {/* Plus button to add child elements */}
-          <div className="mt-4">
-            {showDropdown ? (
-              <div className="flex items-center gap-2">
-                <select
-                  onChange={(e) => {
-                    const type = e.target.value;
-                    if (type) {
-                      addChildElement(element.id, type);
-                      e.target.value = '';
-                      setShowDropdown(false);
-                    }
-                  }}
-                  className="p-2 border rounded w-full"
-                  defaultValue=""
-                >
-                  <option value="" disabled>
-                    Select element type
-                  </option>
-                  {Object.entries(ElementTypes).map(([key, value]) => (
-                    <option key={key} value={value}>
-                      {getElementTypeName(value)}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={() => setShowDropdown(false)}
-                  className="p-2 border rounded hover:bg-gray-100 text-red-600"
-                >
-                  <FaMinus className="h-4 w-4" />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowDropdown(true)}
-                className="text-blue-600 hover:text-blue-700 flex items-center gap-1"
-              >
-                <FaPlus className="h-5 w-5" />
-                <span>Add Child Element</span>
-              </button>
-            )}
-          </div>
+          ) : null}
         </div>
       )}
     </Draggable>
   );
 };
 
-// Sidebar Component
-const AddElementSidebar = ({ addElement }) => (
-  <div className="w-64 bg-white p-6 rounded-lg shadow">
-    <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Add Elements</h2>
-    <div className="space-y-2">
-      {Object.entries(ElementTypes).map(([key, value]) => (
-        <button
-          key={key}
-          onClick={() => addElement(value)}
-          className="w-full text-left px-4 py-2 text-blue-600 hover:bg-blue-50 rounded"
-        >
-          {getElementTypeName(value)}
-        </button>
-      ))}
-    </div>
-  </div>
-);
-
-// Helper functions for handleDragEnd
-const findElementById = (elements, id) => {
-  for (const el of elements) {
-    if (el.id === id) return el;
-    if (el.children) {
-      const childResult = findElementById(el.children, id);
-      if (childResult) return childResult;
-    }
-  }
-  return null;
-};
-
-const removeElementById = (elements, id) => {
-  for (let i = 0; i < elements.length; i++) {
-    if (elements[i].id === id) {
-      elements.splice(i, 1);
-      return true;
-    }
-    if (elements[i].children) {
-      const childResult = removeElementById(elements[i].children, id);
-      if (childResult) return true;
-    }
-  }
-  return false;
-};
-
-const insertElementAt = (elements, index, element) => {
-  elements.splice(index, 0, element);
-};
-
-// Main Component
-const JsonTemplateBuilder = () => {
+/**
+ * Main component for building the JSON template with drag-and-drop functionality.
+ */
+const JsonTemplateBuilderRevert = () => {
   const [elements, setElements] = useState([]);
-  const [jsonSchema, setJsonSchema] = useState('');
-  const [jsonTextarea, setJsonTextarea] = useState('');
+  const [jsonSchema, setJsonSchema] = useState(JSON.stringify({ schema: { properties: { tag: { enum: ['body'] }, children: [] } } }, null, 2));
 
+  /**
+   * Update the JSON schema whenever the elements state changes.
+   */
   useEffect(() => {
-    const schema = JSON.stringify(convertToJsonSchema(), null, 2);
-    setJsonSchema(schema);
-    setJsonTextarea(schema);
+    setJsonSchema(JSON.stringify(convertToJsonSchema(), null, 2));
   }, [elements]);
 
+  /**
+   * Adds a new element to the template.
+   */
   const addElement = useCallback((type) => {
     setElements((prev) => [
       ...prev,
       {
-        id: generateId(),
+        id: uuidv4(),
         type,
-        content: ['ul', 'ol'].includes(type) ? [] : defaultContent[type] || '',
-        description: null,
+        content: defaultContent[type] || 'New element',
+        description: ['ul', 'ol'].includes(type) ? "Follow the instructions mentioned in List description" : null,
         isDynamic: false,
         listItemDescription: null,
-        hasDescription: ['ul', 'ol'].includes(type),
-        children: [],
-        parentId: null,
-      },
+        hasDescription: ['ul', 'ol'].includes(type)
+      }
     ]);
   }, []);
 
-  const addChildElement = useCallback((parentId, type) => {
-    const updateElements = (elements) => {
-      return elements.map((el) => {
-        if (el.id === parentId) {
-          const newChild = {
-            id: generateId(),
-            type,
-            content: ['ul', 'ol'].includes(type) ? [] : defaultContent[type] || '',
-            description: null,
-            isDynamic: false,
-            listItemDescription: null,
-            hasDescription: ['ul', 'ol'].includes(type),
-            children: [],
-            parentId: parentId,
-          };
-          return {
-            ...el,
-            children: [...(el.children || []), newChild],
-          };
-        }
-        if (el.children) {
-          return { ...el, children: updateElements(el.children) };
-        }
-        return el;
-      });
-    };
-    setElements((prev) => updateElements(prev));
-  }, []);
-
+  /**
+   * Removes an element from the template.
+   */
   const removeElement = useCallback((id) => {
-    const removeElementById = (elements, id) => {
-      return elements
-        .filter((el) => el.id !== id)
-        .map((el) => {
-          if (el.children) {
-            return { ...el, children: removeElementById(el.children, id) };
-          }
-          return el;
-        });
-    };
-    setElements((prevElements) => removeElementById(prevElements, id));
+    setElements((prev) => prev.filter((el) => el.id !== id));
   }, []);
 
+  /**
+   * Updates properties of a specific element.
+   */
   const updateElement = useCallback((id, updates) => {
-    const updateElementRecursively = (elements) => {
-      return elements.map((el) => {
+    setElements((prev) =>
+      prev.map((el) => {
         if (el.id === id) {
           const updatedElement = { ...el, ...updates };
-          if (['ul', 'ol'].includes(updatedElement.type) && updatedElement.isDynamic) {
+          if (['ul', 'ol'].includes(updatedElement.type)) {
+            // Optional: You can modify this logic based on your requirements
+            // For example, retain existing description or set a default
+          }
+          if (updatedElement.isDynamic) {
             updatedElement.content = [];
           }
           return updatedElement;
         }
-        if (el.children) {
-          return { ...el, children: updateElementRecursively(el.children) };
-        }
         return el;
-      });
-    };
-    setElements((prev) => updateElementRecursively(prev));
+      })
+    );
   }, []);
 
+  /**
+   * Modifies a list item within a specific list element.
+   */
   const modifyListItem = useCallback((elementId, itemId, action, value = '') => {
-    const updateElements = (elements) => {
-      return elements.map((el) => {
+    setElements((prev) =>
+      prev.map((el) => {
         if (el.id === elementId) {
-          let newContent = Array.isArray(el.content) ? [...el.content] : [];
-
-          switch (action) {
-            case 'add':
-              newContent.push({
-                id: generateId(),
-                content: '',
-                description: null,
-                nestedSpans: [],
-              });
-              break;
-            case 'remove':
-              newContent = newContent.filter((item) => item.id !== itemId);
-              break;
-            case 'removeContent':
-              newContent = newContent.map((item) =>
-                item.id === itemId ? { ...item, content: '' } : item
-              );
-              break;
-            case 'content':
-              newContent = newContent.map((item) =>
-                item.id === itemId ? { ...item, content: value } : item
-              );
-              break;
-            case 'description':
-              newContent = newContent.map((item) =>
-                item.id === itemId
-                  ? { ...item, description: value.trim() === '' ? null : value }
-                  : item
-              );
-              break;
-            default:
-              break;
+          let newContent = [...el.content];
+          if (action === 'add') {
+            newContent.push({ id: uuidv4(), content: '', description: null, nestedSpans: [] });
+          } else if (action === 'remove') {
+            newContent = newContent.filter(item => item.id !== itemId);
+          } else if (action === 'removeContent') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
+          } else if (action === 'content') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: value } : item));
+          } else if (action === 'description') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value.trim() === '' ? null : value } : item));
           }
-
           return { ...el, content: newContent };
         }
-        if (el.children) {
-          return { ...el, children: updateElements(el.children) };
-        }
         return el;
-      });
-    };
-    setElements((prev) => updateElements(prev));
+      })
+    );
   }, []);
 
+  /**
+   * Adds a nested span to a specific list item.
+   */
   const addNestedSpan = useCallback((elementId, itemId) => {
-    const updateElements = (elements) => {
-      return elements.map((el) => {
+    setElements((prev) =>
+      prev.map((el) => {
         if (el.id === elementId) {
           const newContent = el.content.map((item) => {
             if (item.id === itemId) {
-              return {
-                ...item,
-                nestedSpans: [
-                  ...(item.nestedSpans || []),
-                  { id: generateId(), content: '', description: null },
-                ],
-              };
+              return { ...item, nestedSpans: [...item.nestedSpans, { id: uuidv4(), content: '', description: null }] };
             }
             return item;
           });
           return { ...el, content: newContent };
         }
-        if (el.children) {
-          return { ...el, children: updateElements(el.children) };
-        }
         return el;
-      });
-    };
-    setElements((prev) => updateElements(prev));
+      })
+    );
   }, []);
 
+  /**
+   * Updates a nested span within a specific list item.
+   */
   const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) => {
-    const updateElements = (elements) => {
-      return elements.map((el) => {
+    setElements((prev) =>
+      prev.map((el) => {
         if (el.id === elementId) {
           const newContent = el.content.map((item) => {
             if (item.id === itemId) {
@@ -649,376 +459,413 @@ const JsonTemplateBuilder = () => {
           });
           return { ...el, content: newContent };
         }
-        if (el.children) {
-          return { ...el, children: updateElements(el.children) };
-        }
         return el;
-      });
-    };
-    setElements((prev) => updateElements(prev));
+      })
+    );
   }, []);
 
+  /**
+   * Removes a nested span from a specific list item.
+   */
   const removeNestedSpan = useCallback((elementId, itemId, spanId) => {
-    const updateElements = (elements) => {
-      return elements.map((el) => {
+    setElements((prev) =>
+      prev.map((el) => {
         if (el.id === elementId) {
           const newContent = el.content.map((item) => {
             if (item.id === itemId) {
-              return {
-                ...item,
-                nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId),
-              };
+              return { ...item, nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId) };
             }
             return item;
           });
           return { ...el, content: newContent };
         }
-        if (el.children) {
-          return { ...el, children: updateElements(el.children) };
-        }
         return el;
-      });
-    };
-    setElements((prev) => updateElements(prev));
+      })
+    );
   }, []);
 
+  /**
+   * Handles the drag-and-drop events.
+   */
   const handleDragEnd = (result) => {
-    const { destination, source, draggableId, type } = result;
+    const { destination, source, type } = result;
+
+    console.log('Drag event:', { destination, source, type });
 
     if (!destination) return;
 
-    if (
-      destination.droppableId === source.droppableId &&
-      destination.index === source.index
-    ) {
-      return;
+    // Reorder elements
+    if (type === 'ELEMENT') {
+      const reorderedElements = Array.from(elements);
+      const [movedElement] = reorderedElements.splice(source.index, 1);
+      reorderedElements.splice(destination.index, 0, movedElement);
+      setElements(reorderedElements);
+      console.log('Reordered ELEMENTs:', reorderedElements);
+      return; // Exit early since we've handled the ELEMENT type
     }
 
-    setElements((prevElements) => {
-      const newElements = [...prevElements];
+    // Reorder list items
+    if (type === 'LIST') { // Ensure this matches the Droppable type
+      const elementId = source.droppableId; // Use droppableId to identify the list
+      console.log('Reordering list items for element ID:', elementId);
 
-      if (type === 'ELEMENT') {
-        // Handle element drag and drop
-        const draggedElement = findElementById(newElements, draggableId);
-
-        if (!draggedElement) return newElements;
-
-        // Remove the dragged element from its original location
-        removeElementById(newElements, draggableId);
-
-        if (destination.droppableId === 'elements') {
-          // Moved to root level
-          draggedElement.parentId = null;
-          insertElementAt(newElements, destination.index, draggedElement);
-        } else {
-          // Moved into another element's children
-          const parentElement = findElementById(
-            newElements,
-            destination.droppableId.replace('-children', '')
-          );
-          if (parentElement) {
-            if (!parentElement.children) parentElement.children = [];
-            draggedElement.parentId = parentElement.id;
-            insertElementAt(parentElement.children, destination.index, draggedElement);
+      setElements((prevElements) =>
+        prevElements.map((element) => {
+          if (element.id === elementId) {
+            const reorderedItems = Array.from(element.content);
+            const [movedItem] = reorderedItems.splice(source.index, 1);
+            reorderedItems.splice(destination.index, 0, movedItem);
+            console.log(`Moved item from index ${source.index} to ${destination.index}:`, movedItem);
+            return { ...element, content: reorderedItems };
           }
-        }
-      } else if (type === 'LIST_ITEM') {
-        // Handle list item drag and drop
-        const sourceElement = findElementById(
-          newElements,
-          source.droppableId.replace('-list', '')
-        );
-        const destinationElement = findElementById(
-          newElements,
-          destination.droppableId.replace('-list', '')
-        );
-
-        if (!sourceElement || !destinationElement) return newElements;
-
-        const [movedItem] = sourceElement.content.splice(source.index, 1);
-        destinationElement.content.splice(destination.index, 0, movedItem);
-      }
-
-      return newElements;
-    });
+          return element;
+        })
+      );
+    }
   };
 
-  // Updated convertToJsonSchema function
-  const convertToJsonSchema = useCallback(() => {
-    const convertElement = (element) => {
-      const baseProps = { tag: { enum: [element.type] } };
+  /**
+   * Converts the current template elements to a JSON schema.
+   */
+  const convertToJsonSchema = () => ({
+    schema: {
+      description: "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements. Avoid generating any introductory text, section titles, or descriptive elements unless explicitly requested. Focus solely on the required data in the format provided, and ensure no content is generated outside the template's structural elements.Do not mention product name or any details about the product outside the ul,ol,p,span,strong elements",
+      properties: {
+        tag: { enum: ['body'] },
+        children: elements.map((element) => {
+          const baseProps = { tag: { enum: [element.type] } };
+          let baseSchema = {};
 
-      if (element.type === 'br') {
-        return { properties: baseProps };
-      }
+          if (element.type === 'br') {
+            return { properties: baseProps };
+          }
 
-      let properties = {
-        ...baseProps,
-      };
-
-      if (element.content && typeof element.content === 'string' && element.content.trim() !== '') {
-        properties.content = { enum: [element.content] };
-      } else if (element.description) {
-        properties.content = { description: element.description };
-      }
-
-      if (['ul', 'ol'].includes(element.type)) {
-        if (element.isDynamic) {
-          properties.children = [
-            {
-              properties: {
-                tag: { enum: ['li'] },
-                content: element.listItemDescription
-                  ? { description: element.listItemDescription }
-                  : undefined,
-                children: null,
-              },
-            },
-          ];
-        } else {
-          properties.children = element.content.map((item) => ({
-            properties: {
-              tag: { enum: ['li'] },
-              content:
-                item.content.trim() !== ''
-                  ? { enum: [item.content] }
-                  : item.description
-                  ? { description: item.description }
-                  : undefined,
-              children:
-                item.nestedSpans.length > 0
-                  ? item.nestedSpans.map((span) => ({
-                      properties: {
-                        tag: { enum: ['span'] },
-                        content:
-                          span.content.trim() !== ''
+          if (['ul', 'ol'].includes(element.type)) {
+            baseSchema = element.description !== null 
+              ? { description: element.description, properties: { ...baseProps } }
+              : { properties: { ...baseProps } };
+            
+            if (element.isDynamic) {
+              baseSchema.properties.children = [
+                {
+                  type: 'array',
+                  items: {
+                    properties: {
+                      tag: { enum: ['li'] },
+                      content: element.listItemDescription ? { description: element.listItemDescription } : undefined,
+                      children: null
+                    }
+                  }
+                }
+              ];
+            } else {
+              baseSchema.properties.children = element.content.map((item) => ({
+                properties: {
+                  tag: { enum: ['li'] },
+                  content: item.content.trim() !== '' 
+                    ? { enum: [item.content] }
+                    : (item.description ? { description: item.description } : undefined),
+                  children: item.nestedSpans.length > 0
+                    ? item.nestedSpans.map((span) => ({
+                        properties: {
+                          tag: { enum: ['span'] },
+                          content: span.content.trim() !== ''
                             ? { enum: [span.content] }
-                            : span.description
-                            ? { description: span.description }
-                            : undefined,
-                      },
-                    }))
-                  : null,
-            },
-          }));
+                            : (span.description ? { description: span.description } : undefined)
+                        }
+                      }))
+                    : null
+                }
+              }));
+            }
+            return baseSchema;
+          }
+
+          // For non-ul and non-ol elements
+          return {
+            properties: {
+              ...baseProps,
+              content: element.content.trim() !== ''
+                ? { enum: [element.content] }
+                : (element.description ? { description: element.description } : undefined),
+              children: null
+            }
+          };
+        })
+      }
+    }
+  });
+
+  /**
+   * Updates the elements state based on a provided JSON schema.
+   * This function parses the JSON schema and reconstructs the elements state.
+   */
+  const updateElementsFromSchema = () => {
+    try {
+      let parsedSchema;
+      try {
+        parsedSchema = JSON.parse(jsonSchema);
+        console.log('Successfully parsed JSON schema:', parsedSchema);
+      } catch (parseError) {
+        console.error('Error parsing JSON:', parseError);
+        alert(`Invalid JSON format: ${parseError.message}`);
+        return;
+      }
+
+      if (!parsedSchema.schema || !parsedSchema.schema.properties || !parsedSchema.schema.properties.children) {
+        console.error('Invalid schema structure:', parsedSchema);
+        throw new Error('Invalid schema structure. Expected schema.properties.children.');
+      }
+
+      const newElements = parsedSchema.schema.properties.children.map((child, index) => {
+        console.log(`Processing child element at index ${index}:`, child);
+
+        if (!child.properties || !child.properties.tag || !child.properties.tag.enum) {
+          console.error(`Invalid element structure at index ${index}:`, child);
+          throw new Error(`Invalid element structure at index ${index}. Expected properties.tag.enum.`);
         }
-      } else {
-        if (element.children && element.children.length > 0) {
-          properties.children = element.children.map(convertElement);
-        } else {
-          properties.children = null;
+
+        const type = child.properties.tag.enum[0];
+        console.log(`Element type: ${type}`);
+        
+        if (type === 'br') {
+          return {
+            id: uuidv4(),
+            type,
+            content: '',
+            description: null,
+            isDynamic: false,
+            listItemDescription: null,
+            hasDescription: false
+          };
         }
-      }
 
-      return { properties };
-    };
+        if (['ul', 'ol'].includes(type)) {
+          console.log(`Processing list element of type ${type}`);
+          const description = child.description || null;
+          if (child.properties.children && Array.isArray(child.properties.children)) {
+            if (child.properties.children[0]?.type === 'array') {
+              console.log('Processing dynamic list');
+              const listItemDescription = child.properties.children[0].items?.properties?.content?.description || null;
+              return {
+                id: uuidv4(),
+                type,
+                content: [],
+                description,
+                isDynamic: true,
+                listItemDescription,
+                hasDescription: !!description
+              };
+            } else {
+              console.log('Processing static list');
+              const listItems = child.properties.children.map((item, itemIndex) => {
+                console.log(`Processing list item at index ${itemIndex}:`, item);
+                if (!item.properties || !item.properties.tag || !item.properties.tag.enum) {
+                  console.error(`Invalid list item structure at element ${index}, item ${itemIndex}:`, item);
+                  throw new Error(`Invalid list item structure at element ${index}, item ${itemIndex}.`);
+                }
+                
+                return {
+                  id: uuidv4(),
+                  content: item.properties.content?.enum?.[0] || '',
+                  description: item.properties.content?.description || null,
+                  nestedSpans: item.properties.children
+                    ? item.properties.children.map((span, spanIndex) => {
+                        console.log(`Processing nested span at index ${spanIndex}:`, span);
+                        if (!span.properties || !span.properties.tag || !span.properties.tag.enum) {
+                          console.error(`Invalid nested span structure at element ${index}, item ${itemIndex}, span ${spanIndex}:`, span);
+                          throw new Error(`Invalid nested span structure at element ${index}, item ${itemIndex}, span ${spanIndex}.`);
+                        }
+                        return {
+                          id: uuidv4(),
+                          content: span.properties.content?.enum?.[0] || '',
+                          description: span.properties.content?.description || null
+                        };
+                      })
+                    : []
+                };
+              });
+              console.log(`Created list items:`, listItems);
+              return {
+                id: uuidv4(),
+                type,
+                content: listItems,
+                description,
+                isDynamic: false,
+                listItemDescription: null,
+                hasDescription: !!description
+              };
+            }
+          } else {
+            console.error(`Invalid list structure at index ${index}:`, child);
+            throw new Error(`Invalid list structure at index ${index}. Expected children array or dynamic list.`);
+          }
+        }
 
-    return {
-      schema: {
-        description:
-          'Ensure that only the required data fields specified in the template are generated...',
-        properties: {
-          tag: { enum: ['body'] },
-          children: elements.filter((el) => !el.parentId).map(convertElement),
-        },
-      },
-    };
-  }, [elements]);
+        // Other Element Types
+        console.log(`Processing other element type: ${type}`);
+        const description = child.properties.content?.description || null;
+        return {
+          id: uuidv4(),
+          type,
+          content: child.properties.content?.enum?.[0] || '',
+          description,
+          isDynamic: false,
+          listItemDescription: null,
+          hasDescription: !!description
+        };
+      });
 
-  const renderPreview = () => {
-    const renderElement = (element) => {
-      if (element.type === 'br') {
-        return <hr key={element.id} className="my-4 border-t border-gray-300" />;
-      }
+      console.log('New elements created:', newElements);
+      setElements(newElements);
+      alert('Template updated successfully!');
+    } catch (error) {
+      console.error('Error updating elements from schema:', error);
+      alert(`Error updating template: ${error.message}\nPlease check the console for more details.`);
+    }
+  };
 
-      const Component = {
-        h1: (props) => <h1 {...props} className="text-4xl font-bold mb-4" />,
-        h2: (props) => <h2 {...props} className="text-3xl font-bold mb-3" />,
-        h3: (props) => <h3 {...props} className="text-2xl font-bold mb-2" />,
-        p: 'p',
-        strong: 'strong',
-        span: 'span',
-        ul: (props) => <ul {...props} className="list-disc pl-6 mb-4" />,
-        ol: (props) => <ol {...props} className="list-decimal pl-6 mb-4" />,
-      }[element.type] || 'div';
+  /**
+   * Renders a human-readable preview of the current template.
+   */
+  const renderPreview = () => (
+    <div className="p-5 bg-gray-100 rounded mb-5 text-gray-800">
+      {elements.map((element, index) => {
+        if (['ul', 'ol'].includes(element.type)) {
+          return (
+            <div key={index} className="mb-4">
+              {element.description !== null && (
+                <p className="italic text-gray-600 mb-2">List description: {element.description}</p>
+              )}
+              {element.isDynamic ? (
+                <div className="p-3 bg-yellow-100 rounded">
+                  <p className="font-semibold">Dynamic {getElementTypeName(element.type)}:</p>
+                  <p className="italic">Items: {element.listItemDescription || 'No description provided'}</p>
+                </div>
+              ) : (
+                <ListComponent
+                  type={element.type}
+                  items={element.content}
+                />
+              )}
+            </div>
+          );
+        }
 
-      const content =
-        typeof element.content === 'string'
-          ? element.content || (element.description && <em>{element.description}</em>)
-          : null;
+        if (element.type === 'br') {
+          return <hr key={index} className="my-4 border-t border-gray-300" />;
+        }
 
-      let childrenContent = null;
-      if (element.children && element.children.length > 0) {
-        childrenContent = element.children.map(renderElement);
-      }
-
-      if (['ul', 'ol'].includes(element.type)) {
+        const ElementComponent = getElementComponent(element.type);
         return (
-          <div key={element.id} className="mb-4">
-            {element.description && (
-              <p className="text-gray-600 italic mb-2">{element.description}</p>
+          <ElementComponent key={index} className="mb-4">
+            {element.content || (element.description && 
+              <span className="italic text-gray-600">Generated content for: {element.description}</span>
             )}
-            <Component>
-              {element.content.map((item) => (
-                <li key={item.id} className="mb-2">
-                  {item.content || (item.description && <em>{item.description}</em>)}
-                  {item.nestedSpans.map((span) => (
-                    <span key={span.id} className="ml-2">
-                      {span.content || (span.description && <em>{span.description}</em>)}
-                    </span>
-                  ))}
-                </li>
-              ))}
-            </Component>
-          </div>
+          </ElementComponent>
         );
-      }
+      })}
+    </div>
+  );
 
-      return (
-        <Component key={element.id}>
-          {content}
-          {childrenContent}
-        </Component>
-      );
-    };
-
+  /**
+   * Component to render lists based on type and items.
+   */
+  const ListComponent = ({ type, items }) => {
+    const ListTag = type === 'ul' ? 'ul' : 'ol';
     return (
-      <div className="space-y-4">
-        {elements.filter((element) => !element.parentId).map(renderElement)}
-      </div>
+      <ListTag className={`pl-5 ${type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
+        {items.map((item, idx) => (
+          <li key={idx} className="mb-2">
+            {item.content || (item.description && 
+              <span className="italic text-gray-600">Generated content for: {item.description}</span>
+            )}
+            {item.nestedSpans.length > 0 && (
+              <span>
+                {item.nestedSpans.map((span, spanIdx) => (
+                  <span key={spanIdx}>
+                    {span.content || (span.description && 
+                      <span className="italic text-gray-600">Generated content for: {span.description}</span>
+                    )}
+                  </span>
+                ))}
+              </span>
+            )}
+          </li>
+        ))}
+      </ListTag>
     );
   };
 
-  // Updated updateTemplateFromJson function
-  const updateTemplateFromJson = () => {
-    try {
-      const parsedJson = JSON.parse(jsonTextarea);
-
-      const convertJsonToElements = (jsonElement) => {
-        const elProps = jsonElement.properties;
-        const type = elProps.tag.enum[0];
-
-        const newElement = {
-          id: generateId(),
-          type: type,
-          content: elProps.content?.enum ? elProps.content.enum[0] : '',
-          description: elProps.content?.description || null,
-          isDynamic: false,
-          listItemDescription: null,
-          hasDescription: ['ul', 'ol'].includes(type),
-          children: [],
-          parentId: null,
-        };
-
-        if (['ul', 'ol'].includes(type)) {
-          if (elProps.children && elProps.children.length > 0) {
-            newElement.content = elProps.children.map((child) => {
-              const liProps = child.properties;
-              const listItem = {
-                id: generateId(),
-                content: liProps.content?.enum ? liProps.content.enum[0] : '',
-                description: liProps.content?.description || null,
-                nestedSpans: [],
-              };
-
-              if (liProps.children && liProps.children.length > 0) {
-                listItem.nestedSpans = liProps.children.map((span) => {
-                  const spanProps = span.properties;
-                  return {
-                    id: generateId(),
-                    content: spanProps.content?.enum ? spanProps.content.enum[0] : '',
-                    description: spanProps.content?.description || null,
-                  };
-                });
-              }
-
-              return listItem;
-            });
-          } else if (elProps.children && elProps.children[0]?.properties?.content?.description) {
-            newElement.isDynamic = true;
-            newElement.listItemDescription = elProps.children[0].properties.content.description;
-          }
-        }
-
-        if (elProps.children && !['ul', 'ol'].includes(type)) {
-          newElement.children = elProps.children.map((child) => {
-            const childElement = convertJsonToElements(child);
-            childElement.parentId = newElement.id;
-            return childElement;
-          });
-        }
-
-        return newElement;
-      };
-
-      const newElements = parsedJson.schema.properties.children.map((child) => {
-        const element = convertJsonToElements(child);
-        element.parentId = null;
-        return element;
-      });
-
-      setElements(newElements);
-    } catch (error) {
-      alert('Invalid JSON format.');
-      console.error(error);
+  /**
+   * Utility function to get the appropriate HTML element component based on type.
+   */
+  const getElementComponent = (type) => {
+    switch (type) {
+      case 'h1': return ({ children, className }) => <h1 className={`text-4xl font-bold ${className}`}>{children}</h1>;
+      case 'h2': return ({ children, className }) => <h2 className={`text-3xl font-semibold ${className}`}>{children}</h2>;
+      case 'h3': return ({ children, className }) => <h3 className={`text-2xl font-medium ${className}`}>{children}</h3>;
+      case 'p': return ({ children, className }) => <p className={className}>{children}</p>;
+      case 'strong': return ({ children, className }) => <strong className={`font-bold ${className}`}>{children}</strong>;
+      case 'span': return ({ children, className }) => <span className={className}>{children}</span>;
+      default: return ({ children, className }) => <div className={className}>{children}</div>;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
+    <div className="font-sans p-8 bg-gray-100 min-h-screen">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-800 mb-8">JSON Template Builder</h1>
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="flex gap-8">
+          <div className="flex flex-col md:flex-row gap-8">
             <AddElementSidebar addElement={addElement} />
             <div className="flex-1">
-              <div className="bg-white rounded-lg shadow p-6 mb-8">
-                <h2 className="text-xl font-semibold mb-6">Template Builder</h2>
+              {/* Template Builder Section */}
+              <div className="bg-white shadow-md rounded-lg p-6 mb-8">
+                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Template Builder</h2>
                 <Droppable droppableId="elements" type="ELEMENT">
                   {(provided) => (
                     <div ref={provided.innerRef} {...provided.droppableProps}>
-                      {elements
-                        .filter((element) => !element.parentId)
-                        .map((element, index) => (
-                          <Element
-                            key={element.id}
-                            element={element}
-                            index={index}
-                            updateElement={updateElement}
-                            removeElement={removeElement}
-                            modifyListItem={modifyListItem}
-                            addNestedSpan={addNestedSpan}
-                            updateNestedSpan={updateNestedSpan}
-                            removeNestedSpan={removeNestedSpan}
-                            addChildElement={addChildElement}
-                          />
-                        ))}
+                      {elements.map((element, index) => (
+                        <Element
+                          key={element.id}
+                          element={element}
+                          index={index}
+                          updateElement={updateElement}
+                          removeElement={removeElement}
+                          modifyListItem={modifyListItem}
+                          insertVariable={(id) => updateElement(id, { content: `${element.content} {{Group//Variable Name}}` })}
+                          addNestedSpan={addNestedSpan}
+                          updateNestedSpan={updateNestedSpan}
+                          removeNestedSpan={removeNestedSpan}
+                        />
+                      ))}
                       {provided.placeholder}
                     </div>
                   )}
                 </Droppable>
               </div>
 
-              <div className="bg-white rounded-lg shadow p-6 mb-8">
-                <h2 className="text-xl font-semibold mb-6">Preview</h2>
+              {/* Human-Readable Preview Section */}
+              <div className="bg-white shadow-md rounded-lg p-6 mb-8">
+                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Human-Readable Preview</h2>
                 {renderPreview()}
               </div>
 
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-xl font-semibold mb-6">JSON Schema</h2>
+              {/* JSON Schema Section */}
+              <div className="bg-white shadow-md rounded-lg p-6">
+                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">JSON Schema</h2>
                 <textarea
-                  value={jsonTextarea}
-                  onChange={(e) => setJsonTextarea(e.target.value)}
-                  className="w-full h-[300px] font-mono text-sm p-4 border rounded mb-4"
+                  value={jsonSchema}
+                  onChange={(e) => setJsonSchema(e.target.value)}
+                  className="w-full h-[300px] p-2 font-mono text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <div className="flex justify-end">
-                  <button
-                    onClick={updateTemplateFromJson}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >
-                    Update Template from JSON
-                  </button>
-                </div>
+                <button
+                  onClick={updateElementsFromSchema}
+                  className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors duration-200"
+                >
+                  Update Template
+                </button>
               </div>
             </div>
           </div>
@@ -1028,4 +875,4 @@ const JsonTemplateBuilder = () => {
   );
 };
 
-export default JsonTemplateBuilder;
+export default JsonTemplateBuilderRevert;
