@@ -570,7 +570,144 @@ const JsonTemplateBuilderRevert = () => {
     ]);
   }, []);
 
-  // Keep your existing removeElement, updateElement, modifyListItem functions...
+ const removeElement = useCallback((id) => {
+    setElements((prev) => prev.filter((el) => el.id !== id));
+  }, []);
+
+  const updateElement = useCallback((id, updates) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === id) {
+          const updatedElement = { ...el, ...updates };
+          if (['ul', 'ol'].includes(updatedElement.type)) {
+            if (updatedElement.isDynamic) {
+              updatedElement.content = [];
+            }
+          }
+          return updatedElement;
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  const modifyListItem = useCallback((elementId, itemId, action, value = '') => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          let newContent = [...el.content];
+          if (action === 'add') {
+            newContent.push({ id: uuidv4(), content: '', description: null, nestedSpans: [] });
+          } else if (action === 'remove') {
+            newContent = newContent.filter(item => item.id !== itemId);
+          } else if (action === 'removeContent') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
+          } else if (action === 'content') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: value } : item));
+          } else if (action === 'description') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value.trim() === '' ? null : value } : item));
+          }
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  const addNestedSpan = useCallback((elementId, itemId) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          const newContent = el.content.map((item) => {
+            if (item.id === itemId) {
+              return {
+                ...item,
+                nestedSpans: [...item.nestedSpans, { id: uuidv4(), content: '', description: null }]
+              };
+            }
+            return item;
+          });
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          const newContent = el.content.map((item) => {
+            if (item.id === itemId) {
+              const updatedSpans = item.nestedSpans.map((span) => {
+                if (span.id === spanId) {
+                  if (field === 'description') {
+                    return { ...span, [field]: value.trim() === '' ? null : value };
+                  }
+                  return { ...span, [field]: value };
+                }
+                return span;
+              });
+              return { ...item, nestedSpans: updatedSpans };
+            }
+            return item;
+          });
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  const removeNestedSpan = useCallback((elementId, itemId, spanId) => {
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id === elementId) {
+          const newContent = el.content.map((item) => {
+            if (item.id === itemId) {
+              return {
+                ...item,
+                nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId)
+              };
+            }
+            return item;
+          });
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  const handleDragEnd = (result) => {
+    const { destination, source, type } = result;
+
+    if (!destination) return;
+
+    if (type === 'ELEMENT') {
+      const reorderedElements = Array.from(elements);
+      const [movedElement] = reorderedElements.splice(source.index, 1);
+      reorderedElements.splice(destination.index, 0, movedElement);
+      setElements(reorderedElements);
+      return;
+    }
+
+    if (type === 'LIST') {
+      const elementId = source.droppableId;
+      setElements((prevElements) =>
+        prevElements.map((element) => {
+          if (element.id === elementId) {
+            const reorderedItems = Array.from(element.content);
+            const [movedItem] = reorderedItems.splice(source.index, 1);
+            reorderedItems.splice(destination.index, 0, movedItem);
+            return { ...element, content: reorderedItems };
+          }
+          return element;
+        })
+      );
+    }
+  };
 
   const renderPreview = () => (
     <div className="bg-white shadow-md rounded-lg p-6 mb-8">
