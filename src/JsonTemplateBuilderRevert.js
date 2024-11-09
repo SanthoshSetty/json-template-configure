@@ -19,39 +19,71 @@ const FormattingToolbar = ({ onFormatText, activeTextarea }) => {
     const newValue = `${before}<${tag}>${selection}</${tag}>${after}`;
     
     onFormatText(newValue);
-  };
 
-  const insertVariable = () => {
-    if (!activeTextarea) return;
-    
-    const cursorPos = activeTextarea.selectionStart;
-    const text = activeTextarea.value;
-    const newValue = `${text.substring(0, cursorPos)} {{Group//Variable Name}}${text.substring(cursorPos)}`;
-    
-    onFormatText(newValue);
+    // Restore focus to the textarea
+    setTimeout(() => {
+      activeTextarea.focus();
+      activeTextarea.setSelectionRange(
+        start + tag.length + 2,
+        end + tag.length + 2
+      );
+    }, 0);
   };
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white shadow-lg border-t p-4 z-50">
-      <div className="max-w-7xl mx-auto flex space-x-2">
-        <button onClick={() => insertTag('h1')} className="p-1 text-blue-500 hover:text-blue-700">
-          <span className="text-lg font-bold">H1</span>
-        </button>
-        <button onClick={() => insertTag('h2')} className="p-1 text-blue-500 hover:text-blue-700">
-          <span className="text-md font-bold">H2</span>
-        </button>
-        <button onClick={() => insertTag('h3')} className="p-1 text-blue-500 hover:text-blue-700">
-          <span className="text-sm font-bold">H3</span>
-        </button>
-        <button onClick={() => insertTag('strong')} className="p-1 text-blue-500 hover:text-blue-700">
-          <span className="font-bold">B</span>
-        </button>
-        <button onClick={() => insertTag('em')} className="p-1 text-blue-500 hover:text-blue-700">
-          <span className="italic">I</span>
-        </button>
-        <button onClick={insertVariable} className="p-1 text-green-500 hover:text-green-700">
-          <VariableIcon className="h-5 w-5" />
-        </button>
+      <div className="max-w-7xl mx-auto">
+        <div className="text-sm text-gray-600 mb-2">Formatting Toolbar - Select text and click a format option to apply</div>
+        <div className="flex space-x-2">
+          <button 
+            onClick={() => insertTag('h1')}
+            className={`p-1 text-blue-500 hover:text-blue-700 ${!activeTextarea ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={!activeTextarea}
+          >
+            <span className="text-lg font-bold">H1</span>
+          </button>
+          <button 
+            onClick={() => insertTag('h2')}
+            className={`p-1 text-blue-500 hover:text-blue-700 ${!activeTextarea ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={!activeTextarea}
+          >
+            <span className="text-md font-bold">H2</span>
+          </button>
+          <button 
+            onClick={() => insertTag('h3')}
+            className={`p-1 text-blue-500 hover:text-blue-700 ${!activeTextarea ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={!activeTextarea}
+          >
+            <span className="text-sm font-bold">H3</span>
+          </button>
+          <button 
+            onClick={() => insertTag('strong')}
+            className={`p-1 text-blue-500 hover:text-blue-700 ${!activeTextarea ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={!activeTextarea}
+          >
+            <span className="font-bold">B</span>
+          </button>
+          <button 
+            onClick={() => insertTag('em')}
+            className={`p-1 text-blue-500 hover:text-blue-700 ${!activeTextarea ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={!activeTextarea}
+          >
+            <span className="italic">I</span>
+          </button>
+          {activeTextarea && (
+            <button 
+              onClick={() => {
+                const pos = activeTextarea.selectionStart;
+                const text = activeTextarea.value;
+                const newValue = `${text.substring(0, pos)} {{Group//Variable Name}}${text.substring(pos)}`;
+                onFormatText(newValue);
+              }}
+              className="p-1 text-green-500 hover:text-green-700"
+            >
+              <VariableIcon className="h-5 w-5" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -60,7 +92,7 @@ const FormattingToolbar = ({ onFormatText, activeTextarea }) => {
 /**
  * Component for formatted input
  */
-const FormattedInput = ({ value, onChange, placeholder, onAddDescription, onFocus }) => {
+const FormattedInput = ({ value, onChange, placeholder, onAddDescription, onFocus, fieldName, elementId }) => {
   const textareaRef = useRef(null);
 
   return (
@@ -72,6 +104,8 @@ const FormattedInput = ({ value, onChange, placeholder, onAddDescription, onFocu
         onFocus={() => onFocus(textareaRef.current)}
         className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2 h-16"
         placeholder={placeholder}
+        data-field={fieldName}
+        data-element-id={elementId}
       />
       {onAddDescription && (
         <button 
@@ -83,6 +117,39 @@ const FormattedInput = ({ value, onChange, placeholder, onAddDescription, onFocu
       )}
     </div>
   );
+};
+
+/**
+ * Utility function to map HTML tag types to readable names.
+ */
+const getElementTypeName = (type) => {
+  const typeNames = {
+    h1: 'Heading 1',
+    h2: 'Heading 2',
+    h3: 'Heading 3',
+    p: 'Paragraph',
+    ul: 'Unordered List (Bullet Points)',
+    ol: 'Ordered List (Numbered List)',
+    span: 'Span (Continuous Text)',
+    strong: 'Strong (Bold Text)',
+    br: 'Line Break'
+  };
+  return typeNames[type] || type.toUpperCase();
+};
+
+/**
+ * Default content for each element type.
+ */
+const defaultContent = {
+  ul: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
+  ol: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
+  br: '', 
+  h1: 'Heading 1',
+  h2: 'Heading 2',
+  h3: 'Heading 3',
+  p: 'Title',
+  strong: 'Bold text',
+  span: 'Span text'
 };
 
 /**
@@ -119,39 +186,6 @@ const renderFormattedContent = (content) => {
   return Array.from(temp.childNodes).map((node, index) => 
     <React.Fragment key={index}>{convertNode(node)}</React.Fragment>
   );
-};
-
-/**
- * Utility function to map HTML tag types to readable names.
- */
-const getElementTypeName = (type) => {
-  const typeNames = {
-    h1: 'Heading 1',
-    h2: 'Heading 2',
-    h3: 'Heading 3',
-    p: 'Paragraph',
-    ul: 'Unordered List (Bullet Points)',
-    ol: 'Ordered List (Numbered List)',
-    span: 'Span (Continuous Text)',
-    strong: 'Strong (Bold Text)',
-    br: 'Line Break'
-  };
-  return typeNames[type] || type.toUpperCase();
-};
-
-/**
- * Default content for each element type.
- */
-const defaultContent = {
-  ul: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
-  ol: [{ id: uuidv4(), content: 'List item 1', description: null, nestedSpans: [] }],
-  br: '', 
-  h1: 'Heading 1',
-  h2: 'Heading 2',
-  h3: 'Heading 3',
-  p: 'Title',
-  strong: 'Bold text',
-  span: 'Span text'
 };
 
 /**
@@ -228,6 +262,8 @@ const Element = ({
                   onChange={(value) => updateElement(element.id, { content: value })}
                   placeholder="Enter title"
                   onFocus={onTextareaFocus}
+                  fieldName="content"
+                  elementId={element.id}
                 />
               </div>
               
@@ -240,6 +276,8 @@ const Element = ({
                   placeholder="Enter content"
                   onAddDescription={() => setShowDescription(!showDescription)}
                   onFocus={onTextareaFocus}
+                  fieldName="childContent"
+                  elementId={element.id}
                 />
               </div>
               
@@ -344,6 +382,8 @@ const Element = ({
                 onChange={(value) => updateElement(element.id, { content: value })}
                 placeholder={`${getElementTypeName(element.type)} content`}
                 onFocus={onTextareaFocus}
+                fieldName="content"
+                elementId={element.id}
               />
             </>
           )}
@@ -374,6 +414,8 @@ const ListItem = ({ item, index, elementId, modifyListItem, addNestedSpan, updat
               onChange={(value) => modifyListItem(elementId, item.id, 'content', value)}
               placeholder="List item content"
               onFocus={onTextareaFocus}
+              fieldName="content"
+              elementId={elementId}
             />
             <input
               value={item.description || ''}
@@ -389,6 +431,8 @@ const ListItem = ({ item, index, elementId, modifyListItem, addNestedSpan, updat
                 onChange={(value) => updateNestedSpan(elementId, item.id, span.id, 'content', value)}
                 placeholder="Nested span content"
                 onFocus={onTextareaFocus}
+                fieldName="content"
+                elementId={elementId}
               />
               <input
                 value={span.description || ''}
@@ -531,28 +575,18 @@ const JsonTemplateBuilderRevert = () => {
   };
 
   const handleFormatText = (newValue) => {
-    if (!activeTextarea) return;
+    const elementId = activeTextarea?.dataset?.elementId;
+    const fieldName = activeTextarea?.dataset?.field;
+    
+    if (!elementId || !fieldName) return;
 
-    // Find the element and field that corresponds to the active textarea
-    const elementId = activeTextarea.closest('[data-element-id]')?.dataset.elementId;
-    if (!elementId) return;
-
-    const element = elements.find(el => el.id === elementId);
-    if (!element) return;
-
-    // Update the appropriate field
-    if (element.type === 'p') {
-      if (activeTextarea.dataset.field === 'content') {
-        updateElement(elementId, { content: newValue });
-      } else if (activeTextarea.dataset.field === 'childContent') {
-        updateElement(elementId, { childContent: newValue });
-      }
-    } else {
+    if (fieldName === 'content') {
       updateElement(elementId, { content: newValue });
+    } else if (fieldName === 'childContent') {
+      updateElement(elementId, { childContent: newValue });
     }
   };
 
-  // Add your existing element manipulation functions here
   const addElement = useCallback((type) => {
     setElements((prev) => [
       ...prev,
@@ -570,7 +604,7 @@ const JsonTemplateBuilderRevert = () => {
     ]);
   }, []);
 
- const removeElement = useCallback((id) => {
+  const removeElement = useCallback((id) => {
     setElements((prev) => prev.filter((el) => el.id !== id));
   }, []);
 
@@ -752,7 +786,7 @@ const JsonTemplateBuilderRevert = () => {
   );
 
   return (
-    <div className="font-sans p-8 pb-32 bg-gray-100 min-h-screen"> {/* Added pb-32 for toolbar space */}
+    <div className="font-sans p-8 pb-32 bg-gray-100 min-h-screen">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-800 mb-8">JSON Template Builder</h1>
         <DragDropContext onDragEnd={handleDragEnd}>
