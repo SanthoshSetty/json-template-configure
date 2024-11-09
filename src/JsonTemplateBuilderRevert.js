@@ -92,7 +92,7 @@ const FormattingToolbar = ({ onFormatText, activeTextarea }) => {
 /**
  * Component for formatted input
  */
-const FormattedInput = ({ value, onChange, placeholder, onAddDescription, onFocus, fieldName, elementId }) => {
+const FormattedInput = ({ value, onChange, placeholder, onAddDescription, onFocus, fieldName, elementId, itemId }) => {
   const textareaRef = useRef(null);
 
   return (
@@ -106,6 +106,7 @@ const FormattedInput = ({ value, onChange, placeholder, onAddDescription, onFocu
         placeholder={placeholder}
         data-field={fieldName}
         data-element-id={elementId}
+        data-item-id={itemId}
       />
       {onAddDescription && (
         <button 
@@ -325,11 +326,13 @@ const Element = ({
               {element.isDynamic ? (
                 <>
                   {/* Dynamic List Description Field */}
-                  <textarea
+                  <FormattedInput
                     value={element.dynamicListDescription || ''}
-                    onChange={(e) => updateElement(element.id, { dynamicListDescription: e.target.value })}
-                    className="w-full p-2 mb-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
+                    onChange={(value) => updateElement(element.id, { dynamicListDescription: value })}
                     placeholder="Dynamic List Description"
+                    onFocus={onTextareaFocus}
+                    fieldName="dynamicListDescription"
+                    elementId={element.id}
                   />
                 </>
               ) : (
@@ -411,16 +414,18 @@ const ListItem = ({ item, index, elementId, modifyListItem, onTextareaFocus }) =
               onChange={(value) => modifyListItem(elementId, item.id, 'content', value)}
               placeholder="List item content"
               onFocus={onTextareaFocus}
-              fieldName="content"
+              fieldName="itemContent"
               elementId={elementId}
+              itemId={item.id}
             />
             <FormattedInput
               value={item.description || ''}
               onChange={(value) => modifyListItem(elementId, item.id, 'description', value)}
               placeholder="Item description"
               onFocus={onTextareaFocus}
-              fieldName="description"
+              fieldName="itemDescription"
               elementId={elementId}
+              itemId={item.id}
             />
           </div>
           <div className="flex space-x-2 mt-2">
@@ -555,6 +560,7 @@ const JsonTemplateBuilderRevert = () => {
   const handleFormatText = (newValue) => {
     const elementId = activeTextarea?.dataset?.elementId;
     const fieldName = activeTextarea?.dataset?.field;
+    const itemId = activeTextarea?.dataset?.itemId;
     
     if (!elementId || !fieldName) return;
 
@@ -562,8 +568,12 @@ const JsonTemplateBuilderRevert = () => {
       updateElement(elementId, { content: newValue });
     } else if (fieldName === 'childContent') {
       updateElement(elementId, { childContent: newValue });
-    } else if (fieldName === 'description') {
-      modifyListItem(elementId, activeTextarea.dataset.itemId, 'description', newValue);
+    } else if (fieldName === 'dynamicListDescription') {
+      updateElement(elementId, { dynamicListDescription: newValue });
+    } else if (fieldName === 'itemContent' || fieldName === 'itemDescription') {
+      if (!itemId) return;
+      const actionType = fieldName === 'itemContent' ? 'content' : 'description';
+      modifyListItem(elementId, itemId, actionType, newValue);
     }
   };
 
@@ -616,10 +626,8 @@ const JsonTemplateBuilderRevert = () => {
             newContentItems.push({ id: uuidv4(), content: '', description: '' });
           } else if (action === 'remove') {
             newContentItems = newContentItems.filter(item => item.id !== itemId);
-          } else if (action === 'content') {
-            newContentItems = newContentItems.map((item) => (item.id === itemId ? { ...item, content: value } : item));
-          } else if (action === 'description') {
-            newContentItems = newContentItems.map((item) => (item.id === itemId ? { ...item, description: value } : item));
+          } else if (action === 'content' || action === 'description') {
+            newContentItems = newContentItems.map((item) => (item.id === itemId ? { ...item, [action]: value } : item));
           }
           return { ...el, contentItems: newContentItems };
         }
