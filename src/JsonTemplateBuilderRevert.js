@@ -46,36 +46,49 @@ const defaultContent = {
   h1: 'Heading 1',
   h2: 'Heading 2',
   h3: 'Heading 3',
-  p: 'Paragraph text',
+  p: 'Title', // Changed default for paragraph
   strong: 'Bold text',
   span: 'Span text'
 };
 
 /**
- * Sidebar component to add new elements to the template.
+ * Helper function to parse and render HTML content in preview
  */
-const AddElementSidebar = ({ addElement }) => {
-  // Define only the elements we want to show
-  const visibleElements = {
-    PARAGRAPH: ElementTypes.PARAGRAPH,
-    UNORDERED_LIST: ElementTypes.UNORDERED_LIST,
-    ORDERED_LIST: ElementTypes.ORDERED_LIST,
-    BREAK: ElementTypes.BREAK
+const renderFormattedContent = (content) => {
+  if (!content) return null;
+  
+  // Create a temporary div to parse HTML
+  const temp = document.createElement('div');
+  temp.innerHTML = content;
+  
+  // Convert the HTML nodes to React elements
+  const convertNode = (node) => {
+    if (node.nodeType === 3) // Text node
+      return node.textContent;
+    
+    if (node.nodeType !== 1) // Not an element node
+      return null;
+    
+    const children = Array.from(node.childNodes).map(convertNode);
+    
+    switch (node.tagName.toLowerCase()) {
+      case 'h1':
+        return <h1 className="text-4xl font-bold">{children}</h1>;
+      case 'h2':
+        return <h2 className="text-3xl font-bold">{children}</h2>;
+      case 'h3':
+        return <h3 className="text-2xl font-bold">{children}</h3>;
+      case 'strong':
+        return <strong>{children}</strong>;
+      case 'em':
+        return <em>{children}</em>;
+      default:
+        return <>{children}</>;
+    }
   };
-
-  return (
-    <div className="w-full md:w-64 bg-white shadow-md rounded-lg p-6">
-      <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Add Elements</h2>
-      {Object.entries(visibleElements).map(([key, value]) => (
-        <button
-          key={key}
-          onClick={() => addElement(value)}
-          className="block w-full mb-2 text-left text-blue-500 hover:text-blue-700 transition-colors duration-200"
-        >
-          Add {key.replace(/_/g, ' ')}
-        </button>
-      ))}
-    </div>
+  
+  return Array.from(temp.childNodes).map((node, index) => 
+    <React.Fragment key={index}>{convertNode(node)}</React.Fragment>
   );
 };
 
@@ -114,6 +127,15 @@ const FormattedInput = ({ value, onChange, placeholder, onRemove, onAddNestedSpa
         placeholder={placeholder}
       />
       <div className="flex space-x-2 mb-2">
+        <button onClick={() => insertTag('h1')} className="p-1 text-blue-500 hover:text-blue-700">
+          <span className="text-lg font-bold">H1</span>
+        </button>
+        <button onClick={() => insertTag('h2')} className="p-1 text-blue-500 hover:text-blue-700">
+          <span className="text-md font-bold">H2</span>
+        </button>
+        <button onClick={() => insertTag('h3')} className="p-1 text-blue-500 hover:text-blue-700">
+          <span className="text-sm font-bold">H3</span>
+        </button>
         <button onClick={() => insertTag('strong')} className="p-1 text-blue-500 hover:text-blue-700">
           <span className="font-bold">B</span>
         </button>
@@ -152,8 +174,155 @@ const FormattedInput = ({ value, onChange, placeholder, onRemove, onAddNestedSpa
 };
 
 /**
+ * Sidebar component to add new elements to the template.
+ */
+const AddElementSidebar = ({ addElement }) => {
+  const visibleElements = {
+    PARAGRAPH: 'p',
+    UNORDERED_LIST: 'ul',
+    ORDERED_LIST: 'ol',
+    BREAK: 'br'
+  };
+
+  return (
+    <div className="w-full md:w-64 bg-white shadow-md rounded-lg p-6">
+      <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Add Elements</h2>
+      {Object.entries(visibleElements).map(([key, value]) => (
+        <button
+          key={key}
+          onClick={() => addElement(value)}
+          className="block w-full mb-2 text-left text-blue-500 hover:text-blue-700 transition-colors duration-200"
+        >
+          Add {key.replace(/_/g, ' ')}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+/**
+ * Component representing a single element in the template.
+ */
+const Element = ({
+  element,
+  index,
+  updateElement,
+  removeElement,
+  modifyListItem,
+  insertVariable,
+  addNestedSpan,
+  updateNestedSpan,
+  removeNestedSpan
+}) => {
+  const [showDescription, setShowDescription] = useState(!!element.childDescription);
+
+  useEffect(() => {
+    if (element.childDescription) {
+      setShowDescription(true);
+    }
+  }, [element.childDescription]);
+
+  if (element.type === 'p') {
+    return (
+      <Draggable draggableId={element.id} index={index}>
+        {(provided) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.draggableProps}
+            className="mb-6 p-6 border rounded-lg bg-white shadow-sm transition-all duration-200 hover:shadow-md"
+          >
+            <div className="flex justify-between items-center mb-4" {...provided.dragHandleProps}>
+              <h3 className="text-lg font-semibold text-gray-700">Paragraph</h3>
+              <button onClick={() => removeElement(element.id)} className="p-1 text-red-500 hover:text-red-700">
+                <TrashIcon className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {/* Title (Parent paragraph) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                <FormattedInput
+                  value={element.content || ''}
+                  onChange={(value) => updateElement(element.id, { content: value })}
+                  placeholder="Enter title (supports H1/H2/H3, bold, italic)"
+                />
+              </div>
+              
+              {/* Content (Child paragraph) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Content</label>
+                <FormattedInput
+                  value={element.childContent || ''}
+                  onChange={(value) => updateElement(element.id, { childContent: value })}
+                  placeholder="Enter content (supports H1/H2/H3, bold, italic)"
+                  onAddDescription={() => setShowDescription(!showDescription)}
+                />
+              </div>
+              
+              {/* Description for child paragraph */}
+              {showDescription && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Description (for AI)</label>
+                  <textarea
+                    value={element.childDescription || ''}
+                    onChange={(e) => updateElement(element.id, { childDescription: e.target.value })}
+                    className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
+                    placeholder="Enter description for AI-generated content"
+                  />
+                </div>
+              )}
+
+              {/* Preview */}
+              <div className="mt-4 p-4 bg-gray-50 rounded-md">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Preview:</h4>
+                <div className="preview-content">
+                  {renderFormattedContent(element.content)}
+                  {renderFormattedContent(element.childContent)}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </Draggable>
+    );
+  }
+
+  // Original Element rendering for other types
+  return (
+    <Draggable draggableId={element.id} index={index}>
+      {(provided) => (
+        <div
+          className="mb-6 p-6 border rounded-lg bg-white shadow-sm transition-all duration-200 hover:shadow-md"
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+        >
+          <div className="flex justify-between items-center mb-4" {...provided.dragHandleProps}>
+            <h3 className="text-lg font-semibold text-gray-700">{getElementTypeName(element.type)}</h3>
+            <button onClick={() => removeElement(element.id)} className="p-1 text-red-500 hover:text-red-700">
+              <TrashIcon className="h-5 w-5" />
+            </button>
+          </div>
+          {/* Rest of your original element rendering code */}
+          {['ul', 'ol'].includes(element.type) && (
+            // Your existing list rendering code
+            // ... keep this part unchanged
+          )}
+          {element.type === 'br' ? (
+            <hr className="my-4 border-t border-gray-300" />
+          ) : !['ul', 'ol', 'br'].includes(element.type) && (
+            // Your existing non-list element rendering code
+            // ... keep this part unchanged
+          )}
+        </div>
+      )}
+    </Draggable>
+  );
+};
+
+
+/**
  * Component representing an individual list item within a list.
- * Rendered as an <li> element to maintain semantic HTML structure.
  */
 const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addNestedSpan, updateNestedSpan, removeNestedSpan }) => (
   <Draggable draggableId={item.id} index={index} key={item.id}>
@@ -212,131 +381,100 @@ const ListItem = ({ item, index, elementId, modifyListItem, insertVariable, addN
 );
 
 /**
- * Component representing a single element (e.g., heading, paragraph, list) in the template.
+ * Modified schema conversion function
  */
-const Element = ({
-  element,
-  index,
-  updateElement,
-  removeElement,
-  modifyListItem,
-  insertVariable,
-  addNestedSpan,
-  updateNestedSpan,
-  removeNestedSpan
-}) => {
-  const [showDescription, setShowDescription] = useState(!!element.description);
+const convertToJsonSchema = () => ({
+  schema: {
+    description: "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements. Avoid generating any introductory text, section titles, or descriptive elements unless explicitly requested. Focus solely on the required data in the format provided, and ensure no content is generated outside the template's structural elements.Do not mention product name or any details about the product outside the ul,ol,p,span,strong elements",
+    properties: {
+      tag: { enum: ['body'] },
+      children: elements.map((element) => {
+        // Special handling for paragraphs with parent-child structure
+        if (element.type === 'p') {
+          return {
+            properties: {
+              tag: { enum: ['p'] },
+              content: {
+                enum: [element.content || '']
+              },
+              children: [
+                {
+                  properties: {
+                    tag: { enum: ['p'] },
+                    content: element.childContent ? 
+                      { enum: [element.childContent] } : 
+                      (element.childDescription ? { description: element.childDescription } : undefined),
+                    children: null
+                  }
+                }
+              ]
+            }
+          };
+        }
 
-  const toggleDescription = () => {
-    if (!element.description) {
-      updateElement(element.id, { description: '' });
+        // Handle line breaks
+        if (element.type === 'br') {
+          return {
+            properties: { tag: { enum: [element.type] } }
+          };
+        }
+
+        // Handle lists
+        if (['ul', 'ol'].includes(element.type)) {
+          const baseSchema = element.description !== null 
+            ? { description: element.description, properties: { tag: { enum: [element.type] } } }
+            : { properties: { tag: { enum: [element.type] } } };
+          
+          if (element.isDynamic) {
+            baseSchema.properties.children = [
+              {
+                type: 'array',
+                items: {
+                  properties: {
+                    tag: { enum: ['li'] },
+                    content: element.listItemDescription ? { description: element.listItemDescription } : undefined,
+                    children: null
+                  }
+                }
+              }
+            ];
+          } else {
+            baseSchema.properties.children = element.content.map((item) => ({
+              properties: {
+                tag: { enum: ['li'] },
+                content: item.content.trim() !== '' 
+                  ? { enum: [item.content] }
+                  : (item.description ? { description: item.description } : undefined),
+                children: item.nestedSpans.length > 0
+                  ? item.nestedSpans.map((span) => ({
+                      properties: {
+                        tag: { enum: ['span'] },
+                        content: span.content.trim() !== ''
+                          ? { enum: [span.content] }
+                          : (span.description ? { description: span.description } : undefined)
+                      }
+                    }))
+                  : null
+              }
+            }));
+          }
+          return baseSchema;
+        }
+
+        // Handle other elements
+        return {
+          properties: {
+            tag: { enum: [element.type] },
+            content: element.content.trim() !== ''
+              ? { enum: [element.content] }
+              : (element.description ? { description: element.description } : undefined),
+            children: null
+          }
+        };
+      })
     }
-    setShowDescription(!showDescription);
-  };
-
-  useEffect(() => {
-    if (element.description) {
-      setShowDescription(true);
-    }
-  }, [element.description]);
-
-  return (
-    <Draggable draggableId={element.id} index={index} key={element.id}>
-      {(provided) => (
-        <div
-          className="mb-6 p-6 border rounded-lg bg-white shadow-sm transition-all duration-200 hover:shadow-md"
-          ref={provided.innerRef}
-          {...provided.draggableProps}
-        >
-          <div className="flex justify-between items-center mb-4" {...provided.dragHandleProps}>
-            <h3 className="text-lg font-semibold text-gray-700">{getElementTypeName(element.type)}</h3>
-            <button onClick={() => removeElement(element.id)} className="p-1 text-red-500 hover:text-red-700">
-              <TrashIcon className="h-5 w-5" />
-            </button>
-          </div>
-          {['ul', 'ol'].includes(element.type) && (
-            <>
-              <label className="flex items-center mb-4 text-sm text-gray-600">
-                <input
-                  type="checkbox"
-                  checked={element.isDynamic}
-                  onChange={(e) => updateElement(element.id, { isDynamic: e.target.checked })}
-                  className="mr-2"
-                />
-                <span>Dynamic List</span>
-              </label>
-              {!element.isDynamic && (
-                <>
-                  <textarea
-                    value={element.description || ''}
-                    onChange={(e) => updateElement(element.id, { description: e.target.value })}
-                    className="w-full p-2 mb-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
-                    placeholder="List Description"
-                  />
-                  <Droppable droppableId={element.id} type="LIST">
-                    {(provided) => {
-                      const ListTag = element.type === 'ul' ? 'ul' : 'ol';
-                      return (
-                        <ListTag
-                          ref={provided.innerRef}
-                          {...provided.droppableProps}
-                          className={`pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}
-                        >
-                          {element.content.map((item, idx) => (
-                            <ListItem
-                              key={item.id}
-                              item={item}
-                              index={idx}
-                              elementId={element.id}
-                              modifyListItem={modifyListItem}
-                              insertVariable={insertVariable}
-                              addNestedSpan={addNestedSpan}
-                              updateNestedSpan={updateNestedSpan}
-                              removeNestedSpan={removeNestedSpan}
-                            />
-                          ))}
-                          {provided.placeholder}
-                        </ListTag>
-                      );
-                    }}
-                  </Droppable>
-                  <div className="mt-4">
-                    <button
-                      onClick={() => modifyListItem(element.id, null, 'add')}
-                      className="flex items-center p-1 text-green-500 hover:text-green-700"
-                    >
-                      <PlusIcon className="h-5 w-5 mr-1" /> Add Item
-                    </button>
-                  </div>
-                </>
-              )}
-            </>
-          )}
-          {element.type === 'br' ? (
-            <hr className="my-4 border-t border-gray-300" />
-          ) : !['ul', 'ol', 'br'].includes(element.type) ? (
-            <>
-              <FormattedInput
-                value={element.content}
-                onChange={(value) => updateElement(element.id, { content: value })}
-                placeholder={`${getElementTypeName(element.type)} content`}
-                onAddDescription={toggleDescription}
-              />
-              {(showDescription || element.description) && (
-                <textarea
-                  value={element.description || ''}
-                  onChange={(e) => updateElement(element.id, { description: e.target.value })}
-                  placeholder="Description/Instructions for AI"
-                  className="w-full p-2 mt-4 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
-                />
-              )}
-            </>
-          ) : null}
-        </div>
-      )}
-    </Draggable>
-  );
-};
+  }
+});
 
 /**
  * Main component for building the JSON template with drag-and-drop functionality.
@@ -361,7 +499,9 @@ const JsonTemplateBuilderRevert = () => {
       {
         id: uuidv4(),
         type,
-        content: defaultContent[type] || 'New element',
+        content: type === 'p' ? '' : defaultContent[type],
+        childContent: type === 'p' ? '' : undefined,
+        childDescription: null,
         description: ['ul', 'ol'].includes(type) ? "Follow the instructions mentioned in List description" : null,
         isDynamic: false,
         listItemDescription: null,
@@ -386,11 +526,9 @@ const JsonTemplateBuilderRevert = () => {
         if (el.id === id) {
           const updatedElement = { ...el, ...updates };
           if (['ul', 'ol'].includes(updatedElement.type)) {
-            // Optional: You can modify this logic based on your requirements
-            // For example, retain existing description or set a default
-          }
-          if (updatedElement.isDynamic) {
-            updatedElement.content = [];
+            if (updatedElement.isDynamic) {
+              updatedElement.content = [];
+            }
           }
           return updatedElement;
         }
@@ -426,399 +564,34 @@ const JsonTemplateBuilderRevert = () => {
   }, []);
 
   /**
-   * Adds a nested span to a specific list item.
-   */
-  const addNestedSpan = useCallback((elementId, itemId) => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === elementId) {
-          const newContent = el.content.map((item) => {
-            if (item.id === itemId) {
-              return { ...item, nestedSpans: [...item.nestedSpans, { id: uuidv4(), content: '', description: null }] };
-            }
-            return item;
-          });
-          return { ...el, content: newContent };
-        }
-        return el;
-      })
-    );
-  }, []);
-
-  /**
-   * Updates a nested span within a specific list item.
-   */
-  const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === elementId) {
-          const newContent = el.content.map((item) => {
-            if (item.id === itemId) {
-              const updatedSpans = item.nestedSpans.map((span) => {
-                if (span.id === spanId) {
-                  if (field === 'description') {
-                    return { ...span, [field]: value.trim() === '' ? null : value };
-                  }
-                  return { ...span, [field]: value };
-                }
-                return span;
-              });
-              return { ...item, nestedSpans: updatedSpans };
-            }
-            return item;
-          });
-          return { ...el, content: newContent };
-        }
-        return el;
-      })
-    );
-  }, []);
-
-  /**
-   * Removes a nested span from a specific list item.
-   */
-  const removeNestedSpan = useCallback((elementId, itemId, spanId) => {
-    setElements((prev) =>
-      prev.map((el) => {
-        if (el.id === elementId) {
-          const newContent = el.content.map((item) => {
-            if (item.id === itemId) {
-              return { ...item, nestedSpans: item.nestedSpans.filter((span) => span.id !== spanId) };
-            }
-            return item;
-          });
-          return { ...el, content: newContent };
-        }
-        return el;
-      })
-    );
-  }, []);
-
-  /**
    * Handles the drag-and-drop events.
    */
   const handleDragEnd = (result) => {
     const { destination, source, type } = result;
 
-    console.log('Drag event:', { destination, source, type });
-
     if (!destination) return;
 
-    // Reorder elements
     if (type === 'ELEMENT') {
       const reorderedElements = Array.from(elements);
       const [movedElement] = reorderedElements.splice(source.index, 1);
       reorderedElements.splice(destination.index, 0, movedElement);
       setElements(reorderedElements);
-      console.log('Reordered ELEMENTs:', reorderedElements);
-      return; // Exit early since we've handled the ELEMENT type
+      return;
     }
 
-    // Reorder list items
-    if (type === 'LIST') { // Ensure this matches the Droppable type
-      const elementId = source.droppableId; // Use droppableId to identify the list
-      console.log('Reordering list items for element ID:', elementId);
-
+    if (type === 'LIST') {
+      const elementId = source.droppableId;
       setElements((prevElements) =>
         prevElements.map((element) => {
           if (element.id === elementId) {
             const reorderedItems = Array.from(element.content);
             const [movedItem] = reorderedItems.splice(source.index, 1);
             reorderedItems.splice(destination.index, 0, movedItem);
-            console.log(`Moved item from index ${source.index} to ${destination.index}:`, movedItem);
             return { ...element, content: reorderedItems };
           }
           return element;
         })
       );
-    }
-  };
-
-  /**
-   * Converts the current template elements to a JSON schema.
-   */
-  const convertToJsonSchema = () => ({
-    schema: {
-      description: "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements. Avoid generating any introductory text, section titles, or descriptive elements unless explicitly requested. Focus solely on the required data in the format provided, and ensure no content is generated outside the template's structural elements.Do not mention product name or any details about the product outside the ul,ol,p,span,strong elements",
-      properties: {
-        tag: { enum: ['body'] },
-        children: elements.map((element) => {
-          const baseProps = { tag: { enum: [element.type] } };
-          let baseSchema = {};
-
-          if (element.type === 'br') {
-            return { properties: baseProps };
-          }
-
-          if (['ul', 'ol'].includes(element.type)) {
-            baseSchema = element.description !== null 
-              ? { description: element.description, properties: { ...baseProps } }
-              : { properties: { ...baseProps } };
-            
-            if (element.isDynamic) {
-              baseSchema.properties.children = [
-                {
-                  type: 'array',
-                  items: {
-                    properties: {
-                      tag: { enum: ['li'] },
-                      content: element.listItemDescription ? { description: element.listItemDescription } : undefined,
-                      children: null
-                    }
-                  }
-                }
-              ];
-            } else {
-              baseSchema.properties.children = element.content.map((item) => ({
-                properties: {
-                  tag: { enum: ['li'] },
-                  content: item.content.trim() !== '' 
-                    ? { enum: [item.content] }
-                    : (item.description ? { description: item.description } : undefined),
-                  children: item.nestedSpans.length > 0
-                    ? item.nestedSpans.map((span) => ({
-                        properties: {
-                          tag: { enum: ['span'] },
-                          content: span.content.trim() !== ''
-                            ? { enum: [span.content] }
-                            : (span.description ? { description: span.description } : undefined)
-                        }
-                      }))
-                    : null
-                }
-              }));
-            }
-            return baseSchema;
-          }
-
-          // For non-ul and non-ol elements
-          return {
-            properties: {
-              ...baseProps,
-              content: element.content.trim() !== ''
-                ? { enum: [element.content] }
-                : (element.description ? { description: element.description } : undefined),
-              children: null
-            }
-          };
-        })
-      }
-    }
-  });
-
-  /**
-   * Updates the elements state based on a provided JSON schema.
-   * This function parses the JSON schema and reconstructs the elements state.
-   */
-  const updateElementsFromSchema = () => {
-    try {
-      let parsedSchema;
-      try {
-        parsedSchema = JSON.parse(jsonSchema);
-        console.log('Successfully parsed JSON schema:', parsedSchema);
-      } catch (parseError) {
-        console.error('Error parsing JSON:', parseError);
-        alert(`Invalid JSON format: ${parseError.message}`);
-        return;
-      }
-
-      if (!parsedSchema.schema || !parsedSchema.schema.properties || !parsedSchema.schema.properties.children) {
-        console.error('Invalid schema structure:', parsedSchema);
-        throw new Error('Invalid schema structure. Expected schema.properties.children.');
-      }
-
-      const newElements = parsedSchema.schema.properties.children.map((child, index) => {
-        console.log(`Processing child element at index ${index}:`, child);
-
-        if (!child.properties || !child.properties.tag || !child.properties.tag.enum) {
-          console.error(`Invalid element structure at index ${index}:`, child);
-          throw new Error(`Invalid element structure at index ${index}. Expected properties.tag.enum.`);
-        }
-
-        const type = child.properties.tag.enum[0];
-        console.log(`Element type: ${type}`);
-        
-        if (type === 'br') {
-          return {
-            id: uuidv4(),
-            type,
-            content: '',
-            description: null,
-            isDynamic: false,
-            listItemDescription: null,
-            hasDescription: false
-          };
-        }
-
-        if (['ul', 'ol'].includes(type)) {
-          console.log(`Processing list element of type ${type}`);
-          const description = child.description || null;
-          if (child.properties.children && Array.isArray(child.properties.children)) {
-            if (child.properties.children[0]?.type === 'array') {
-              console.log('Processing dynamic list');
-              const listItemDescription = child.properties.children[0].items?.properties?.content?.description || null;
-              return {
-                id: uuidv4(),
-                type,
-                content: [],
-                description,
-                isDynamic: true,
-                listItemDescription,
-                hasDescription: !!description
-              };
-            } else {
-              console.log('Processing static list');
-              const listItems = child.properties.children.map((item, itemIndex) => {
-                console.log(`Processing list item at index ${itemIndex}:`, item);
-                if (!item.properties || !item.properties.tag || !item.properties.tag.enum) {
-                  console.error(`Invalid list item structure at element ${index}, item ${itemIndex}:`, item);
-                  throw new Error(`Invalid list item structure at element ${index}, item ${itemIndex}.`);
-                }
-                
-                return {
-                  id: uuidv4(),
-                  content: item.properties.content?.enum?.[0] || '',
-                  description: item.properties.content?.description || null,
-                  nestedSpans: item.properties.children
-                    ? item.properties.children.map((span, spanIndex) => {
-                        console.log(`Processing nested span at index ${spanIndex}:`, span);
-                        if (!span.properties || !span.properties.tag || !span.properties.tag.enum) {
-                          console.error(`Invalid nested span structure at element ${index}, item ${itemIndex}, span ${spanIndex}:`, span);
-                          throw new Error(`Invalid nested span structure at element ${index}, item ${itemIndex}, span ${spanIndex}.`);
-                        }
-                        return {
-                          id: uuidv4(),
-                          content: span.properties.content?.enum?.[0] || '',
-                          description: span.properties.content?.description || null
-                        };
-                      })
-                    : []
-                };
-              });
-              console.log(`Created list items:`, listItems);
-              return {
-                id: uuidv4(),
-                type,
-                content: listItems,
-                description,
-                isDynamic: false,
-                listItemDescription: null,
-                hasDescription: !!description
-              };
-            }
-          } else {
-            console.error(`Invalid list structure at index ${index}:`, child);
-            throw new Error(`Invalid list structure at index ${index}. Expected children array or dynamic list.`);
-          }
-        }
-
-        // Other Element Types
-        console.log(`Processing other element type: ${type}`);
-        const description = child.properties.content?.description || null;
-        return {
-          id: uuidv4(),
-          type,
-          content: child.properties.content?.enum?.[0] || '',
-          description,
-          isDynamic: false,
-          listItemDescription: null,
-          hasDescription: !!description
-        };
-      });
-
-      console.log('New elements created:', newElements);
-      setElements(newElements);
-      alert('Template updated successfully!');
-    } catch (error) {
-      console.error('Error updating elements from schema:', error);
-      alert(`Error updating template: ${error.message}\nPlease check the console for more details.`);
-    }
-  };
-
-  /**
-   * Renders a human-readable preview of the current template.
-   */
-  const renderPreview = () => (
-    <div className="p-5 bg-gray-100 rounded mb-5 text-gray-800">
-      {elements.map((element, index) => {
-        if (['ul', 'ol'].includes(element.type)) {
-          return (
-            <div key={index} className="mb-4">
-              {element.description !== null && (
-                <p className="italic text-gray-600 mb-2">List description: {element.description}</p>
-              )}
-              {element.isDynamic ? (
-                <div className="p-3 bg-yellow-100 rounded">
-                  <p className="font-semibold">Dynamic {getElementTypeName(element.type)}:</p>
-                  <p className="italic">Items: {element.listItemDescription || 'No description provided'}</p>
-                </div>
-              ) : (
-                <ListComponent
-                  type={element.type}
-                  items={element.content}
-                />
-              )}
-            </div>
-          );
-        }
-
-        if (element.type === 'br') {
-          return <hr key={index} className="my-4 border-t border-gray-300" />;
-        }
-
-        const ElementComponent = getElementComponent(element.type);
-        return (
-          <ElementComponent key={index} className="mb-4">
-            {element.content || (element.description && 
-              <span className="italic text-gray-600">Generated content for: {element.description}</span>
-            )}
-          </ElementComponent>
-        );
-      })}
-    </div>
-  );
-
-  /**
-   * Component to render lists based on type and items.
-   */
-  const ListComponent = ({ type, items }) => {
-    const ListTag = type === 'ul' ? 'ul' : 'ol';
-    return (
-      <ListTag className={`pl-5 ${type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
-        {items.map((item, idx) => (
-          <li key={idx} className="mb-2">
-            {item.content || (item.description && 
-              <span className="italic text-gray-600">Generated content for: {item.description}</span>
-            )}
-            {item.nestedSpans.length > 0 && (
-              <span>
-                {item.nestedSpans.map((span, spanIdx) => (
-                  <span key={spanIdx}>
-                    {span.content || (span.description && 
-                      <span className="italic text-gray-600">Generated content for: {span.description}</span>
-                    )}
-                  </span>
-                ))}
-              </span>
-            )}
-          </li>
-        ))}
-      </ListTag>
-    );
-  };
-
-  /**
-   * Utility function to get the appropriate HTML element component based on type.
-   */
-  const getElementComponent = (type) => {
-    switch (type) {
-      case 'h1': return ({ children, className }) => <h1 className={`text-4xl font-bold ${className}`}>{children}</h1>;
-      case 'h2': return ({ children, className }) => <h2 className={`text-3xl font-semibold ${className}`}>{children}</h2>;
-      case 'h3': return ({ children, className }) => <h3 className={`text-2xl font-medium ${className}`}>{children}</h3>;
-      case 'p': return ({ children, className }) => <p className={className}>{children}</p>;
-      case 'strong': return ({ children, className }) => <strong className={`font-bold ${className}`}>{children}</strong>;
-      case 'span': return ({ children, className }) => <span className={className}>{children}</span>;
-      default: return ({ children, className }) => <div className={className}>{children}</div>;
     }
   };
 
@@ -856,12 +629,6 @@ const JsonTemplateBuilderRevert = () => {
                 </Droppable>
               </div>
 
-              {/* Human-Readable Preview Section */}
-              <div className="bg-white shadow-md rounded-lg p-6 mb-8">
-                <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Human-Readable Preview</h2>
-                {renderPreview()}
-              </div>
-
               {/* JSON Schema Section */}
               <div className="bg-white shadow-md rounded-lg p-6">
                 <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">JSON Schema</h2>
@@ -870,12 +637,6 @@ const JsonTemplateBuilderRevert = () => {
                   onChange={(e) => setJsonSchema(e.target.value)}
                   className="w-full h-[300px] p-2 font-mono text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <button
-                  onClick={updateElementsFromSchema}
-                  className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors duration-200"
-                >
-                  Update Template
-                </button>
               </div>
             </div>
           </div>
