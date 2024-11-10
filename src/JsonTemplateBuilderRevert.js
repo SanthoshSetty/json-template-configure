@@ -448,31 +448,33 @@ const ListItem = ({ item, index, elementId, modifyListItem, onTextareaFocus }) =
 const convertToJsonSchema = (elements) => ({
   schema: {
     description:
-      "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure.",
+      "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements. Avoid generating any introductory text, section titles, or descriptive elements unless explicitly requested. Focus solely on the required data in the format provided, and ensure no content is generated outside the template's structural elements. Do not mention product name or any details about the product outside the ul, ol, p, span, strong elements.",
     properties: {
       tag: { enum: ['body'] },
       children: elements.map((element) => {
-        // Special handling for paragraphs with parent-child structure
+        // Handle paragraph elements
         if (element.type === 'p') {
+          const hasContent = element.content && element.content.trim() !== '';
+          const hasChildContent = element.childContent && element.childContent.trim() !== '';
+          const hasDescription = element.childDescription && element.childDescription.trim() !== '';
+
+          // Decide on the content property
+          let contentProperty;
+          if (hasContent) {
+            contentProperty = { enum: [element.content] };
+          } else if (hasChildContent) {
+            contentProperty = { enum: [element.childContent] };
+          } else if (hasDescription) {
+            contentProperty = { description: element.childDescription };
+          } else {
+            contentProperty = undefined;
+          }
+
           return {
             properties: {
               tag: { enum: ['p'] },
-              content: element.content ? { enum: [element.content] } : undefined,
-              children:
-                element.childContent || element.childDescription
-                  ? [
-                      {
-                        properties: {
-                          tag: { enum: ['p'] },
-                          content: element.childContent
-                            ? { enum: [element.childContent] }
-                            : element.childDescription
-                            ? { description: element.childDescription }
-                            : undefined,
-                        },
-                      },
-                    ]
-                  : undefined,
+              content: contentProperty,
+              children: null, // Set children to null or omit if not needed
             },
           };
         }
@@ -529,7 +531,7 @@ const convertToJsonSchema = (elements) => ({
           properties: {
             tag: { enum: [element.type] },
             content:
-              element.content.trim() !== ''
+              element.content && element.content.trim() !== ''
                 ? { enum: [element.content] }
                 : element.description
                 ? { description: element.description }
@@ -540,6 +542,7 @@ const convertToJsonSchema = (elements) => ({
     },
   },
 });
+
 
 /**
  * Main component for building the JSON template with drag-and-drop functionality.
