@@ -723,11 +723,10 @@ const JsonTemplateBuilderRevert = () => {
   }
 };
 
-
   // Function to convert JSON schema back to elements
   const parseJsonSchemaToElements = (schema) => {
   const elements = [];
-  const bodyChildren = schema.schema?.properties?.children || [];
+  const bodyChildren = schema?.schema?.properties?.children || [];
   bodyChildren.forEach((child) => {
     const element = parseElement(child);
     if (element) {
@@ -744,7 +743,7 @@ const parseElement = (schemaElement) => {
 
   const properties = schemaElement.properties;
   const tagEnum = properties.tag?.enum;
-  const tag = tagEnum && tagEnum[0];
+  const tag = Array.isArray(tagEnum) && tagEnum[0];
 
   if (!tag) {
     return null;
@@ -776,18 +775,21 @@ const parseElement = (schemaElement) => {
   if (properties.children) {
     if (Array.isArray(properties.children)) {
       // For elements with children, e.g., paragraphs with child paragraphs
-      const childElements = properties.children.map(parseElement).filter(Boolean);
+      const childElements = properties.children
+        .map(parseElement)
+        .filter(Boolean);
       if (element.type === 'p' && childElements.length > 0) {
         const child = childElements[0];
         element.childContent = child.content;
         element.childDescription = child.description;
       } else if (['ul', 'ol'].includes(element.type)) {
         // Handle lists
-        if (properties.children[0].type === 'array') {
+        const firstChild = properties.children[0];
+        if (firstChild && firstChild.type === 'array') {
           // Dynamic list
           element.isDynamic = true;
-          const itemsProps = properties.children[0].items.properties;
-          if (itemsProps.content) {
+          const itemsProps = firstChild.items?.properties;
+          if (itemsProps?.content) {
             if (itemsProps.content.description) {
               element.dynamicListDescription = itemsProps.content.description;
             } else if (itemsProps.content.enum) {
@@ -798,25 +800,23 @@ const parseElement = (schemaElement) => {
         } else {
           // Static list
           element.isDynamic = false;
-          element.contentItems = properties.children.map((child) => {
-            const item = {};
-            if (child.properties.content) {
-              if (child.properties.content.enum) {
-                item.content = child.properties.content.enum[0];
-              } else if (child.properties.content.description) {
-                item.description = child.properties.content.description;
+          element.contentItems = properties.children
+            .map((child) => {
+              const itemProps = child.properties;
+              const item = { id: uuidv4(), content: '', description: '' };
+              if (itemProps?.content) {
+                if (itemProps.content.enum) {
+                  item.content = itemProps.content.enum[0];
+                } else if (itemProps.content.description) {
+                  item.description = itemProps.content.description;
+                }
               }
-            }
-            item.id = uuidv4();
-            return item;
-          });
+              return item;
+            })
+            .filter((item) => item.content || item.description);
         }
       }
-    } else {
-      element.children = null;
     }
-  } else {
-    element.children = null;
   }
 
   return element;
