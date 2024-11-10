@@ -713,97 +713,114 @@ const JsonTemplateBuilderRevert = () => {
 
   // Function to parse JSON schema and update elements
   const handleUpdateTemplate = () => {
-    try {
-      const parsedSchema = JSON.parse(jsonSchema);
-      const newElements = parseJsonSchemaToElements(parsedSchema);
-      setElements(newElements);
-    } catch (error) {
-      console.error('Failed to parse JSON schema:', error);
-      alert('Failed to parse JSON schema. Please check the syntax.');
-    }
-  };
+  try {
+    const parsedSchema = JSON.parse(jsonSchema);
+    const newElements = parseJsonSchemaToElements(parsedSchema);
+    setElements(newElements);
+  } catch (error) {
+    console.error('Failed to parse JSON schema:', error);
+    alert(`Failed to parse JSON schema: ${error.message}`);
+  }
+};
+
 
   // Function to convert JSON schema back to elements
   const parseJsonSchemaToElements = (schema) => {
-    const elements = [];
-    const bodyChildren = schema.schema.properties.children || [];
-    bodyChildren.forEach((child) => {
-      const element = parseElement(child);
-      if (element) {
-        elements.push(element);
-      }
-    });
-    return elements;
+  const elements = [];
+  const bodyChildren = schema.schema?.properties?.children || [];
+  bodyChildren.forEach((child) => {
+    const element = parseElement(child);
+    if (element) {
+      elements.push(element);
+    }
+  });
+  return elements;
+};
+
+const parseElement = (schemaElement) => {
+  if (!schemaElement || !schemaElement.properties) {
+    return null;
+  }
+
+  const properties = schemaElement.properties;
+  const tagEnum = properties.tag?.enum;
+  const tag = tagEnum && tagEnum[0];
+
+  if (!tag) {
+    return null;
+  }
+
+  let element = {
+    id: uuidv4(),
+    type: tag,
+    content: '',
+    contentItems: [],
+    childContent: '',
+    childDescription: '',
+    description: '',
+    isDynamic: false,
+    dynamicListDescription: '',
+    hasDescription: false,
   };
 
-  const parseElement = (schemaElement) => {
-    const properties = schemaElement.properties;
-    const tag = properties.tag.enum[0];
-
-    let element = {
-      id: uuidv4(),
-      type: tag,
-      content: '',
-      contentItems: [],
-      childContent: '',
-      childDescription: '',
-      description: '',
-      isDynamic: false,
-      dynamicListDescription: '',
-      hasDescription: false,
-    };
-
-    // Handle content
-    if (properties.content) {
-      if (properties.content.enum) {
-        element.content = properties.content.enum[0];
-      } else if (properties.content.description) {
-        element.description = properties.content.description;
-      }
+  // Handle content
+  if (properties.content) {
+    if (properties.content.enum) {
+      element.content = properties.content.enum[0];
+    } else if (properties.content.description) {
+      element.description = properties.content.description;
     }
+  }
 
-    // Handle children
-    if (properties.children) {
-      if (Array.isArray(properties.children)) {
-        // For elements with children, e.g., paragraphs with child paragraphs
-        const childElements = properties.children.map(parseElement);
-        if (element.type === 'p' && childElements.length > 0) {
-          const child = childElements[0];
-          element.childContent = child.content;
-          element.childDescription = child.description;
-        } else if (['ul', 'ol'].includes(element.type)) {
-          // Handle lists
-          if (properties.children[0].type === 'array') {
-            // Dynamic list
-            element.isDynamic = true;
-            const itemsProps = properties.children[0].items.properties;
+  // Handle children
+  if (properties.children) {
+    if (Array.isArray(properties.children)) {
+      // For elements with children, e.g., paragraphs with child paragraphs
+      const childElements = properties.children.map(parseElement).filter(Boolean);
+      if (element.type === 'p' && childElements.length > 0) {
+        const child = childElements[0];
+        element.childContent = child.content;
+        element.childDescription = child.description;
+      } else if (['ul', 'ol'].includes(element.type)) {
+        // Handle lists
+        if (properties.children[0].type === 'array') {
+          // Dynamic list
+          element.isDynamic = true;
+          const itemsProps = properties.children[0].items.properties;
+          if (itemsProps.content) {
             if (itemsProps.content.description) {
               element.dynamicListDescription = itemsProps.content.description;
+            } else if (itemsProps.content.enum) {
+              // Handle cases where dynamic list items have enum content
+              element.dynamicListDescription = itemsProps.content.enum[0];
             }
-          } else {
-            // Static list
-            element.isDynamic = false;
-            element.contentItems = properties.children.map((child) => {
-              const item = {};
-              if (child.properties.content) {
-                if (child.properties.content.enum) {
-                  item.content = child.properties.content.enum[0];
-                } else if (child.properties.content.description) {
-                  item.description = child.properties.content.description;
-                }
-              }
-              item.id = uuidv4();
-              return item;
-            });
           }
+        } else {
+          // Static list
+          element.isDynamic = false;
+          element.contentItems = properties.children.map((child) => {
+            const item = {};
+            if (child.properties.content) {
+              if (child.properties.content.enum) {
+                item.content = child.properties.content.enum[0];
+              } else if (child.properties.content.description) {
+                item.description = child.properties.content.description;
+              }
+            }
+            item.id = uuidv4();
+            return item;
+          });
         }
       }
     } else {
       element.children = null;
     }
+  } else {
+    element.children = null;
+  }
 
-    return element;
-  };
+  return element;
+};
 
   const renderPreview = () => (
     <div className="bg-white shadow-md rounded-lg p-6 mb-8">
