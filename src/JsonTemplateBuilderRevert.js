@@ -30,6 +30,27 @@ const FormattingToolbar = ({ onFormatText, activeTextarea }) => {
     }, 0);
   };
 
+  const insertSelfClosingTag = (tag) => {
+    if (!activeTextarea) return;
+
+    const pos = activeTextarea.selectionStart;
+    const text = activeTextarea.value;
+    const before = text.substring(0, pos);
+    const after = text.substring(pos);
+    const newValue = `${before}<${tag}>${after}`;
+
+    onFormatText(newValue);
+
+    // Restore focus to the textarea
+    setTimeout(() => {
+      activeTextarea.focus();
+      activeTextarea.setSelectionRange(
+        pos + tag.length + 2,
+        pos + tag.length + 2
+      );
+    }, 0);
+  };
+
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white shadow-lg border-t p-4 z-50">
       <div className="max-w-7xl mx-auto">
@@ -69,6 +90,13 @@ const FormattingToolbar = ({ onFormatText, activeTextarea }) => {
             disabled={!activeTextarea}
           >
             <span className="italic">I</span>
+          </button>
+          <button 
+            onClick={() => insertSelfClosingTag('br')}
+            className={`p-1 text-blue-500 hover:text-blue-700 ${!activeTextarea ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={!activeTextarea}
+          >
+            <span>BR</span>
           </button>
           {activeTextarea && (
             <button 
@@ -164,6 +192,8 @@ const renderFormattedContent = (content) => {
         return <strong>{children}</strong>;
       case 'em':
         return <em>{children}</em>;
+      case 'br':
+        return <br />;
       default:
         return <>{children}</>;
     }
@@ -480,7 +510,6 @@ const convertToJsonSchema = (elements) => ({
                 children: null, // Set children to null for child paragraph
               },
             };
-            // Assign the child paragraph inside the parent's properties
             parentParagraph.properties.children = [childParagraph];
           }
 
@@ -503,7 +532,7 @@ const convertToJsonSchema = (elements) => ({
             properties: {
               tag: { enum: [element.type] },
               content: element.content ? { enum: [element.content] } : undefined,
-              children: null, // Initialize children as null
+              children: null,
             },
           };
 
@@ -557,7 +586,6 @@ const convertToJsonSchema = (elements) => ({
     },
   },
 });
-
 
 /**
  * Main component for building the JSON template with drag-and-drop functionality.
@@ -683,6 +711,100 @@ const JsonTemplateBuilderRevert = () => {
     }
   };
 
+  // Function to parse JSON schema and update elements
+  const handleUpdateTemplate = () => {
+    try {
+      const parsedSchema = JSON.parse(jsonSchema);
+      const newElements = parseJsonSchemaToElements(parsedSchema);
+      setElements(newElements);
+    } catch (error) {
+      console.error('Failed to parse JSON schema:', error);
+      alert('Failed to parse JSON schema. Please check the syntax.');
+    }
+  };
+
+  // Function to convert JSON schema back to elements
+  const parseJsonSchemaToElements = (schema) => {
+    const elements = [];
+    const bodyChildren = schema.schema.properties.children || [];
+    bodyChildren.forEach((child) => {
+      const element = parseElement(child);
+      if (element) {
+        elements.push(element);
+      }
+    });
+    return elements;
+  };
+
+  const parseElement = (schemaElement) => {
+    const properties = schemaElement.properties;
+    const tag = properties.tag.enum[0];
+
+    let element = {
+      id: uuidv4(),
+      type: tag,
+      content: '',
+      contentItems: [],
+      childContent: '',
+      childDescription: '',
+      description: '',
+      isDynamic: false,
+      dynamicListDescription: '',
+      hasDescription: false,
+    };
+
+    // Handle content
+    if (properties.content) {
+      if (properties.content.enum) {
+        element.content = properties.content.enum[0];
+      } else if (properties.content.description) {
+        element.description = properties.content.description;
+      }
+    }
+
+    // Handle children
+    if (properties.children) {
+      if (Array.isArray(properties.children)) {
+        // For elements with children, e.g., paragraphs with child paragraphs
+        const childElements = properties.children.map(parseElement);
+        if (element.type === 'p' && childElements.length > 0) {
+          const child = childElements[0];
+          element.childContent = child.content;
+          element.childDescription = child.description;
+        } else if (['ul', 'ol'].includes(element.type)) {
+          // Handle lists
+          if (properties.children[0].type === 'array') {
+            // Dynamic list
+            element.isDynamic = true;
+            const itemsProps = properties.children[0].items.properties;
+            if (itemsProps.content.description) {
+              element.dynamicListDescription = itemsProps.content.description;
+            }
+          } else {
+            // Static list
+            element.isDynamic = false;
+            element.contentItems = properties.children.map((child) => {
+              const item = {};
+              if (child.properties.content) {
+                if (child.properties.content.enum) {
+                  item.content = child.properties.content.enum[0];
+                } else if (child.properties.content.description) {
+                  item.description = child.properties.content.description;
+                }
+              }
+              item.id = uuidv4();
+              return item;
+            });
+          }
+        }
+      }
+    } else {
+      element.children = null;
+    }
+
+    return element;
+  };
+
   const renderPreview = () => (
     <div className="bg-white shadow-md rounded-lg p-6 mb-8">
       <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Preview</h2>
@@ -708,7 +830,7 @@ const JsonTemplateBuilderRevert = () => {
           }
 
           if (element.type === 'br') {
-            return <hr key={index} className="my-4 border-t border-gray-300" />;
+            return <br key={index} />;
           }
 
           if (['ul', 'ol'].includes(element.type)) {
@@ -807,6 +929,12 @@ const JsonTemplateBuilderRevert = () => {
                   onChange={(e) => setJsonSchema(e.target.value)}
                   className="w-full h-[300px] p-2 font-mono text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <button
+                  onClick={handleUpdateTemplate}
+                  className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  Update Template
+                </button>
               </div>
             </div>
           </div>
