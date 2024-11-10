@@ -480,7 +480,8 @@ const convertToJsonSchema = (elements) => ({
                 children: null, // Set children to null for child paragraph
               },
             };
-            parentParagraph.children = [childParagraph];
+            // Assign the child paragraph inside the parent's properties
+            parentParagraph.properties.children = [childParagraph];
           }
 
           return parentParagraph;
@@ -491,7 +492,7 @@ const convertToJsonSchema = (elements) => ({
           return {
             properties: {
               tag: { enum: [element.type] },
-              children: null, // Set children to null for line break
+              children: null,
             },
           };
         }
@@ -507,7 +508,7 @@ const convertToJsonSchema = (elements) => ({
           };
 
           if (element.isDynamic) {
-            baseSchema.children = [
+            baseSchema.properties.children = [
               {
                 type: 'array',
                 items: {
@@ -516,13 +517,13 @@ const convertToJsonSchema = (elements) => ({
                     content: element.dynamicListDescription
                       ? { description: element.dynamicListDescription }
                       : {},
-                    children: null, // Set children to null for dynamic list items
+                    children: null,
                   },
                 },
               },
             ];
           } else if (element.contentItems.length > 0) {
-            baseSchema.children = element.contentItems.map((item) => ({
+            baseSchema.properties.children = element.contentItems.map((item) => ({
               properties: {
                 tag: { enum: ['li'] },
                 content:
@@ -531,7 +532,7 @@ const convertToJsonSchema = (elements) => ({
                     : item.description
                     ? { description: item.description }
                     : undefined,
-                children: null, // Set children to null for list items
+                children: null,
               },
             }));
           }
@@ -549,7 +550,7 @@ const convertToJsonSchema = (elements) => ({
                 : element.description
                 ? { description: element.description }
                 : undefined,
-            children: null, // Set children to null for other elements
+            children: null,
           },
         };
       }),
