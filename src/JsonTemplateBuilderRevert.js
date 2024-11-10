@@ -447,7 +447,8 @@ const ListItem = ({ item, index, elementId, modifyListItem, onTextareaFocus }) =
  */
 const convertToJsonSchema = (elements) => ({
   schema: {
-    description: "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure.",
+    description:
+      "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure.",
     properties: {
       tag: { enum: ['body'] },
       children: elements.map((element) => {
@@ -456,23 +457,22 @@ const convertToJsonSchema = (elements) => ({
           return {
             properties: {
               tag: { enum: ['p'] },
-              content: element.content
-                ? { enum: [element.content] }
-                : undefined,
-              children: element.childContent || element.childDescription
-                ? [
-                    {
-                      properties: {
-                        tag: { enum: ['p'] },
-                        content: element.childContent
-                          ? { enum: [element.childContent] }
-                          : element.childDescription
-                          ? { description: element.childDescription }
-                          : undefined,
+              content: element.content ? { enum: [element.content] } : undefined,
+              children:
+                element.childContent || element.childDescription
+                  ? [
+                      {
+                        properties: {
+                          tag: { enum: ['p'] },
+                          content: element.childContent
+                            ? { enum: [element.childContent] }
+                            : element.childDescription
+                            ? { description: element.childDescription }
+                            : undefined,
+                        },
                       },
-                    },
-                  ]
-                : undefined,
+                    ]
+                  : undefined,
             },
           };
         }
@@ -480,7 +480,7 @@ const convertToJsonSchema = (elements) => ({
         // Handle line breaks
         if (element.type === 'br') {
           return {
-            properties: { tag: { enum: [element.type] } }
+            properties: { tag: { enum: [element.type] } },
           };
         }
 
@@ -489,10 +489,7 @@ const convertToJsonSchema = (elements) => ({
           const baseSchema = {
             properties: {
               tag: { enum: [element.type] },
-              content: element.content
-                ? { enum: [element.content] }
-                : undefined,
-              children: []
+              content: element.content ? { enum: [element.content] } : undefined,
             },
           };
 
@@ -510,18 +507,20 @@ const convertToJsonSchema = (elements) => ({
                 },
               },
             ];
-          } else {
+          } else if (element.contentItems.length > 0) {
             baseSchema.children = element.contentItems.map((item) => ({
               properties: {
                 tag: { enum: ['li'] },
-                content: item.content.trim() !== ''
-                  ? { enum: [item.content] }
-                  : item.description
-                  ? { description: item.description }
-                  : undefined,
+                content:
+                  item.content.trim() !== ''
+                    ? { enum: [item.content] }
+                    : item.description
+                    ? { description: item.description }
+                    : undefined,
               },
             }));
           }
+
           return baseSchema;
         }
 
@@ -529,11 +528,12 @@ const convertToJsonSchema = (elements) => ({
         return {
           properties: {
             tag: { enum: [element.type] },
-            content: element.content.trim() !== ''
-              ? { enum: [element.content] }
-              : element.description
-              ? { description: element.description }
-              : undefined,
+            content:
+              element.content.trim() !== ''
+                ? { enum: [element.content] }
+                : element.description
+                ? { description: element.description }
+                : undefined,
           },
         };
       }),
