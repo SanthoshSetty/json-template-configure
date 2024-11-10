@@ -454,29 +454,36 @@ const convertToJsonSchema = (elements) => ({
       children: elements.map((element) => {
         // Handle paragraph elements
         if (element.type === 'p') {
-          const hasContent = element.content && element.content.trim() !== '';
-          const hasChildContent = element.childContent && element.childContent.trim() !== '';
+          const hasTitle = element.content && element.content.trim() !== '';
+          const hasContent = element.childContent && element.childContent.trim() !== '';
           const hasDescription = element.childDescription && element.childDescription.trim() !== '';
 
-          // Decide on the content property
-          let contentProperty;
-          if (hasContent) {
-            contentProperty = { enum: [element.content] };
-          } else if (hasChildContent) {
-            contentProperty = { enum: [element.childContent] };
-          } else if (hasDescription) {
-            contentProperty = { description: element.childDescription };
-          } else {
-            contentProperty = undefined;
-          }
-
-          return {
+          // Parent paragraph with title
+          const parentParagraph = {
             properties: {
               tag: { enum: ['p'] },
-              content: contentProperty,
-              children: null, // Set children to null or omit if not needed
+              content: hasTitle ? { enum: [element.content] } : undefined,
             },
           };
+
+          // Child paragraph with content or description
+          if (hasContent || hasDescription) {
+            const childParagraph = {
+              properties: {
+                tag: { enum: ['p'] },
+                content: hasContent
+                  ? { enum: [element.childContent] }
+                  : hasDescription
+                  ? { description: element.childDescription }
+                  : undefined,
+              },
+            };
+            parentParagraph.children = [childParagraph];
+          } else {
+            parentParagraph.children = null;
+          }
+
+          return parentParagraph;
         }
 
         // Handle line breaks
