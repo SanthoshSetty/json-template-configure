@@ -327,9 +327,430 @@ const JsonTemplateBuilder = () => {
     ));
   }, []);
 
-  const toggleElementSelection = useCallback((elementId) => {
+ const toggleElementSelection = useCallback((elementId) => {
     setSelectedElements(prev =>
       prev.includes(elementId)
         ? prev.filter(id => id !== elementId)
         : [...prev, elementId]
     );
+  }, []);
+
+  const elementIsInGroup = useCallback((elementId) => {
+    return groups.some(group => group.elements.includes(elementId));
+  }, [groups]);
+
+  // Element management
+  const addElement = useCallback((type) => {
+    setElements(prev => [...prev, {
+      id: uuidv4(),
+      type,
+      content: defaultContent[type] || '',
+      description: null,
+      isDynamic: false,
+      content: type === 'ul' || type === 'ol' ? defaultContent[type] : defaultContent[type] || ''
+    }]);
+  }, []);
+
+  const removeElement = useCallback((id) => {
+    setElements(prev => prev.filter(el => el.id !== id));
+    setGroups(prev => prev.map(group => ({
+      ...group,
+      elements: group.elements.filter(elementId => elementId !== id)
+    })));
+  }, []);
+
+  const updateElement = useCallback((id, updates) => {
+    setElements(prev =>
+      prev.map(el => {
+        if (el.id === id) {
+          const updatedElement = { ...el, ...updates };
+          if (['ul', 'ol'].includes(updatedElement.type) && updatedElement.isDynamic) {
+            updatedElement.content = [];
+          }
+          return updatedElement;
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  const modifyListItem = useCallback((elementId, itemId, action, value = '') => {
+    setElements(prev =>
+      prev.map(el => {
+        if (el.id === elementId) {
+          let newContent = [...el.content];
+          if (action === 'add') {
+            newContent.push({ id: uuidv4(), content: '', description: null, nestedSpans: [] });
+          } else if (action === 'remove') {
+            newContent = newContent.filter(item => item.id !== itemId);
+          } else if (action === 'removeContent') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: '' } : item));
+          } else if (action === 'content') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, content: value } : item));
+          } else if (action === 'description') {
+            newContent = newContent.map((item) => (item.id === itemId ? { ...item, description: value.trim() === '' ? null : value } : item));
+          }
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  const addNestedSpan = useCallback((elementId, itemId) => {
+    setElements(prev =>
+      prev.map(el => {
+        if (el.id === elementId) {
+          const newContent = el.content.map(item => {
+            if (item.id === itemId) {
+              return {
+                ...item,
+                nestedSpans: [...item.nestedSpans, { id: uuidv4(), content: '', description: null }]
+              };
+            }
+            return item;
+          });
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  const updateNestedSpan = useCallback((elementId, itemId, spanId, field, value) => {
+    setElements(prev =>
+      prev.map(el => {
+        if (el.id === elementId) {
+          const newContent = el.content.map(item => {
+            if (item.id === itemId) {
+              const updatedSpans = item.nestedSpans.map(span => {
+                if (span.id === spanId) {
+                  if (field === 'description') {
+                    return { ...span, [field]: value.trim() === '' ? null : value };
+                  }
+                  return { ...span, [field]: value };
+                }
+                return span;
+              });
+              return { ...item, nestedSpans: updatedSpans };
+            }
+            return item;
+          });
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  const removeNestedSpan = useCallback((elementId, itemId, spanId) => {
+    setElements(prev =>
+      prev.map(el => {
+        if (el.id === elementId) {
+          const newContent = el.content.map(item => {
+            if (item.id === itemId) {
+              return {
+                ...item,
+                nestedSpans: item.nestedSpans.filter(span => span.id !== spanId)
+              };
+            }
+            return item;
+          });
+          return { ...el, content: newContent };
+        }
+        return el;
+      })
+    );
+  }, []);
+
+  const convertToJsonSchema = useCallback(() => ({
+    schema: {
+      description: "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements. Avoid generating any introductory text, section titles, or descriptive elements unless explicitly requested. Focus solely on the required data in the format provided, and ensure no content is generated outside the template's structural elements.Do not mention product name or any details about the product outside the ul,ol,p,span,strong elements",
+      properties: {
+        tag: { enum: ['body'] },
+        children: [
+          // Grouped elements
+          ...groups.map(group => ({
+            properties: {
+              tag: { enum: ['div'] },
+              className: { enum: [`group-${group.id}`] },
+              children: group.elements.map(elementId => {
+                const element = elements.find(e => e.id === elementId);
+                if (!element) return null;
+
+                const baseProps = { 
+                  tag: { 
+                    enum: [element.type === 'p' && element.content.trim() !== '' ? 'div' : element.type] 
+                  }
+                };
+
+                if (element.type === 'br') {
+                  return { properties: baseProps };
+                }
+
+                if (['ul', 'ol'].includes(element.type)) {
+                  const baseSchema = element.description !== null 
+                    ? { description: element.description, properties: { ...baseProps } }
+                    : { properties: { ...baseProps } };
+                  
+                  if (element.isDynamic) {
+                    baseSchema.properties.children = [{
+                      type: 'array',
+                      items: {
+                        properties: {
+                          tag: { enum: ['li'] },
+                          content: element.listItemDescription ? { description: element.listItemDescription } : undefined,
+                          children: null
+                        }
+                      }
+                    }];
+                  } else {
+                    baseSchema.properties.children = element.content.map(item => ({
+                      properties: {
+                        tag: { enum: ['li'] },
+                        content: item.content.trim() !== '' 
+                          ? { enum: [item.content] }
+                          : (item.description ? { description: item.description } : undefined),
+                        children: item.nestedSpans.length > 0
+                          ? item.nestedSpans.map(span => ({
+                              properties: {
+                                tag: { enum: ['span'] },
+                                content: span.content.trim() !== ''
+                                  ? { enum: [span.content] }
+                                  : (span.description ? { description: span.description } : undefined)
+                              }
+                            }))
+                          : null
+                      }
+                    }));
+                  }
+                  return baseSchema;
+                }
+
+                return {
+                  properties: {
+                    ...baseProps,
+                    content: element.content.trim() !== ''
+                      ? { enum: [element.content] }
+                      : (element.description ? { description: element.description } : undefined),
+                    children: null
+                  }
+                };
+              }).filter(Boolean)
+            }
+          })),
+          // Ungrouped elements
+          ...elements
+            .filter(element => !groups.some(group => group.elements.includes(element.id)))
+            .map(element => {
+              const baseProps = { 
+                tag: { 
+                  enum: [element.type === 'p' && element.content.trim() !== '' ? 'div' : element.type] 
+                }
+              };
+
+              if (element.type === 'br') {
+                return { properties: baseProps };
+              }
+
+              if (['ul', 'ol'].includes(element.type)) {
+                const baseSchema = element.description !== null 
+                  ? { description: element.description, properties: { ...baseProps } }
+                  : { properties: { ...baseProps } };
+                
+                if (element.isDynamic) {
+                  baseSchema.properties.children = [{
+                    type: 'array',
+                    items: {
+                      properties: {
+                        tag: { enum: ['li'] },
+                        content: element.listItemDescription ? { description: element.listItemDescription } : undefined,
+                        children: null
+                      }
+                    }
+                  }];
+                } else {
+                  baseSchema.properties.children = element.content.map(item => ({
+                    properties: {
+                      tag: { enum: ['li'] },
+                      content: item.content.trim() !== '' 
+                        ? { enum: [item.content] }
+                        : (item.description ? { description: item.description } : undefined),
+                      children: item.nestedSpans.length > 0
+                        ? item.nestedSpans.map(span => ({
+                            properties: {
+                              tag: { enum: ['span'] },
+                              content: span.content.trim() !== ''
+                                ? { enum: [span.content] }
+                                : (span.description ? { description: span.description } : undefined)
+                            }
+                          }))
+                        : null
+                    }
+                  }));
+                }
+                return baseSchema;
+              }
+
+              return {
+                properties: {
+                  ...baseProps,
+                  content: element.content.trim() !== ''
+                    ? { enum: [element.content] }
+                    : (element.description ? { description: element.description } : undefined),
+                  children: null
+                }
+              };
+            })
+        ]
+      }
+    }
+  }), [elements, groups]);
+
+  const handleDragEnd = (result) => {
+    const { destination, source, type } = result;
+
+    if (!destination) return;
+
+    if (type === 'ELEMENT') {
+      const reorderedElements = Array.from(elements);
+      const [movedElement] = reorderedElements.splice(source.index, 1);
+      reorderedElements.splice(destination.index, 0, movedElement);
+      setElements(reorderedElements);
+      return;
+    }
+
+    if (type === 'LIST') {
+      const elementId = source.droppableId;
+      setElements(prev =>
+        prev.map(element => {
+          if (element.id === elementId) {
+            const reorderedItems = Array.from(element.content);
+            const [movedItem] = reorderedItems.splice(source.index, 1);
+            reorderedItems.splice(destination.index, 0, movedItem);
+            return { ...element, content: reorderedItems };
+          }
+          return element;
+        })
+      );
+    }
+  };
+
+  useEffect(() => {
+    setJsonSchema(JSON.stringify(convertToJsonSchema(), null, 2));
+  }, [elements, groups]);
+
+  const AddElementSidebar = ({ addElement }) => (
+    <div className="w-full md:w-64 bg-white shadow-md rounded-lg p-6">
+      <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Add Elements</h2>
+      {Object.entries(ElementTypes).map(([key, value]) => (
+        <button
+          key={key}
+          onClick={() => addElement(value)}
+          className="block w-full mb-2 text-left text-blue-500 hover:text-blue-700 transition-colors duration-200"
+        >
+          Add {key.replace(/_/g, ' ')}
+        </button>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="font-sans p-8 bg-gray-100 min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-3xl font-bold text-gray-800 mb-8">JSON Template Builder</h1>
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="flex flex-col md:flex-row gap-8">
+            <AddElementSidebar addElement={addElement} />
+            <div className="flex-1">
+              <Droppable droppableId="elements" type="ELEMENT">
+                {(provided) => (
+                  <div ref={provided.innerRef} {...provided.droppableProps}>
+                    {/* Groups */}
+                    {groups.map(group => (
+                      <GroupContainer
+                        key={group.id}
+                        group={group}
+                        onRemoveGroup={removeGroup}
+                        onToggleCollapse={toggleGroupCollapse}
+                        onUpdateGroupTitle={updateGroupTitle}
+                      >
+                        {elements
+                          .filter(element => group.elements.includes(element.id))
+                          .map((element, index) => (
+                            <Element
+                              key={element.id}
+                              element={element}
+                              index={index}
+                              updateElement={updateElement}
+                              removeElement={removeElement}
+                              modifyListItem={modifyListItem}
+                              insertVariable={(id) => updateElement(id, { content: `${element.content} {{Group//Variable Name}}` })}
+                              addNestedSpan={addNestedSpan}
+                              updateNestedSpan={updateNestedSpan}
+                              removeNestedSpan={removeNestedSpan}
+                              isSelected={selectedElements.includes(element.id)}
+                              onSelect={() => toggleElementSelection(element.id)}
+                            />
+                          ))}
+                      </GroupContainer>
+                    ))}
+
+                    {/* Ungrouped elements */}
+                    {elements
+                      .filter(element => !elementIsInGroup(element.id))
+                      .map((element, index) => (
+                        <Element
+                          key={element.id}
+                          element={element}
+                          index={index}
+                          updateElement={updateElement}
+                          removeElement={removeElement}
+                          modifyListItem={modifyListItem}
+                          insertVariable={(id) => updateElement(id, { content: `${element.content} {{Group//Variable Name}}` })}
+                          addNestedSpan={addNestedSpan}
+                          updateNestedSpan={updateNestedSpan}
+                          removeNestedSpan={removeNestedSpan}
+                          isSelected={selectedElements.includes(element.id)}
+                          onSelect={() => toggleElementSelection(element.id)}
+                        />
+                      ))}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle>JSON Schema</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <textarea
+                    value={jsonSchema}
+                    readOnly
+                    className="w-full h-64 p-2 font-mono text-sm border rounded"
+                  />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </DragDropContext>
+
+        {/* Floating group actions */}
+        {selectedElements.length >= 2 && (
+          <div className="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg p-4 z-50">
+            <button
+              onClick={createGroup}
+              className="flex items-center gap-2 text-blue-500 hover:text-blue-700"
+            >
+              <FolderPlusIcon className="h-4 w-4" />
+              Create Group ({selectedElements.length} items)
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default JsonTemplateBuilder;
