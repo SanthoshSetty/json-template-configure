@@ -1,8 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { PlusIcon, MinusIcon, TrashIcon, VariableIcon, MenuIcon, FolderPlusIcon, ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
+import { PlusIcon, MinusIcon, TrashIcon, VariableIcon, MenuIcon, FolderPlus, ChevronDown, ChevronRight } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 
 // Existing constants and types remain the same
 const ElementTypes = {
@@ -29,14 +27,29 @@ const defaultContent = {
   span: 'Span text'
 };
 
+const getElementTypeName = (type) => {
+  const typeNames = {
+    h1: 'Heading 1',
+    h2: 'Heading 2',
+    h3: 'Heading 3',
+    p: 'Paragraph',
+    ul: 'Unordered List',
+    ol: 'Ordered List',
+    span: 'Span',
+    strong: 'Strong',
+    br: 'Line Break'
+  };
+  return typeNames[type] || type.toUpperCase();
+};
+
 // Group management components
 const GroupContainer = ({ group, elements, onRemoveGroup, onToggleCollapse, onUpdateGroupTitle, selectedElements, onElementSelect }) => {
   return (
-    <Card className="mb-4 border-l-4 border-blue-500">
-      <CardHeader className="flex flex-row items-center justify-between bg-gray-50 p-2">
+    <div className="mb-4 border-l-4 border-blue-500 bg-white rounded-lg shadow">
+      <div className="flex items-center justify-between bg-gray-50 p-4 rounded-t-lg">
         <div className="flex items-center gap-2">
           <button onClick={() => onToggleCollapse(group.id)} className="p-1">
-            {group.isCollapsed ? <ChevronRightIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
+            {group.isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </button>
           <input
             type="text"
@@ -48,9 +61,9 @@ const GroupContainer = ({ group, elements, onRemoveGroup, onToggleCollapse, onUp
         <button onClick={() => onRemoveGroup(group.id)} className="text-red-500 p-1">
           <TrashIcon className="h-4 w-4" />
         </button>
-      </CardHeader>
+      </div>
       {!group.isCollapsed && (
-        <CardContent className="pl-4">
+        <div className="p-4">
           {elements.map(element => (
             <Element
               key={element.id}
@@ -60,9 +73,9 @@ const GroupContainer = ({ group, elements, onRemoveGroup, onToggleCollapse, onUp
               isInGroup={true}
             />
           ))}
-        </CardContent>
+        </div>
       )}
-    </Card>
+    </div>
   );
 };
 
@@ -75,7 +88,7 @@ const GroupActions = ({ selectedElements, onCreateGroup }) => {
         onClick={onCreateGroup}
         className="flex items-center gap-2 text-blue-500 hover:text-blue-700"
       >
-        <FolderPlusIcon className="h-4 w-4" />
+        <FolderPlus className="h-4 w-4" />
         Create Group ({selectedElements.length} items)
       </button>
     </div>
@@ -87,25 +100,27 @@ const Element = ({ element, isSelected, onSelect, isInGroup, ...props }) => {
   const [showDescription, setShowDescription] = useState(!!element.description);
 
   return (
-    <Card className={`mb-4 relative ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
+    <div className={`mb-4 relative bg-white rounded-lg shadow ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
       <div className="absolute top-2 left-2 z-10">
-        <Checkbox
+        <input
+          type="checkbox"
           checked={isSelected}
-          onCheckedChange={onSelect}
+          onChange={() => onSelect()}
+          className="h-4 w-4"
         />
       </div>
-      <CardHeader className="flex flex-row items-center justify-between pt-8">
-        <CardTitle>{getElementTypeName(element.type)}</CardTitle>
+      <div className="flex items-center justify-between p-4 pt-8">
+        <h3 className="text-lg font-semibold">{getElementTypeName(element.type)}</h3>
         {props.onRemove && (
           <button onClick={props.onRemove} className="text-red-500 hover:text-red-700">
             <TrashIcon className="h-5 w-5" />
           </button>
         )}
-      </CardHeader>
-      <CardContent>
-        {/* Existing element content rendering */}
-      </CardContent>
-    </Card>
+      </div>
+      <div className="p-4 pt-0">
+        {/* Element content here */}
+      </div>
+    </div>
   );
 };
 
@@ -127,7 +142,6 @@ const JsonTemplateBuilderWithGroups = () => {
       isCollapsed: false
     }]);
 
-    // Clear selections after grouping
     setSelectedElements([]);
   }, [selectedElements]);
 
@@ -155,7 +169,7 @@ const JsonTemplateBuilderWithGroups = () => {
     );
   }, []);
 
-  // Element management functions (existing)
+  // Element management functions
   const addElement = useCallback((type) => {
     setElements(prev => [...prev, {
       id: uuidv4(),
@@ -174,14 +188,13 @@ const JsonTemplateBuilderWithGroups = () => {
     })));
   }, []);
 
-  // Modified schema generation to include groups
+  // Schema conversion function
   const convertToJsonSchema = useCallback(() => ({
     schema: {
       description: "Ensure that only the required data fields specified in the template are generated...",
       properties: {
         tag: { enum: ['body'] },
         children: [
-          // Grouped elements
           ...groups.map(group => ({
             properties: {
               tag: { enum: ['div'] },
@@ -208,7 +221,6 @@ const JsonTemplateBuilderWithGroups = () => {
               }).filter(Boolean)
             }
           })),
-          // Ungrouped elements
           ...elements
             .filter(element => !groups.some(group => group.elements.includes(element.id)))
             .map(element => {
@@ -253,22 +265,18 @@ const JsonTemplateBuilderWithGroups = () => {
         <h1 className="text-3xl font-bold text-gray-800 mb-8">JSON Template Builder</h1>
         <div className="flex flex-col md:flex-row gap-8">
           {/* Sidebar */}
-          <Card className="w-64 h-fit">
-            <CardHeader>
-              <CardTitle>Add Elements</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {Object.entries(ElementTypes).map(([key, value]) => (
-                <button
-                  key={key}
-                  onClick={() => addElement(value)}
-                  className="block w-full mb-2 text-left text-blue-500 hover:text-blue-700"
-                >
-                  Add {key.replace(/_/g, ' ')}
-                </button>
-              ))}
-            </CardContent>
-          </Card>
+          <div className="w-64 bg-white rounded-lg shadow p-4">
+            <h2 className="text-xl font-semibold mb-4">Add Elements</h2>
+            {Object.entries(ElementTypes).map(([key, value]) => (
+              <button
+                key={key}
+                onClick={() => addElement(value)}
+                className="block w-full mb-2 text-left text-blue-500 hover:text-blue-700"
+              >
+                Add {key.replace(/_/g, ' ')}
+              </button>
+            ))}
+          </div>
 
           {/* Main content */}
           <div className="flex-1">
@@ -300,18 +308,14 @@ const JsonTemplateBuilderWithGroups = () => {
               ))}
 
             {/* JSON Schema */}
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>JSON Schema</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <textarea
-                  value={jsonSchema}
-                  readOnly
-                  className="w-full h-64 p-2 font-mono text-sm border rounded"
-                />
-              </CardContent>
-            </Card>
+            <div className="bg-white rounded-lg shadow mt-6 p-4">
+              <h2 className="text-xl font-semibold mb-4">JSON Schema</h2>
+              <textarea
+                value={jsonSchema}
+                readOnly
+                className="w-full h-64 p-2 font-mono text-sm border rounded"
+              />
+            </div>
           </div>
         </div>
 
