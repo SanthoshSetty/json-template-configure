@@ -582,6 +582,21 @@ const JsonTemplateBuilderRevert = () => {
           }
 
           // For non-ul and non-ol elements
+          if (element.type === 'p') {
+            return {
+              properties: {
+                ...baseProps,
+                content: element.content.trim() !== ''
+                  ? { enum: [element.content], tag: { enum: ['div'] } }
+                  : (element.description 
+                      ? { description: element.description, tag: { enum: ['p'] } }
+                      : undefined),
+                children: null
+              }
+            };
+          }
+
+          // For all other elements
           return {
             properties: {
               ...baseProps,
@@ -595,6 +610,7 @@ const JsonTemplateBuilderRevert = () => {
       }
     }
   });
+
 
   /**
    * Updates the elements state based on a provided JSON schema.
