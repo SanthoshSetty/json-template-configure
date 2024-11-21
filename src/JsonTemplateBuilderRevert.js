@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { v4 as uuidv4 } from 'uuid';
 
+// Formatting Toolbar Component
 const FormattingToolbar = ({ onFormatText, activeTextarea }) => {
   const insertTag = (tag) => {
     if (!activeTextarea) return;
@@ -47,6 +48,7 @@ const FormattingToolbar = ({ onFormatText, activeTextarea }) => {
   );
 };
 
+// Add Element Sidebar Component
 const AddElementSidebar = ({ addElement }) => {
   return (
     <div className="w-full md:w-64 bg-white shadow-md rounded-lg p-6">
@@ -73,7 +75,8 @@ const AddElementSidebar = ({ addElement }) => {
   );
 };
 
-const FormattedInput = ({ value, onChange, onFocus }) => {
+// Formatted Input Component
+const FormattedInput = ({ value, onChange, onFocus, placeholder }) => {
   const textareaRef = useRef(null);
 
   return (
@@ -82,11 +85,13 @@ const FormattedInput = ({ value, onChange, onFocus }) => {
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onFocus={() => onFocus(textareaRef.current)}
+      placeholder={placeholder}
       className="w-full p-2 border rounded"
     />
   );
 };
 
+// Element Component
 const Element = ({ element, index, updateElement, removeElement }) => {
   return (
     <Draggable draggableId={element.id} index={index}>
@@ -97,19 +102,66 @@ const Element = ({ element, index, updateElement, removeElement }) => {
           className="mb-6 p-6 border rounded-lg bg-white shadow-sm"
         >
           <div className="flex justify-between items-center mb-4" {...provided.dragHandleProps}>
-            <h3 className="text-lg font-semibold">Element {index + 1}</h3>
-            <button onClick={() => removeElement(element.id)} className="text-red-500">Remove</button>
+            <h3 className="text-lg font-semibold">{element.type === 'p' ? 'Paragraph' : 'List'}</h3>
+            <button onClick={() => removeElement(element.id)} className="text-red-500">
+              Remove
+            </button>
           </div>
           <FormattedInput
             value={element.content}
             onChange={(value) => updateElement(element.id, { content: value })}
+            placeholder={element.type === 'p' ? 'Enter paragraph content' : 'Enter list title'}
           />
+          {element.type === 'ul' || element.type === 'ol' ? (
+            <>
+              <h4 className="mt-4 font-semibold">List Items</h4>
+              {element.items.map((item, idx) => (
+                <div key={item.id} className="flex space-x-2 mt-2">
+                  <FormattedInput
+                    value={item.content}
+                    onChange={(value) =>
+                      updateElement(element.id, {
+                        items: element.items.map((i) =>
+                          i.id === item.id ? { ...i, content: value } : i
+                        ),
+                      })
+                    }
+                    placeholder="Enter list item"
+                  />
+                  <button
+                    onClick={() =>
+                      updateElement(element.id, {
+                        items: element.items.filter((i) => i.id !== item.id),
+                      })
+                    }
+                    className="text-red-500"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={() =>
+                  updateElement(element.id, {
+                    items: [
+                      ...element.items,
+                      { id: uuidv4(), content: '' },
+                    ],
+                  })
+                }
+                className="mt-2 text-blue-500 hover:text-blue-700"
+              >
+                Add Item
+              </button>
+            </>
+          ) : null}
         </div>
       )}
     </Draggable>
   );
 };
 
+// JSON Schema Conversion
 const convertToUpdatedJsonSchema = (elements) => ({
   schema: {
     description:
@@ -117,7 +169,7 @@ const convertToUpdatedJsonSchema = (elements) => ({
     properties: {
       tag: { enum: ["body"] },
       content: null,
-      children: elements.map((element, index) => {
+      children: elements.flatMap((element, index) => {
         const groupId = `group${index + 1}`;
         const firstFieldAttributes = [
           {
@@ -136,19 +188,52 @@ const convertToUpdatedJsonSchema = (elements) => ({
           },
         ];
 
-        return {
-          properties: {
-            tag: { enum: [element.type] },
-            attributes: index === 0 ? firstFieldAttributes : otherFieldAttributes,
-            content: element.content ? { enum: [element.content] } : null,
-            children: null,
-          },
-        };
+        if (element.type === 'p') {
+          return [
+            {
+              properties: {
+                tag: { enum: ["p"] },
+                attributes: firstFieldAttributes,
+                content: element.content ? { enum: [element.content] } : null,
+                children: null,
+              },
+            },
+          ];
+        }
+
+        if (element.type === 'ul' || element.type === 'ol') {
+          return [
+            {
+              properties: {
+                tag: { enum: ["p"] },
+                attributes: firstFieldAttributes,
+                content: element.content ? { enum: [element.content] } : null,
+                children: null,
+              },
+            },
+            {
+              properties: {
+                tag: { enum: [element.type] },
+                attributes: otherFieldAttributes,
+                children: element.items.map((item) => ({
+                  properties: {
+                    tag: { enum: ["li"] },
+                    content: item.content ? { enum: [item.content] } : null,
+                    children: null,
+                  },
+                })),
+              },
+            },
+          ];
+        }
+
+        return [];
       }),
     },
   },
 });
 
+// Main Component
 const JsonTemplateBuilder = () => {
   const [elements, setElements] = useState([]);
   const [jsonSchema, setJsonSchema] = useState(null);
@@ -165,7 +250,7 @@ const JsonTemplateBuilder = () => {
   const addElement = (type) => {
     setElements((prev) => [
       ...prev,
-      { id: uuidv4(), type, content: '' },
+      { id: uuidv4(), type, content: '', items: type === 'ul' || type === 'ol' ? [] : undefined },
     ]);
   };
 
