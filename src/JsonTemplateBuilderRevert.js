@@ -478,103 +478,76 @@ const ListItem = ({ item, index, elementId, modifyListItem, onTextareaFocus }) =
 
 
 
+
 const convertToJsonSchema = (elements) => ({
   schema: {
     description:
       "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements.",
     properties: {
       tag: { enum: ["body"] },
-      content: null, // Ensure body tag has content set to null
-      children: elements.flatMap((element, index) => {
+      content: null, // Body content is always null
+      children: elements.map((element, index) => {
         const groupId = `group${index + 1}`;
-        const firstFieldAttributes = [
-          {
-            properties: {
-              name: { enum: ["data-related-id"] },
-              value: { enum: [groupId] },
-            },
-          },
-        ];
-        const otherFieldAttributes = [
-          {
-            properties: {
-              name: { enum: ["id"] },
-              value: { enum: [groupId] },
-            },
-          },
-        ];
+        const attributes =
+          index === 0
+            ? [
+                {
+                  properties: {
+                    name: { enum: ["data-related-id"] },
+                    value: { enum: [groupId] },
+                  },
+                },
+              ]
+            : [
+                {
+                  properties: {
+                    name: { enum: ["id"] },
+                    value: { enum: [groupId] },
+                  },
+                },
+              ];
 
-        // Handle Paragraph (p) elements
+        // Generate schema for paragraphs
         if (element.type === "p") {
-          const hasContent = element.content && element.content.trim() !== '';
-          const hasDescription = element.childDescription && element.childDescription.trim() !== '';
-
-          const paragraphSchema = {
+          return {
             properties: {
               tag: { enum: ["p"] },
-              attributes: firstFieldAttributes,
-              content: hasContent ? { enum: [element.content] } : null,
+              attributes,
+              content: element.childDescription
+                ? { description: element.childDescription }
+                : element.content
+                ? { enum: [element.content] }
+                : null,
               children: null,
             },
           };
-
-          // If description exists, use it instead of content
-          if (hasDescription) {
-            paragraphSchema.properties.content = { description: element.childDescription };
-          }
-
-          return [paragraphSchema];
         }
 
-        // Handle Ordered and Unordered Lists (ul, ol)
+        // Generate schema for lists
         if (["ul", "ol"].includes(element.type)) {
-          const listSchema = {
+          const children = element.contentItems.map((item) => ({
+            properties: {
+              tag: { enum: ["li"] },
+              content: item.content
+                ? { enum: [item.content] }
+                : item.description
+                ? { description: item.description }
+                : null,
+              children: null,
+            },
+          }));
+
+          return {
             properties: {
               tag: { enum: [element.type] },
-              attributes: otherFieldAttributes,
+              attributes,
               content: element.content ? { enum: [element.content] } : null,
-              children: element.contentItems.map((item) => ({
-                properties: {
-                  tag: { enum: ["li"] },
-                  content: item.content ? { enum: [item.content] } : null,
-                  children: null,
-                },
-              })),
+              children,
             },
           };
-
-          // If description exists, use it instead of content
-          if (element.dynamicListDescription) {
-            listSchema.properties.children = [
-              {
-                type: "array",
-                items: {
-                  properties: {
-                    tag: { enum: ["li"] },
-                    content: element.dynamicListDescription
-                      ? { description: element.dynamicListDescription }
-                      : {},
-                    children: null,
-                  },
-                },
-              },
-            ];
-          }
-
-          return [
-            {
-              properties: {
-                tag: { enum: ["p"] },
-                attributes: firstFieldAttributes,
-                content: element.content ? { enum: [element.content] } : null,
-                children: null,
-              },
-            },
-            listSchema,
-          ];
         }
 
-        return [];
+        return null;
       }),
     },
   },
