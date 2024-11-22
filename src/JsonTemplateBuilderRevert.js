@@ -476,7 +476,10 @@ const ListItem = ({ item, index, elementId, modifyListItem, onTextareaFocus }) =
  * Modified schema conversion function
  */
 
-
+const sanitizeContent = (content) => {
+  if (!content) return null; // Return null if content is empty or undefined
+  return content.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+};
 
 
 const convertToJsonSchema = (elements) => ({
