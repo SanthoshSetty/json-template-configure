@@ -477,13 +477,14 @@ const ListItem = ({ item, index, elementId, modifyListItem, onTextareaFocus }) =
  */
 
 
+
 const convertToJsonSchema = (elements) => ({
   schema: {
     description:
       "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements.",
     properties: {
       tag: { enum: ["body"] },
-      content: null, // Ensures body tag has content set to null
+      content: null, // Ensure body tag has content set to null
       children: elements.flatMap((element, index) => {
         const groupId = `group${index + 1}`;
         const firstFieldAttributes = [
@@ -503,46 +504,63 @@ const convertToJsonSchema = (elements) => ({
           },
         ];
 
-        // Handle Paragraph
+        // Handle Paragraph (p) elements
         if (element.type === "p") {
-          return [
-            {
-              properties: {
-                tag: { enum: ["p"] },
-                attributes: firstFieldAttributes,
-                content: element.content ? { enum: [element.content] } : null,
-                children: null,
-              },
+          const hasContent = element.content && element.content.trim() !== '';
+          const hasDescription = element.childDescription && element.childDescription.trim() !== '';
+
+          const paragraphSchema = {
+            properties: {
+              tag: { enum: ["p"] },
+              attributes: firstFieldAttributes,
+              content: hasContent ? { enum: [element.content] } : null,
+              children: null,
             },
-            ...(element.childContent
-              ? [
-                  {
-                    properties: {
-                      tag: { enum: ["div"] },
-                      attributes: otherFieldAttributes,
-                      content: { enum: [element.childContent] },
-                      children: null,
-                    },
-                  },
-                ]
-              : []),
-            ...(element.childDescription
-              ? [
-                  {
-                    properties: {
-                      tag: { enum: ["p"] },
-                      attributes: otherFieldAttributes,
-                      content: { enum: [element.childDescription] },
-                      children: null,
-                    },
-                  },
-                ]
-              : []),
-          ];
+          };
+
+          // If description exists, use it instead of content
+          if (hasDescription) {
+            paragraphSchema.properties.content = { description: element.childDescription };
+          }
+
+          return [paragraphSchema];
         }
 
-        // Handle Ordered and Unordered Lists
+        // Handle Ordered and Unordered Lists (ul, ol)
         if (["ul", "ol"].includes(element.type)) {
+          const listSchema = {
+            properties: {
+              tag: { enum: [element.type] },
+              attributes: otherFieldAttributes,
+              content: element.content ? { enum: [element.content] } : null,
+              children: element.contentItems.map((item) => ({
+                properties: {
+                  tag: { enum: ["li"] },
+                  content: item.content ? { enum: [item.content] } : null,
+                  children: null,
+                },
+              })),
+            },
+          };
+
+          // If description exists, use it instead of content
+          if (element.dynamicListDescription) {
+            listSchema.properties.children = [
+              {
+                type: "array",
+                items: {
+                  properties: {
+                    tag: { enum: ["li"] },
+                    content: element.dynamicListDescription
+                      ? { description: element.dynamicListDescription }
+                      : {},
+                    children: null,
+                  },
+                },
+              },
+            ];
+          }
+
           return [
             {
               properties: {
@@ -552,19 +570,7 @@ const convertToJsonSchema = (elements) => ({
                 children: null,
               },
             },
-            {
-              properties: {
-                tag: { enum: [element.type] },
-                attributes: otherFieldAttributes,
-                children: element.contentItems.map((item) => ({
-                  properties: {
-                    tag: { enum: ["li"] },
-                    content: item.content ? { enum: [item.content] } : null,
-                    children: null,
-                  },
-                })),
-              },
-            },
+            listSchema,
           ];
         }
 
