@@ -482,7 +482,7 @@ const ListItem = ({ item, index, elementId, modifyListItem, onTextareaFocus }) =
 const convertToJsonSchema = (elements) => ({
   schema: {
     description:
-      "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements.",
+      "Ensure that each element is grouped into a title and content pair, strictly adhering to the structure provided. Titles are paragraphs, and content is either a div, list, or formatted text.",
     properties: {
       tag: { enum: ["body"] },
       content: null, // Ensure body content is always null
@@ -500,14 +500,14 @@ const convertToJsonSchema = (elements) => ({
                 },
               },
             ],
-            content: element.content ? { enum: [element.content] } : null,
+            content: { enum: [sanitizeContent(element.title)] },
             children: null,
           },
         };
 
         const contentOrDescriptionElement = {
           properties: {
-            tag: element.childDescription ? { enum: ["p"] } : { enum: ["div"] },
+            tag: element.type === "list" ? { enum: ["div"] } : { enum: ["div"] },
             attributes: [
               {
                 properties: {
@@ -516,12 +516,22 @@ const convertToJsonSchema = (elements) => ({
                 },
               },
             ],
-            content: element.childDescription
-              ? { description: element.childDescription }
+            content: element.type === "list"
+              ? null // For lists, the content is null, and children contain list items
+              : element.childDescription
+              ? { description: sanitizeContent(element.childDescription) }
               : element.childContent
-              ? { enum: [element.childContent] }
+              ? { enum: [sanitizeContent(element.childContent)] }
               : null,
-            children: null,
+            children: element.type === "list"
+              ? element.items.map((item) => ({
+                  properties: {
+                    tag: { enum: ["li"] },
+                    content: { enum: [sanitizeContent(item)] },
+                    children: null,
+                  },
+                }))
+              : null,
           },
         };
 
@@ -530,6 +540,7 @@ const convertToJsonSchema = (elements) => ({
     },
   },
 });
+
 
 /**
  * Main component for building the JSON template with drag-and-drop functionality.
