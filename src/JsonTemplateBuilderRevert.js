@@ -485,69 +485,47 @@ const convertToJsonSchema = (elements) => ({
       "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements.",
     properties: {
       tag: { enum: ["body"] },
-      content: null, // Body content is always null
-      children: elements.map((element, index) => {
+      content: null, // Ensure body content is always null
+      children: elements.flatMap((element, index) => {
         const groupId = `group${index + 1}`;
-        const attributes =
-          index === 0
-            ? [
-                {
-                  properties: {
-                    name: { enum: ["data-related-id"] },
-                    value: { enum: [groupId] },
-                  },
+
+        const titleElement = {
+          properties: {
+            tag: { enum: ["p"] },
+            attributes: [
+              {
+                properties: {
+                  name: { enum: ["data-related-id"] },
+                  value: { enum: [groupId] },
                 },
-              ]
-            : [
-                {
-                  properties: {
-                    name: { enum: ["id"] },
-                    value: { enum: [groupId] },
-                  },
+              },
+            ],
+            content: element.content ? { enum: [element.content] } : null,
+            children: null,
+          },
+        };
+
+        const contentOrDescriptionElement = {
+          properties: {
+            tag: element.childDescription ? { enum: ["p"] } : { enum: ["div"] },
+            attributes: [
+              {
+                properties: {
+                  name: { enum: ["id"] },
+                  value: { enum: [groupId] },
                 },
-              ];
+              },
+            ],
+            content: element.childDescription
+              ? { description: element.childDescription }
+              : element.childContent
+              ? { enum: [element.childContent] }
+              : null,
+            children: null,
+          },
+        };
 
-        // Generate schema for paragraphs
-        if (element.type === "p") {
-          return {
-            properties: {
-              tag: { enum: ["p"] },
-              attributes,
-              content: element.childDescription
-                ? { description: element.childDescription }
-                : element.content
-                ? { enum: [element.content] }
-                : null,
-              children: null,
-            },
-          };
-        }
-
-        // Generate schema for lists
-        if (["ul", "ol"].includes(element.type)) {
-          const children = element.contentItems.map((item) => ({
-            properties: {
-              tag: { enum: ["li"] },
-              content: item.content
-                ? { enum: [item.content] }
-                : item.description
-                ? { description: item.description }
-                : null,
-              children: null,
-            },
-          }));
-
-          return {
-            properties: {
-              tag: { enum: [element.type] },
-              attributes,
-              content: element.content ? { enum: [element.content] } : null,
-              children,
-            },
-          };
-        }
-
-        return null;
+        return [titleElement, contentOrDescriptionElement];
       }),
     },
   },
