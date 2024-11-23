@@ -505,7 +505,7 @@ const convertToJsonSchema = (elements) => ({
 
         const groupElements = [];
 
-        // Title handling: Always as <p> with data-related-id for the first element
+        // Title handling: Always as <p> with data-related-id for the first element in a group
         if (element.title) {
           groupElements.push({
             properties: {
