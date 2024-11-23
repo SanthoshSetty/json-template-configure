@@ -505,26 +505,26 @@ const convertToJsonSchema = (elements) => ({
 
         const groupElements = [];
 
-        // Title handling: Always as <p> with data-related-id for the first element in a group
+        // Step 1: Handle the Title (as <p>)
         if (element.title && element.title.trim() !== "") {
           groupElements.push({
             properties: {
               tag: { enum: ["p"] },
-              attributes: createAttributes(true),
+              attributes: createAttributes(groupElements.length === 0),
               content: { enum: [element.title] },
               children: null,
             },
           });
         }
 
-        // For lists (ul or ol)
+        // Step 2: Handle Lists (ul or ol)
         if (["ul", "ol"].includes(element.type)) {
           if (element.isDynamic) {
             // Dynamic list: parent <ul> or <ol> with <li> as children and description in content
             groupElements.push({
               properties: {
                 tag: { enum: [element.type] },
-                attributes: createAttributes(false),
+                attributes: createAttributes(groupElements.length === 0),
                 content: null,
                 children: [
                   {
@@ -548,7 +548,7 @@ const convertToJsonSchema = (elements) => ({
             groupElements.push({
               properties: {
                 tag: { enum: [element.type] },
-                attributes: createAttributes(false),
+                attributes: createAttributes(groupElements.length === 0),
                 content: null,
                 children: element.contentItems.flatMap((item) => {
                   const listItemElements = [];
@@ -583,12 +583,12 @@ const convertToJsonSchema = (elements) => ({
             });
           }
         } else {
-          // Non-list elements: handle content and description
+          // Step 3: Handle General Elements (div, p, etc.)
           if (element.content && element.content.trim() !== "") {
             groupElements.push({
               properties: {
                 tag: { enum: ["div"] },
-                attributes: createAttributes(false),
+                attributes: createAttributes(groupElements.length === 0),
                 content: { enum: [element.content] },
                 children: null,
               },
@@ -612,7 +612,6 @@ const convertToJsonSchema = (elements) => ({
     },
   },
 });
-
 
 
 
