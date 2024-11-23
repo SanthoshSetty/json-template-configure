@@ -505,12 +505,12 @@ const convertToJsonSchema = (elements) => ({
 
         const groupElements = [];
 
-        // Step 1: Handle the Title (as <p>)
+        // Step 1: Handle the Title (always as <p>)
         if (element.title && element.title.trim() !== "") {
           groupElements.push({
             properties: {
               tag: { enum: ["p"] },
-              attributes: createAttributes(groupElements.length === 0),
+              attributes: createAttributes(true),
               content: { enum: [element.title] },
               children: null,
             },
@@ -519,69 +519,58 @@ const convertToJsonSchema = (elements) => ({
 
         // Step 2: Handle Lists (ul or ol)
         if (["ul", "ol"].includes(element.type)) {
-          if (element.isDynamic) {
-            // Dynamic list: parent <ul> or <ol> with <li> as children and description in content
-            groupElements.push({
-              properties: {
-                tag: { enum: [element.type] },
-                attributes: createAttributes(groupElements.length === 0),
-                content: null,
-                children: [
-                  {
-                    type: "array",
-                    items: {
-                      properties: {
-                        tag: { enum: ["li"] },
-                        attributes: createAttributes(false),
-                        content: {
-                          description: element.dynamicListDescription,
+          const listElement = {
+            properties: {
+              tag: { enum: [element.type] },
+              attributes: createAttributes(groupElements.length === 0),
+              content: null,
+              children: element.isDynamic
+                ? [
+                    {
+                      type: "array",
+                      items: {
+                        properties: {
+                          tag: { enum: ["li"] },
+                          attributes: createAttributes(false),
+                          content: { description: element.dynamicListDescription },
+                          children: null,
                         },
-                        children: null,
                       },
                     },
-                  },
-                ],
-              },
-            });
-          } else {
-            // Static list: parent <ul> or <ol> with each <li> as individual elements
-            groupElements.push({
-              properties: {
-                tag: { enum: [element.type] },
-                attributes: createAttributes(groupElements.length === 0),
-                content: null,
-                children: element.contentItems.flatMap((item) => {
-                  const listItemElements = [];
+                  ]
+                : element.contentItems.flatMap((item) => {
+                    const listItemElements = [];
 
-                  // Content for <li>
-                  if (item.content && item.content.trim() !== "") {
-                    listItemElements.push({
-                      properties: {
-                        tag: { enum: ["li"] },
-                        attributes: createAttributes(false),
-                        content: { enum: [item.content] },
-                        children: null,
-                      },
-                    });
-                  }
+                    // Content for <li>
+                    if (item.content && item.content.trim() !== "") {
+                      listItemElements.push({
+                        properties: {
+                          tag: { enum: ["li"] },
+                          attributes: createAttributes(false),
+                          content: { enum: [item.content] },
+                          children: null,
+                        },
+                      });
+                    }
 
-                  // Description for <li>
-                  if (item.description && item.description.trim() !== "") {
-                    listItemElements.push({
-                      properties: {
-                        tag: { enum: ["li"] },
-                        attributes: createAttributes(false),
-                        content: { description: item.description },
-                        children: null,
-                      },
-                    });
-                  }
+                    // Description for <li>
+                    if (item.description && item.description.trim() !== "") {
+                      listItemElements.push({
+                        properties: {
+                          tag: { enum: ["li"] },
+                          attributes: createAttributes(false),
+                          content: { description: item.description },
+                          children: null,
+                        },
+                      });
+                    }
 
-                  return listItemElements;
-                }),
-              },
-            });
-          }
+                    return listItemElements;
+                  }),
+            },
+          };
+
+          groupElements.push(listElement);
         } else {
           // Step 3: Handle General Elements (div, p, etc.)
           if (element.content && element.content.trim() !== "") {
@@ -612,7 +601,6 @@ const convertToJsonSchema = (elements) => ({
     },
   },
 });
-
 
 
 /**
