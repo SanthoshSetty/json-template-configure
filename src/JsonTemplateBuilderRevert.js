@@ -490,7 +490,7 @@ const convertToJsonSchema = (elements) => ({
       "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements.",
     properties: {
       tag: { enum: ["body"] },
-      content: null, // Body's content is always null
+      content: null,
       children: elements.flatMap((element, index) => {
         const groupId = `group${index + 1}`;
 
@@ -547,7 +547,7 @@ const convertToJsonSchema = (elements) => ({
                   },
                 ],
                 content: null, // Lists don't have direct content
-                children: Array.isArray(element.items)
+                children: Array.isArray(element.items) && element.items.length > 0
                   ? element.items.map((item) => ({
                       properties: {
                         tag: { enum: ["li"] },
