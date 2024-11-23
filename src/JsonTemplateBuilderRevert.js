@@ -550,7 +550,7 @@ const convertToJsonSchema = (elements) => ({
                 tag: { enum: [element.type] },
                 attributes: createAttributes(false),
                 content: null,
-                children: element.items.flatMap((item) => {
+                children: element.contentItems.flatMap((item) => {
                   const listItemElements = [];
 
                   // Content for <li>
@@ -612,7 +612,6 @@ const convertToJsonSchema = (elements) => ({
     },
   },
 });
-
 
 
 
