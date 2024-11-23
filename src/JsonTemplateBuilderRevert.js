@@ -487,13 +487,14 @@ const convertToJsonSchema = (elements) => ({
 
   schema: {
     description:
-      "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements. Avoid generating any introductory text, section titles, or descriptive elements unless explicitly requested. Focus solely on the required data in the format provided, and ensure no content is generated outside the template's structural elements. Do not mention product name or any details about the product outside the ul, ol, p, span, strong elements.",
+      "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements.",
     properties: {
       tag: { enum: ["body"] },
       content: null,
       children: elements.flatMap((element, index) => {
         const groupId = `group${index + 1}`;
 
+        // Helper to create attributes
         const createAttributes = (isFirst) => [
           {
             properties: {
@@ -503,39 +504,25 @@ const convertToJsonSchema = (elements) => ({
           },
         ];
 
-        // Break Element
-        if (element.type === "br") {
-          return [
-            {
-              properties: {
-                tag: { enum: ["br"] },
-                attributes: null,
-                content: null,
-                children: null,
-              },
+        const groupElements = [];
+
+        // Title always as <p> with data-related-id for the first element
+        if (element.title) {
+          groupElements.push({
+            properties: {
+              tag: { enum: ["p"] },
+              attributes: createAttributes(true),
+              content: { enum: [element.title] },
+              children: null,
             },
-          ];
+          });
         }
 
-        // Lists (ul or ol)
+        // For lists (ul or ol)
         if (["ul", "ol"].includes(element.type)) {
-          const listElements = [];
-
-          // Title as <p> (data-related-id for the first element)
-          if (element.title) {
-            listElements.push({
-              properties: {
-                tag: { enum: ["p"] },
-                attributes: createAttributes(true),
-                content: { enum: [element.title] },
-                children: null,
-              },
-            });
-          }
-
-          // Dynamic List
           if (element.isDynamic) {
-            listElements.push({
+            // Dynamic list: parent <ul> or <ol> with <li> as children and description in content
+            groupElements.push({
               properties: {
                 tag: { enum: [element.type] },
                 attributes: createAttributes(false),
@@ -547,9 +534,9 @@ const convertToJsonSchema = (elements) => ({
                       properties: {
                         tag: { enum: ["li"] },
                         attributes: createAttributes(false),
-                        content: element.listItemDescription
-                          ? { description: element.listItemDescription }
-                          : undefined,
+                        content: {
+                          description: element.dynamicListDescription,
+                        },
                         children: null,
                       },
                     },
@@ -558,84 +545,70 @@ const convertToJsonSchema = (elements) => ({
               },
             });
           } else {
-            // Static List
-            listElements.push({
+            // Static list: parent <ul> or <ol> with each <li> as individual elements
+            groupElements.push({
               properties: {
                 tag: { enum: [element.type] },
                 attributes: createAttributes(false),
                 content: null,
-                children: element.content.map((item) => ({
-                  properties: {
-                    tag: { enum: ["li"] },
-                    attributes: createAttributes(false),
-                    content: item.content.trim()
-                      ? { enum: [item.content] }
-                      : item.description
-                      ? { description: item.description }
-                      : undefined,
-                    children: item.nestedSpans.length > 0
-                      ? item.nestedSpans.map((span) => ({
-                          properties: {
-                            tag: { enum: ["span"] },
-                            attributes: createAttributes(false),
-                            content: span.content.trim()
-                              ? { enum: [span.content] }
-                              : span.description
-                              ? { description: span.description }
-                              : undefined,
-                            children: null,
-                          },
-                        }))
-                      : null,
-                  },
-                })),
+                children: element.items.flatMap((item) => {
+                  const listItemElements = [];
+
+                  // Content for <li>
+                  if (item.content) {
+                    listItemElements.push({
+                      properties: {
+                        tag: { enum: ["li"] },
+                        attributes: createAttributes(false),
+                        content: { enum: [item.content] },
+                        children: null,
+                      },
+                    });
+                  }
+
+                  // Description for <li>
+                  if (item.description) {
+                    listItemElements.push({
+                      properties: {
+                        tag: { enum: ["li"] },
+                        attributes: createAttributes(false),
+                        content: { description: item.description },
+                        children: null,
+                      },
+                    });
+                  }
+
+                  return listItemElements;
+                }),
+              },
+            });
+          }
+        } else {
+          // Non-list elements: handle content and description
+          if (element.content) {
+            groupElements.push({
+              properties: {
+                tag: { enum: ["div"] },
+                attributes: createAttributes(false),
+                content: { enum: [element.content] },
+                children: null,
               },
             });
           }
 
-          return listElements;
+          if (element.description) {
+            groupElements.push({
+              properties: {
+                tag: { enum: ["p"] },
+                attributes: createAttributes(false),
+                content: { description: element.description },
+                children: null,
+              },
+            });
+          }
         }
 
-        // Non-list Elements (e.g., p, div)
-        const elementProperties = [];
-
-        // Title
-        if (element.title) {
-          elementProperties.push({
-            properties: {
-              tag: { enum: ["p"] },
-              attributes: createAttributes(true),
-              content: { enum: [element.title] },
-              children: null,
-            },
-          });
-        }
-
-        // Content
-        if (element.content) {
-          elementProperties.push({
-            properties: {
-              tag: { enum: ["div"] },
-              attributes: createAttributes(false),
-              content: { enum: [element.content] },
-              children: null,
-            },
-          });
-        }
-
-        // Description
-        if (element.description) {
-          elementProperties.push({
-            properties: {
-              tag: { enum: ["p"] },
-              attributes: createAttributes(false),
-              content: { description: element.description },
-              children: null,
-            },
-          });
-        }
-
-        return elementProperties;
+        return groupElements;
       }),
     },
   },
