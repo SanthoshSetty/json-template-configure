@@ -492,6 +492,7 @@ const convertToJsonSchema = (elements) => ({
       content: null,
       children: elements.flatMap((element, index) => {
         const groupId = `group${index + 1}`;
+        const groupElements = [];
 
         // Helper to create attributes
         const createAttributes = (isFirst) => [
@@ -503,22 +504,21 @@ const convertToJsonSchema = (elements) => ({
           },
         ];
 
-        const groupElements = [];
-
-        // Step 1: Handle the Title (always as <p>)
-        if (element.title && element.title.trim() !== "") {
+        // Step 1: Always handle the content/title as a <p> element first
+        if (element.content && element.content.trim() !== "") {
           groupElements.push({
             properties: {
               tag: { enum: ["p"] },
               attributes: createAttributes(true),
-              content: { enum: [element.title] },
+              content: { enum: [element.content] },
               children: null,
             },
           });
         }
 
-        // Step 2: Handle Lists (ul or ol)
+        // Step 2: Handle the main element based on its type
         if (["ul", "ol"].includes(element.type)) {
+          // For lists, add the list element after the title
           const listElement = {
             properties: {
               tag: { enum: [element.type] },
@@ -571,29 +571,39 @@ const convertToJsonSchema = (elements) => ({
           };
 
           groupElements.push(listElement);
-        } else {
-          // Step 3: Handle General Elements (div, p, etc.)
-          if (element.content && element.content.trim() !== "") {
+        } else if (element.type === 'p') {
+          // For paragraphs, handle the child content and description
+          if (element.childContent && element.childContent.trim() !== "") {
             groupElements.push({
               properties: {
-                tag: { enum: ["div"] },
+                tag: { enum: ["p"] },
                 attributes: createAttributes(groupElements.length === 0),
-                content: { enum: [element.content] },
+                content: { enum: [element.childContent] },
                 children: null,
               },
             });
           }
 
-          if (element.description && element.description.trim() !== "") {
+          if (element.childDescription && element.childDescription.trim() !== "") {
             groupElements.push({
               properties: {
                 tag: { enum: ["p"] },
                 attributes: createAttributes(false),
-                content: { description: element.description },
+                content: { description: element.childDescription },
                 children: null,
               },
             });
           }
+        } else if (element.type === 'br') {
+          // Handle line breaks
+          groupElements.push({
+            properties: {
+              tag: { enum: ["br"] },
+              attributes: createAttributes(groupElements.length === 0),
+              content: null,
+              children: null,
+            },
+          });
         }
 
         return groupElements;
