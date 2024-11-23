@@ -484,7 +484,6 @@ const sanitizeContent = (content) => {
 
 
 const convertToJsonSchema = (elements) => ({
-
   schema: {
     description:
       "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements.",
@@ -506,7 +505,7 @@ const convertToJsonSchema = (elements) => ({
 
         const groupElements = [];
 
-        // Title always as <p> with data-related-id for the first element
+        // Title handling: Always as <p> with data-related-id for the first element
         if (element.title) {
           groupElements.push({
             properties: {
