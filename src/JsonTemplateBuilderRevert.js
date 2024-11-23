@@ -494,10 +494,9 @@ const convertToJsonSchema = (elements) => ({
       children: elements.flatMap((element, index) => {
         const groupId = `group${index + 1}`;
 
-        // Handle Paragraph
-        if (element.type === "p") {
-          return [
-            {
+        // Title as a paragraph
+        const titleElement = element.title
+          ? {
               properties: {
                 tag: { enum: ["p"] },
                 attributes: [
@@ -508,36 +507,17 @@ const convertToJsonSchema = (elements) => ({
                     },
                   },
                 ],
-                content: element.content ? { enum: [element.content] } : null,
+                content: { enum: [element.title] },
                 children: null,
               },
-            },
-          ];
-        }
+            }
+          : null;
 
-        // Handle Lists (ul or ol)
-        if (["ul", "ol"].includes(element.type)) {
-          return [
-            // Title as a paragraph with data-related-id
-            {
+        // Content or Description
+        const contentOrDescriptionElement = element.content
+          ? {
               properties: {
-                tag: { enum: ["p"] },
-                attributes: [
-                  {
-                    properties: {
-                      name: { enum: ["data-related-id"] },
-                      value: { enum: [groupId] },
-                    },
-                  },
-                ],
-                content: element.title ? { enum: [element.title] } : null,
-                children: null,
-              },
-            },
-            // List element with list items
-            {
-              properties: {
-                tag: { enum: [element.type] },
+                tag: { enum: ["div"] },
                 attributes: [
                   {
                     properties: {
@@ -546,52 +526,81 @@ const convertToJsonSchema = (elements) => ({
                     },
                   },
                 ],
-                content: null, // Lists don't have direct content
-                children: Array.isArray(element.items) && element.items.length > 0
-                  ? element.items.map((item) => ({
-                      properties: {
-                        tag: { enum: ["li"] },
-                        attributes: [
-                          {
-                            properties: {
-                              name: { enum: ["id"] },
-                              value: { enum: [groupId] },
-                            },
-                          },
-                        ],
-                        content: item.content
-                          ? { enum: [item.content] }
-                          : item.description
-                          ? { description: item.description }
-                          : null,
-                        children: null,
-                      },
-                    }))
-                  : null, // Handle cases with no items
-              },
-            },
-          ];
-        }
-
-        // Handle Break (br)
-        if (element.type === "br") {
-          return [
-            {
-              properties: {
-                tag: { enum: ["br"] },
-                attributes: null,
-                content: null,
+                content: { enum: [element.content] },
                 children: null,
               },
-            },
-          ];
-        }
+            }
+          : element.description
+          ? {
+              properties: {
+                tag: { enum: ["p"] },
+                attributes: [
+                  {
+                    properties: {
+                      name: { enum: ["id"] },
+                      value: { enum: [groupId] },
+                    },
+                  },
+                ],
+                content: { description: element.description },
+                children: null,
+              },
+            }
+          : null;
 
-        return []; // Fallback for unsupported elements
+        // List Items
+        const listItems =
+          element.items && Array.isArray(element.items)
+            ? element.items.map((item) => ({
+                properties: {
+                  tag: { enum: ["li"] },
+                  attributes: [
+                    {
+                      properties: {
+                        name: { enum: ["id"] },
+                        value: { enum: [groupId] },
+                      },
+                    },
+                  ],
+                  content: item.content
+                    ? { enum: [item.content] }
+                    : item.description
+                    ? { description: item.description }
+                    : null,
+                  children: null,
+                },
+              }))
+            : [];
+
+        // List (ul or ol)
+        const listElement =
+          ["ul", "ol"].includes(element.type) && listItems.length > 0
+            ? {
+                properties: {
+                  tag: { enum: [element.type] },
+                  attributes: [
+                    {
+                      properties: {
+                        name: { enum: ["id"] },
+                        value: { enum: [groupId] },
+                      },
+                    },
+                  ],
+                  content: null,
+                  children: listItems,
+                },
+              }
+            : null;
+
+        // Combine all parts for the current element
+        return [titleElement, contentOrDescriptionElement, listElement].filter(
+          Boolean
+        );
       }),
     },
   },
 });
+
 
 
 
