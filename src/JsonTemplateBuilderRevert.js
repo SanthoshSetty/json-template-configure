@@ -484,12 +484,13 @@ const sanitizeContent = (content) => {
 
 
 const convertToJsonSchema = (elements) => ({
+
   schema: {
     description:
       "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements.",
     properties: {
       tag: { enum: ["body"] },
-      content: null, // Content of the body is always null
+      content: null, // Body's content is always null
       children: elements.flatMap((element, index) => {
         const groupId = `group${index + 1}`;
 
@@ -507,7 +508,7 @@ const convertToJsonSchema = (elements) => ({
                     },
                   },
                 ],
-                content: { enum: [element.content] },
+                content: element.content ? { enum: [element.content] } : null,
                 children: null,
               },
             },
@@ -529,7 +530,7 @@ const convertToJsonSchema = (elements) => ({
                     },
                   },
                 ],
-                content: { enum: [element.title] },
+                content: element.title ? { enum: [element.title] } : null,
                 children: null,
               },
             },
@@ -546,23 +547,27 @@ const convertToJsonSchema = (elements) => ({
                   },
                 ],
                 content: null, // Lists don't have direct content
-                children: element.items.map((item) => ({
-                  properties: {
-                    tag: { enum: ["li"] },
-                    attributes: [
-                      {
-                        properties: {
-                          name: { enum: ["id"] },
-                          value: { enum: [groupId] },
-                        },
+                children: Array.isArray(element.items)
+                  ? element.items.map((item) => ({
+                      properties: {
+                        tag: { enum: ["li"] },
+                        attributes: [
+                          {
+                            properties: {
+                              name: { enum: ["id"] },
+                              value: { enum: [groupId] },
+                            },
+                          },
+                        ],
+                        content: item.content
+                          ? { enum: [item.content] }
+                          : item.description
+                          ? { description: item.description }
+                          : null,
+                        children: null,
                       },
-                    ],
-                    content: item.content
-                      ? { enum: [item.content] }
-                      : { description: item.description },
-                    children: null,
-                  },
-                })),
+                    }))
+                  : null, // Handle cases with no items
               },
             },
           ];
@@ -574,8 +579,8 @@ const convertToJsonSchema = (elements) => ({
             {
               properties: {
                 tag: { enum: ["br"] },
-                attributes: null, // Breaks don't have attributes
-                content: null, // Breaks don't have content
+                attributes: null,
+                content: null,
                 children: null,
               },
             },
