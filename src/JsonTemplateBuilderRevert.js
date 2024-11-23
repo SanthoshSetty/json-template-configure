@@ -486,64 +486,108 @@ const sanitizeContent = (content) => {
 const convertToJsonSchema = (elements) => ({
   schema: {
     description:
-      "Ensure that each element is grouped into a title and content pair, strictly adhering to the structure provided. Titles are paragraphs, and content is either a div, list, or formatted text.",
+      "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements.",
     properties: {
       tag: { enum: ["body"] },
-      content: null, // Ensure body content is always null
+      content: null, // Content of the body is always null
       children: elements.flatMap((element, index) => {
         const groupId = `group${index + 1}`;
 
-        const titleElement = {
-          properties: {
-            tag: { enum: ["p"] },
-            attributes: [
-              {
-                properties: {
-                  name: { enum: ["data-related-id"] },
-                  value: { enum: [groupId] },
-                },
+        // Handle Paragraph
+        if (element.type === "p") {
+          return [
+            {
+              properties: {
+                tag: { enum: ["p"] },
+                attributes: [
+                  {
+                    properties: {
+                      name: { enum: ["data-related-id"] },
+                      value: { enum: [groupId] },
+                    },
+                  },
+                ],
+                content: { enum: [element.content] },
+                children: null,
               },
-            ],
-            content: { enum: [sanitizeContent(element.title)] },
-            children: null,
-          },
-        };
+            },
+          ];
+        }
 
-        const contentOrDescriptionElement = {
-          properties: {
-            tag: element.type === "list" ? { enum: ["div"] } : { enum: ["div"] },
-            attributes: [
-              {
-                properties: {
-                  name: { enum: ["id"] },
-                  value: { enum: [groupId] },
-                },
+        // Handle Lists (ul or ol)
+        if (["ul", "ol"].includes(element.type)) {
+          return [
+            // Title as a paragraph with data-related-id
+            {
+              properties: {
+                tag: { enum: ["p"] },
+                attributes: [
+                  {
+                    properties: {
+                      name: { enum: ["data-related-id"] },
+                      value: { enum: [groupId] },
+                    },
+                  },
+                ],
+                content: { enum: [element.title] },
+                children: null,
               },
-            ],
-            content: element.type === "list"
-              ? null // For lists, the content is null, and children contain list items
-              : element.childDescription
-              ? { description: sanitizeContent(element.childDescription) }
-              : element.childContent
-              ? { enum: [sanitizeContent(element.childContent)] }
-              : null,
-            children: element.type === "list"
-              ? element.items.map((item) => ({
+            },
+            // List element with list items
+            {
+              properties: {
+                tag: { enum: [element.type] },
+                attributes: [
+                  {
+                    properties: {
+                      name: { enum: ["id"] },
+                      value: { enum: [groupId] },
+                    },
+                  },
+                ],
+                content: null, // Lists don't have direct content
+                children: element.items.map((item) => ({
                   properties: {
                     tag: { enum: ["li"] },
-                    content: { enum: [sanitizeContent(item)] },
+                    attributes: [
+                      {
+                        properties: {
+                          name: { enum: ["id"] },
+                          value: { enum: [groupId] },
+                        },
+                      },
+                    ],
+                    content: item.content
+                      ? { enum: [item.content] }
+                      : { description: item.description },
                     children: null,
                   },
-                }))
-              : null,
-          },
-        };
+                })),
+              },
+            },
+          ];
+        }
 
-        return [titleElement, contentOrDescriptionElement];
+        // Handle Break (br)
+        if (element.type === "br") {
+          return [
+            {
+              properties: {
+                tag: { enum: ["br"] },
+                attributes: null, // Breaks don't have attributes
+                content: null, // Breaks don't have content
+                children: null,
+              },
+            },
+          ];
+        }
+
+        return []; // Fallback for unsupported elements
       }),
     },
   },
 });
+
 
 
 /**
