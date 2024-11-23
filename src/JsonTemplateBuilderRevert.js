@@ -486,7 +486,7 @@ const sanitizeContent = (content) => {
 const convertToJsonSchema = (elements) => ({
   schema: {
     description:
-      "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure. Do not include any additional labels, headers, context, or text that falls outside the defined elements.",
+      "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure.",
     properties: {
       tag: { enum: ["body"] },
       content: null,
@@ -495,21 +495,24 @@ const convertToJsonSchema = (elements) => ({
         const groupElements = [];
 
         // Helper to create attributes
-        const createAttributes = (isFirst) => [
-          {
-            properties: {
-              name: { enum: [isFirst ? "data-related-id" : "id"] },
-              value: { enum: [groupId] },
-            },
-          },
-        ];
+        const createAttributes = () => [{
+          properties: {
+            name: { enum: ["id"] },
+            value: { enum: [groupId] }
+          }
+        }];
 
         // Step 1: Always handle the content/title as a <p> element first
         if (element.content && element.content.trim() !== "") {
           groupElements.push({
             properties: {
               tag: { enum: ["p"] },
-              attributes: createAttributes(true),
+              attributes: [{
+                properties: {
+                  name: { enum: ["data-related-id"] },
+                  value: { enum: [groupId] }
+                }
+              }],
               content: { enum: [element.content] },
               children: null,
             },
@@ -520,56 +523,35 @@ const convertToJsonSchema = (elements) => ({
         if (["ul", "ol"].includes(element.type)) {
           // For lists, add the list element after the title
           const listElement = {
+            description: "Follow the instructions mentioned in List description",
             properties: {
               tag: { enum: [element.type] },
-              attributes: createAttributes(groupElements.length === 0),
+              attributes: createAttributes(),
               content: null,
               children: element.isDynamic
-                ? [
-                    {
-                      type: "array",
-                      items: {
-                        properties: {
-                          tag: { enum: ["li"] },
-                          attributes: createAttributes(false),
-                          content: { description: element.dynamicListDescription },
-                          children: null,
-                        },
+                ? [{
+                    type: "array",
+                    items: {
+                      properties: {
+                        tag: { enum: ["li"] },
+                        attributes: createAttributes(),
+                        content: { description: element.dynamicListDescription },
+                        children: null,
                       },
                     },
-                  ]
-                : element.contentItems.flatMap((item) => {
-                    const listItemElements = [];
-
-                    // Content for <li>
-                    if (item.content && item.content.trim() !== "") {
-                      listItemElements.push({
-                        properties: {
-                          tag: { enum: ["li"] },
-                          attributes: createAttributes(false),
-                          content: { enum: [item.content] },
-                          children: null,
-                        },
-                      });
+                  }]
+                : element.contentItems.map(item => ({
+                    properties: {
+                      tag: { enum: ["li"] },
+                      attributes: createAttributes(),
+                      content: item.description 
+                        ? { description: item.description }
+                        : { enum: [item.content] },
+                      children: null,
                     }
-
-                    // Description for <li>
-                    if (item.description && item.description.trim() !== "") {
-                      listItemElements.push({
-                        properties: {
-                          tag: { enum: ["li"] },
-                          attributes: createAttributes(false),
-                          content: { description: item.description },
-                          children: null,
-                        },
-                      });
-                    }
-
-                    return listItemElements;
-                  }),
-            },
+                  }))
+            }
           };
-
           groupElements.push(listElement);
         } else if (element.type === 'p') {
           // For paragraphs, handle the child content and description
@@ -577,7 +559,7 @@ const convertToJsonSchema = (elements) => ({
             groupElements.push({
               properties: {
                 tag: { enum: ["p"] },
-                attributes: createAttributes(groupElements.length === 0),
+                attributes: createAttributes(),
                 content: { enum: [element.childContent] },
                 children: null,
               },
@@ -588,7 +570,7 @@ const convertToJsonSchema = (elements) => ({
             groupElements.push({
               properties: {
                 tag: { enum: ["p"] },
-                attributes: createAttributes(false),
+                attributes: createAttributes(),
                 content: { description: element.childDescription },
                 children: null,
               },
@@ -599,8 +581,20 @@ const convertToJsonSchema = (elements) => ({
           groupElements.push({
             properties: {
               tag: { enum: ["br"] },
-              attributes: createAttributes(groupElements.length === 0),
+              attributes: createAttributes(),
               content: null,
+              children: null,
+            },
+          });
+        } else {
+          // Handle other elements
+          groupElements.push({
+            properties: {
+              tag: { enum: [element.type] },
+              attributes: createAttributes(),
+              content: element.description 
+                ? { description: element.description }
+                : { enum: [element.content] },
               children: null,
             },
           });
