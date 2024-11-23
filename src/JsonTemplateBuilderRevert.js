@@ -506,7 +506,7 @@ const convertToJsonSchema = (elements) => ({
         const groupElements = [];
 
         // Title handling: Always as <p> with data-related-id for the first element in a group
-        if (element.title) {
+        if (element.title && element.title.trim() !== "") {
           groupElements.push({
             properties: {
               tag: { enum: ["p"] },
@@ -554,7 +554,7 @@ const convertToJsonSchema = (elements) => ({
                   const listItemElements = [];
 
                   // Content for <li>
-                  if (item.content) {
+                  if (item.content && item.content.trim() !== "") {
                     listItemElements.push({
                       properties: {
                         tag: { enum: ["li"] },
@@ -566,7 +566,7 @@ const convertToJsonSchema = (elements) => ({
                   }
 
                   // Description for <li>
-                  if (item.description) {
+                  if (item.description && item.description.trim() !== "") {
                     listItemElements.push({
                       properties: {
                         tag: { enum: ["li"] },
@@ -584,7 +584,7 @@ const convertToJsonSchema = (elements) => ({
           }
         } else {
           // Non-list elements: handle content and description
-          if (element.content) {
+          if (element.content && element.content.trim() !== "") {
             groupElements.push({
               properties: {
                 tag: { enum: ["div"] },
@@ -595,7 +595,7 @@ const convertToJsonSchema = (elements) => ({
             });
           }
 
-          if (element.description) {
+          if (element.description && element.description.trim() !== "") {
             groupElements.push({
               properties: {
                 tag: { enum: ["p"] },
