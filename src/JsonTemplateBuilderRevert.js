@@ -833,60 +833,60 @@ const parseElement = (schemaElement) => {
     hasDescription: false,
   };
 
-  // Handle content
-  if (properties.content) {
-    if (properties.content.enum) {
+  // Handle attributes to determine if this is a title element
+  const attributes = properties.attributes?.[0]?.properties;
+  const isTitle = attributes?.name?.enum?.[0] === 'data-related-id';
+
+  if (isTitle) {
+    // This is a title element, find the corresponding main element
+    if (properties.content?.enum?.[0]) {
       element.content = properties.content.enum[0];
-    } else if (properties.content.description) {
-      element.description = properties.content.description;
     }
+    return element;
   }
 
-  // Handle children
-  if (properties.children) {
-    if (Array.isArray(properties.children)) {
-      // For elements with children, e.g., paragraphs with child paragraphs
-      const childElements = properties.children
-        .map(parseElement)
-        .filter(Boolean);
-      if (element.type === 'p' && childElements.length > 0) {
-        const child = childElements[0];
-        element.childContent = child.content;
-        element.childDescription = child.description;
-      } else if (['ul', 'ol'].includes(element.type)) {
-        // Handle lists
-        const firstChild = properties.children[0];
-        if (firstChild && firstChild.type === 'array') {
-          // Dynamic list
-          element.isDynamic = true;
-          const itemsProps = firstChild.items?.properties;
-          if (itemsProps?.content) {
-            if (itemsProps.content.description) {
-              element.dynamicListDescription = itemsProps.content.description;
-            } else if (itemsProps.content.enum) {
-              // Handle cases where dynamic list items have enum content
-              element.dynamicListDescription = itemsProps.content.enum[0];
-            }
-          }
-        } else {
-          // Static list
-          element.isDynamic = false;
-          element.contentItems = properties.children
-            .map((child) => {
-              const itemProps = child.properties;
-              const item = { id: uuidv4(), content: '', description: '' };
-              if (itemProps?.content) {
-                if (itemProps.content.enum) {
-                  item.content = itemProps.content.enum[0];
-                } else if (itemProps.content.description) {
-                  item.description = itemProps.content.description;
-                }
-              }
-              return item;
-            })
-            .filter((item) => item.content || item.description);
-        }
+  // Handle lists
+  if (['ul', 'ol'].includes(tag)) {
+    const children = properties.children;
+    if (Array.isArray(children)) {
+      if (children[0]?.type === 'array') {
+        // Dynamic list
+        element.isDynamic = true;
+        element.dynamicListDescription = children[0].items?.properties?.content?.description || '';
+      } else {
+        // Static list
+        element.isDynamic = false;
+        element.contentItems = children.map(child => {
+          const itemProperties = child.properties;
+          return {
+            id: uuidv4(),
+            content: itemProperties?.content?.enum?.[0] || '',
+            description: itemProperties?.content?.description || ''
+          };
+        });
       }
+    }
+  } 
+  // Handle paragraphs
+  else if (tag === 'p') {
+    // Check if this is a description
+    if (properties.content?.description) {
+      element.childDescription = properties.content.description;
+    } else if (properties.content?.enum?.[0]) {
+      element.content = properties.content.enum[0];
+    }
+  }
+  // Handle div as paragraph content
+  else if (tag === 'div') {
+    element.type = 'p';
+    element.childContent = properties.content?.enum?.[0] || '';
+  }
+  // Handle other elements
+  else {
+    if (properties.content?.enum?.[0]) {
+      element.content = properties.content.enum[0];
+    } else if (properties.content?.description) {
+      element.description = properties.content.description;
     }
   }
 
