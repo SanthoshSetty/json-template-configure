@@ -484,6 +484,12 @@ const sanitizeContent = (content) => {
 
 
 const convertToJsonSchema = (elements) => {
+  // Helper function to sanitize content
+  const sanitizeContent = (content) => {
+    if (!content) return "";
+    return content.replace(/\n/g, "").trim();
+  };
+
   // Handle empty elements array
   if (!elements || elements.length === 0) {
     return {
@@ -517,20 +523,23 @@ const convertToJsonSchema = (elements) => {
           }];
 
           // Step 1: Always handle the content/title as a <p> element first
-          if (element.content && element.content.trim() !== "") {
-            groupElements.push({
-              properties: {
-                tag: { enum: ["p"] },
-                attributes: [{
-                  properties: {
-                    name: { enum: ["data-related-id"] },
-                    value: { enum: [groupId] }
-                  }
-                }],
-                content: { enum: [element.content] },
-                children: null,
-              },
-            });
+          if (element.content) {
+            const sanitizedContent = sanitizeContent(element.content);
+            if (sanitizedContent) {
+              groupElements.push({
+                properties: {
+                  tag: { enum: ["p"] },
+                  attributes: [{
+                    properties: {
+                      name: { enum: ["data-related-id"] },
+                      value: { enum: [groupId] }
+                    }
+                  }],
+                  content: { enum: [sanitizedContent] },
+                  children: null,
+                },
+              });
+            }
           }
 
           // Step 2: Handle the main element based on its type
@@ -549,7 +558,7 @@ const convertToJsonSchema = (elements) => {
                         properties: {
                           tag: { enum: ["li"] },
                           attributes: createAttributes(),
-                          content: { description: element.dynamicListDescription },
+                          content: { description: sanitizeContent(element.dynamicListDescription) },
                           children: null,
                         },
                       },
@@ -559,8 +568,8 @@ const convertToJsonSchema = (elements) => {
                         tag: { enum: ["li"] },
                         attributes: createAttributes(),
                         content: item.description 
-                          ? { description: item.description }
-                          : { enum: [item.content] },
+                          ? { description: sanitizeContent(item.description) }
+                          : { enum: [sanitizeContent(item.content)] },
                         children: null,
                       }
                     }))
@@ -570,26 +579,32 @@ const convertToJsonSchema = (elements) => {
 
           } else if (element.type === 'p') {
             // For paragraphs, handle both content and description with correct tags
-            if (element.childContent && element.childContent.trim() !== "") {
-              groupElements.push({
-                properties: {
-                  tag: { enum: ["div"] }, // For content, use div
-                  attributes: createAttributes(),
-                  content: { enum: [element.childContent] },
-                  children: null,
-                },
-              });
+            if (element.childContent) {
+              const sanitizedChildContent = sanitizeContent(element.childContent);
+              if (sanitizedChildContent) {
+                groupElements.push({
+                  properties: {
+                    tag: { enum: ["div"] },
+                    attributes: createAttributes(),
+                    content: { enum: [sanitizedChildContent] },
+                    children: null,
+                  },
+                });
+              }
             }
 
-            if (element.childDescription && element.childDescription.trim() !== "") {
-              groupElements.push({
-                properties: {
-                  tag: { enum: ["p"] }, // For description, use p
-                  attributes: createAttributes(),
-                  content: { description: element.childDescription },
-                  children: null,
-                },
-              });
+            if (element.childDescription) {
+              const sanitizedChildDesc = sanitizeContent(element.childDescription);
+              if (sanitizedChildDesc) {
+                groupElements.push({
+                  properties: {
+                    tag: { enum: ["p"] },
+                    attributes: createAttributes(),
+                    content: { description: sanitizedChildDesc },
+                    children: null,
+                  },
+                });
+              }
             }
 
           } else if (element.type === 'br') {
@@ -604,28 +619,35 @@ const convertToJsonSchema = (elements) => {
             });
           } else if (element.type === 'h1' || element.type === 'h2' || element.type === 'h3') {
             // Handle headings
-            groupElements.push({
-              properties: {
-                tag: { enum: [element.type] },
-                attributes: createAttributes(),
-                content: element.content ? { enum: [element.content] } : null,
-                children: null,
-              },
-            });
+            const sanitizedContent = sanitizeContent(element.content);
+            if (sanitizedContent) {
+              groupElements.push({
+                properties: {
+                  tag: { enum: [element.type] },
+                  attributes: createAttributes(),
+                  content: { enum: [sanitizedContent] },
+                  children: null,
+                },
+              });
+            }
           } else {
             // Handle any other elements
-            groupElements.push({
-              properties: {
-                tag: { enum: [element.type] },
-                attributes: createAttributes(),
-                content: element.description 
-                  ? { description: element.description }
-                  : element.content 
-                    ? { enum: [element.content] }
-                    : null,
-                children: null,
-              },
-            });
+            const sanitizedContent = sanitizeContent(element.content);
+            const sanitizedDesc = sanitizeContent(element.description);
+            if (sanitizedContent || sanitizedDesc) {
+              groupElements.push({
+                properties: {
+                  tag: { enum: [element.type] },
+                  attributes: createAttributes(),
+                  content: sanitizedDesc 
+                    ? { description: sanitizedDesc }
+                    : sanitizedContent 
+                      ? { enum: [sanitizedContent] }
+                      : null,
+                  children: null,
+                },
+              });
+            }
           }
 
           return groupElements;
@@ -634,6 +656,7 @@ const convertToJsonSchema = (elements) => {
     },
   };
 };
+
 
 /**
  * Main component for building the JSON template with drag-and-drop functionality.
