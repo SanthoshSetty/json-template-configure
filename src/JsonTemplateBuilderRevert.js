@@ -875,22 +875,19 @@ const JsonTemplateBuilderRevert = () => {
   const renderPreview = () => (
   <div className="bg-white shadow-md rounded-lg p-6 mb-8">
     <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Preview</h2>
-    <div className="space-y-4 whitespace-pre-wrap">
+    <div className="space-y-4">
       {elements.map((element, index) => {
-        // Handle paragraph elements
         if (element.type === 'p') {
           return (
             <div key={index} className="mb-6">
-              {/* Title preview */}
               {element.content && (
-                <div className="font-semibold whitespace-pre-wrap">
-                  {renderFormattedContent(element.content)}
+                <div className="font-semibold">
+                  <span>{element.content}</span>
                 </div>
               )}
-              {/* Content/Description preview */}
-              <div className="mt-2 ml-4 whitespace-pre-wrap">
+              <div className="mt-2 ml-4">
                 {element.childContent ? (
-                  renderFormattedContent(element.childContent)
+                  <span>{element.childContent}</span>
                 ) : element.childDescription ? (
                   <span className="text-gray-600 italic">
                     Generated content for Prompt: "{element.childDescription}"
@@ -901,23 +898,19 @@ const JsonTemplateBuilderRevert = () => {
           );
         }
 
-        // Handle line breaks
         if (element.type === 'br') {
           return <br key={index} />;
         }
 
-        // Handle lists (unordered and ordered)
         if (['ul', 'ol'].includes(element.type)) {
           const ListTag = element.type;
           return (
             <div key={index} className="mb-6">
-              {/* List title */}
               {element.content && (
-                <div className="font-semibold whitespace-pre-wrap">
-                  {renderFormattedContent(element.content)}
+                <div className="font-semibold">
+                  <span>{element.content}</span>
                 </div>
               )}
-              {/* Dynamic or static list content */}
               <div className="mt-2">
                 {element.isDynamic ? (
                   <div className="ml-4 text-gray-600 italic">
@@ -926,9 +919,9 @@ const JsonTemplateBuilderRevert = () => {
                 ) : (
                   <ListTag className={`pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
                     {element.contentItems.map((item, itemIndex) => (
-                      <li key={itemIndex} className="whitespace-pre-wrap">
+                      <li key={itemIndex}>
                         {item.content ? (
-                          renderFormattedContent(item.content)
+                          <span>{item.content}</span>
                         ) : item.description ? (
                           <span className="text-gray-600 italic">
                             Generated content for Prompt: "{item.description}"
@@ -943,11 +936,10 @@ const JsonTemplateBuilderRevert = () => {
           );
         }
 
-        // Handle all other elements (like headings)
         return (
-          <div key={index} className="whitespace-pre-wrap">
+          <div key={index}>
             {element.content ? (
-              renderFormattedContent(element.content)
+              <span>{element.content}</span>
             ) : element.description ? (
               <span className="text-gray-600 italic">
                 Generated content for Prompt: "{element.description}"
