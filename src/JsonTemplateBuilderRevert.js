@@ -176,26 +176,30 @@ const renderFormattedContent = (content) => {
   temp.innerHTML = content;
   
   const convertNode = (node) => {
-    if (node.nodeType === 3) return node.textContent;
+    if (node.nodeType === 3) {
+      // Text node - preserve spaces and line breaks
+      return node.textContent.replace(/\n/g, '<br/>').replace(/ /g, '\u00A0');
+    }
     if (node.nodeType !== 1) return null;
     
     const children = Array.from(node.childNodes).map(convertNode);
+    const joinedChildren = children.join('');
     
     switch (node.tagName.toLowerCase()) {
       case 'h1':
-        return <h1 className="text-4xl font-bold">{children}</h1>;
+        return <h1 className="text-4xl font-bold" dangerouslySetInnerHTML={{ __html: joinedChildren }} />;
       case 'h2':
-        return <h2 className="text-3xl font-bold">{children}</h2>;
+        return <h2 className="text-3xl font-bold" dangerouslySetInnerHTML={{ __html: joinedChildren }} />;
       case 'h3':
-        return <h3 className="text-2xl font-bold">{children}</h3>;
+        return <h3 className="text-2xl font-bold" dangerouslySetInnerHTML={{ __html: joinedChildren }} />;
       case 'strong':
-        return <strong>{children}</strong>;
+        return <strong dangerouslySetInnerHTML={{ __html: joinedChildren }} />;
       case 'em':
-        return <em>{children}</em>;
+        return <em dangerouslySetInnerHTML={{ __html: joinedChildren }} />;
       case 'br':
         return <br />;
       default:
-        return <>{children}</>;
+        return <span dangerouslySetInnerHTML={{ __html: joinedChildren }} />;
     }
   };
   
@@ -871,7 +875,7 @@ const JsonTemplateBuilderRevert = () => {
   const renderPreview = () => (
   <div className="bg-white shadow-md rounded-lg p-6 mb-8">
     <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Preview</h2>
-    <div className="space-y-4">
+    <div className="space-y-4 whitespace-pre-wrap">
       {elements.map((element, index) => {
         // Handle paragraph elements
         if (element.type === 'p') {
@@ -879,12 +883,12 @@ const JsonTemplateBuilderRevert = () => {
             <div key={index} className="mb-6">
               {/* Title preview */}
               {element.content && (
-                <div className="font-semibold">
+                <div className="font-semibold whitespace-pre-wrap">
                   {renderFormattedContent(element.content)}
                 </div>
               )}
               {/* Content/Description preview */}
-              <div className="mt-2 ml-4">
+              <div className="mt-2 ml-4 whitespace-pre-wrap">
                 {element.childContent ? (
                   renderFormattedContent(element.childContent)
                 ) : element.childDescription ? (
@@ -899,7 +903,7 @@ const JsonTemplateBuilderRevert = () => {
 
         // Handle line breaks
         if (element.type === 'br') {
-          return <hr key={index} className="my-4 border-t border-gray-300" />;
+          return <br key={index} />;
         }
 
         // Handle lists (unordered and ordered)
@@ -909,7 +913,7 @@ const JsonTemplateBuilderRevert = () => {
             <div key={index} className="mb-6">
               {/* List title */}
               {element.content && (
-                <div className="font-semibold">
+                <div className="font-semibold whitespace-pre-wrap">
                   {renderFormattedContent(element.content)}
                 </div>
               )}
@@ -922,7 +926,7 @@ const JsonTemplateBuilderRevert = () => {
                 ) : (
                   <ListTag className={`pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
                     {element.contentItems.map((item, itemIndex) => (
-                      <li key={itemIndex}>
+                      <li key={itemIndex} className="whitespace-pre-wrap">
                         {item.content ? (
                           renderFormattedContent(item.content)
                         ) : item.description ? (
@@ -941,7 +945,7 @@ const JsonTemplateBuilderRevert = () => {
 
         // Handle all other elements (like headings)
         return (
-          <div key={index}>
+          <div key={index} className="whitespace-pre-wrap">
             {element.content ? (
               renderFormattedContent(element.content)
             ) : element.description ? (
