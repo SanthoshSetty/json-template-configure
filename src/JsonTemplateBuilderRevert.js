@@ -798,99 +798,98 @@ const JsonTemplateBuilderRevert = () => {
   const parseJsonSchemaToElements = (schema) => {
   const elements = [];
   const bodyChildren = schema?.schema?.properties?.children || [];
+  
+  // Group elements by their groupId
+  const groupedElements = {};
+  
   bodyChildren.forEach((child) => {
-    const element = parseElement(child);
-    if (element) {
-      elements.push(element);
+    if (!child.properties) return;
+    
+    // Get the group ID from attributes
+    const attributes = child.properties.attributes?.[0]?.properties;
+    const groupId = attributes?.value?.enum?.[0];
+    if (!groupId) return;
+    
+    if (!groupedElements[groupId]) {
+      groupedElements[groupId] = [];
     }
+    groupedElements[groupId].push(child);
   });
-  return elements;
-};
 
-const parseElement = (schemaElement) => {
-  if (!schemaElement || !schemaElement.properties) {
-    return null;
-  }
+  // Process each group of elements
+  Object.values(groupedElements).forEach((group) => {
+    let element = {
+      id: uuidv4(),
+      type: '',
+      content: '',
+      contentItems: [],
+      childContent: '',
+      childDescription: '',
+      description: '',
+      isDynamic: false,
+      dynamicListDescription: '',
+      hasDescription: false,
+    };
 
-  const properties = schemaElement.properties;
-  const tagEnum = properties.tag?.enum;
-  const tag = Array.isArray(tagEnum) && tagEnum[0];
+    // Find the title element (with data-related-id) and main element
+    const titleElement = group.find(el => 
+      el.properties.attributes?.[0]?.properties?.name?.enum?.[0] === 'data-related-id'
+    );
+    const mainElement = group.find(el => 
+      el.properties.attributes?.[0]?.properties?.name?.enum?.[0] === 'id'
+    );
 
-  if (!tag) {
-    return null;
-  }
+    if (!mainElement) return;
 
-  let element = {
-    id: uuidv4(),
-    type: tag,
-    content: '',
-    contentItems: [],
-    childContent: '',
-    childDescription: '',
-    description: '',
-    isDynamic: false,
-    dynamicListDescription: '',
-    hasDescription: false,
-  };
+    // Set the element type
+    element.type = mainElement.properties.tag.enum[0];
 
-  // Handle attributes to determine if this is a title element
-  const attributes = properties.attributes?.[0]?.properties;
-  const isTitle = attributes?.name?.enum?.[0] === 'data-related-id';
-
-  if (isTitle) {
-    // This is a title element, find the corresponding main element
-    if (properties.content?.enum?.[0]) {
-      element.content = properties.content.enum[0];
+    // Handle title content
+    if (titleElement) {
+      element.content = titleElement.properties.content?.enum?.[0] || '';
     }
-    return element;
-  }
 
-  // Handle lists
-  if (['ul', 'ol'].includes(tag)) {
-    const children = properties.children;
-    if (Array.isArray(children)) {
-      if (children[0]?.type === 'array') {
-        // Dynamic list
-        element.isDynamic = true;
-        element.dynamicListDescription = children[0].items?.properties?.content?.description || '';
-      } else {
-        // Static list
-        element.isDynamic = false;
-        element.contentItems = children.map(child => {
-          const itemProperties = child.properties;
-          return {
+    // Handle lists
+    if (['ul', 'ol'].includes(element.type)) {
+      if (mainElement.properties.children) {
+        if (mainElement.properties.children[0]?.type === 'array') {
+          // Dynamic list
+          element.isDynamic = true;
+          element.dynamicListDescription = 
+            mainElement.properties.children[0].items?.properties?.content?.description || '';
+        } else {
+          // Static list
+          element.isDynamic = false;
+          element.contentItems = mainElement.properties.children.map(child => ({
             id: uuidv4(),
-            content: itemProperties?.content?.enum?.[0] || '',
-            description: itemProperties?.content?.description || ''
-          };
-        });
+            content: child.properties?.content?.enum?.[0] || '',
+            description: child.properties?.content?.description || ''
+          }));
+        }
       }
     }
-  } 
-  // Handle paragraphs
-  else if (tag === 'p') {
-    // Check if this is a description
-    if (properties.content?.description) {
-      element.childDescription = properties.content.description;
-    } else if (properties.content?.enum?.[0]) {
-      element.content = properties.content.enum[0];
-    }
-  }
-  // Handle div as paragraph content
-  else if (tag === 'div') {
-    element.type = 'p';
-    element.childContent = properties.content?.enum?.[0] || '';
-  }
-  // Handle other elements
-  else {
-    if (properties.content?.enum?.[0]) {
-      element.content = properties.content.enum[0];
-    } else if (properties.content?.description) {
-      element.description = properties.content.description;
-    }
-  }
+    // Handle paragraphs
+    else if (element.type === 'p') {
+      const contentElement = group.find(el => 
+        el.properties.tag?.enum?.[0] === 'div'
+      );
+      const descriptionElement = group.find(el => 
+        el.properties.tag?.enum?.[0] === 'p' && 
+        el.properties.content?.description
+      );
 
-  return element;
+      if (contentElement) {
+        element.childContent = contentElement.properties.content?.enum?.[0] || '';
+      }
+      if (descriptionElement) {
+        element.childDescription = descriptionElement.properties.content?.description || '';
+      }
+    }
+    
+    elements.push(element);
+  });
+
+  return elements;
 };
 
   const renderPreview = () => (
