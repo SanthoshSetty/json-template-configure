@@ -483,129 +483,157 @@ const sanitizeContent = (content) => {
 
 
 
-const convertToJsonSchema = (elements) => ({
-  schema: {
-    description:
-      "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure.",
-    properties: {
-      tag: { enum: ["body"] },
-      content: null,
-      children: elements.flatMap((element, index) => {
-        const groupId = `group${index + 1}`;
-        const groupElements = [];
-
-        // Helper to create attributes
-        const createAttributes = () => [{
-          properties: {
-            name: { enum: ["id"] },
-            value: { enum: [groupId] }
-          }
-        }];
-
-        // Step 1: Always handle the content/title as a <p> element first
-        if (element.content && element.content.trim() !== "") {
-          groupElements.push({
-            properties: {
-              tag: { enum: ["p"] },
-              attributes: [{
-                properties: {
-                  name: { enum: ["data-related-id"] },
-                  value: { enum: [groupId] }
-                }
-              }],
-              content: { enum: [element.content] },
-              children: null,
-            },
-          });
+const convertToJsonSchema = (elements) => {
+  // Handle empty elements array
+  if (!elements || elements.length === 0) {
+    return {
+      schema: {
+        description: "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure.",
+        properties: {
+          tag: { enum: ["body"] },
+          content: null,
+          children: []
         }
+      }
+    };
+  }
 
-        // Step 2: Handle the main element based on its type
-        if (["ul", "ol"].includes(element.type)) {
-          // For lists, add the list element after the title
-          const listElement = {
-            description: "Follow the instructions mentioned in List description",
+  return {
+    schema: {
+      description: "Ensure that only the required data fields specified in the template are generated, strictly adhering to the provided element structure.",
+      properties: {
+        tag: { enum: ["body"] },
+        content: null,
+        children: elements.flatMap((element, index) => {
+          const groupId = `group${index + 1}`;
+          const groupElements = [];
+
+          // Helper to create attributes
+          const createAttributes = () => [{
             properties: {
-              tag: { enum: [element.type] },
-              attributes: createAttributes(),
-              content: null,
-              children: element.isDynamic
-                ? [{
-                    type: "array",
-                    items: {
+              name: { enum: ["id"] },
+              value: { enum: [groupId] }
+            }
+          }];
+
+          // Step 1: Always handle the content/title as a <p> element first
+          if (element.content && element.content.trim() !== "") {
+            groupElements.push({
+              properties: {
+                tag: { enum: ["p"] },
+                attributes: [{
+                  properties: {
+                    name: { enum: ["data-related-id"] },
+                    value: { enum: [groupId] }
+                  }
+                }],
+                content: { enum: [element.content] },
+                children: null,
+              },
+            });
+          }
+
+          // Step 2: Handle the main element based on its type
+          if (["ul", "ol"].includes(element.type)) {
+            // For lists, handle both dynamic and static lists
+            const listElement = {
+              description: "Follow the instructions mentioned in List description",
+              properties: {
+                tag: { enum: [element.type] },
+                attributes: createAttributes(),
+                content: null,
+                children: element.isDynamic
+                  ? [{
+                      type: "array",
+                      items: {
+                        properties: {
+                          tag: { enum: ["li"] },
+                          attributes: createAttributes(),
+                          content: { description: element.dynamicListDescription },
+                          children: null,
+                        },
+                      },
+                    }]
+                  : element.contentItems.map(item => ({
                       properties: {
                         tag: { enum: ["li"] },
                         attributes: createAttributes(),
-                        content: { description: element.dynamicListDescription },
+                        content: item.description 
+                          ? { description: item.description }
+                          : { enum: [item.content] },
                         children: null,
-                      },
-                    },
-                  }]
-                : element.contentItems.map(item => ({
-                    properties: {
-                      tag: { enum: ["li"] },
-                      attributes: createAttributes(),
-                      content: item.description 
-                        ? { description: item.description }
-                        : { enum: [item.content] },
-                      children: null,
-                    }
-                  }))
+                      }
+                    }))
+              }
+            };
+            groupElements.push(listElement);
+
+          } else if (element.type === 'p') {
+            // For paragraphs, handle both content and description with correct tags
+            if (element.childContent && element.childContent.trim() !== "") {
+              groupElements.push({
+                properties: {
+                  tag: { enum: ["div"] }, // For content, use div
+                  attributes: createAttributes(),
+                  content: { enum: [element.childContent] },
+                  children: null,
+                },
+              });
             }
-          };
-          groupElements.push(listElement);
-        } else if (element.type === 'p') {
-          // For paragraphs, handle the child content and description
-          if (element.childContent && element.childContent.trim() !== "") {
+
+            if (element.childDescription && element.childDescription.trim() !== "") {
+              groupElements.push({
+                properties: {
+                  tag: { enum: ["p"] }, // For description, use p
+                  attributes: createAttributes(),
+                  content: { description: element.childDescription },
+                  children: null,
+                },
+              });
+            }
+
+          } else if (element.type === 'br') {
+            // Handle line breaks
             groupElements.push({
               properties: {
-                tag: { enum: ["p"] },
+                tag: { enum: ["br"] },
                 attributes: createAttributes(),
-                content: { enum: [element.childContent] },
+                content: null,
+                children: null,
+              },
+            });
+          } else if (element.type === 'h1' || element.type === 'h2' || element.type === 'h3') {
+            // Handle headings
+            groupElements.push({
+              properties: {
+                tag: { enum: [element.type] },
+                attributes: createAttributes(),
+                content: element.content ? { enum: [element.content] } : null,
+                children: null,
+              },
+            });
+          } else {
+            // Handle any other elements
+            groupElements.push({
+              properties: {
+                tag: { enum: [element.type] },
+                attributes: createAttributes(),
+                content: element.description 
+                  ? { description: element.description }
+                  : element.content 
+                    ? { enum: [element.content] }
+                    : null,
                 children: null,
               },
             });
           }
 
-          if (element.childDescription && element.childDescription.trim() !== "") {
-            groupElements.push({
-              properties: {
-                tag: { enum: ["p"] },
-                attributes: createAttributes(),
-                content: { description: element.childDescription },
-                children: null,
-              },
-            });
-          }
-        } else if (element.type === 'br') {
-          // Handle line breaks
-          groupElements.push({
-            properties: {
-              tag: { enum: ["br"] },
-              attributes: createAttributes(),
-              content: null,
-              children: null,
-            },
-          });
-        } else {
-          // Handle other elements
-          groupElements.push({
-            properties: {
-              tag: { enum: [element.type] },
-              attributes: createAttributes(),
-              content: element.description 
-                ? { description: element.description }
-                : { enum: [element.content] },
-              children: null,
-            },
-          });
-        }
-
-        return groupElements;
-      }),
+          return groupElements;
+        }),
+      },
     },
-  },
-});
-
+  };
+};
 
 /**
  * Main component for building the JSON template with drag-and-drop functionality.
