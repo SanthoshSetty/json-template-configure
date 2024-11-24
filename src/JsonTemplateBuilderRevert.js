@@ -795,103 +795,79 @@ const JsonTemplateBuilderRevert = () => {
 };
 
   // Function to convert JSON schema back to elements
-  const parseJsonSchemaToElements = (schema) => {
-  const elements = [];
-  const bodyChildren = schema?.schema?.properties?.children || [];
-  
-  // Group elements by their groupId
+ const parseJsonSchemaToElements = (schema) => {
   const groupedElements = {};
-  
-  bodyChildren.forEach((child) => {
-    if (!child.properties) return;
-    
-    // Get the group ID from attributes
-    const attributes = child.properties.attributes?.[0]?.properties;
-    const groupId = attributes?.value?.enum?.[0];
-    if (!groupId) return;
-    
-    if (!groupedElements[groupId]) {
-      groupedElements[groupId] = [];
+  const bodyChildren = schema?.schema?.properties?.children || [];
+
+  // Group elements by their group ID
+  bodyChildren.forEach(child => {
+    const groupId = child.properties?.attributes?.[0]?.properties?.value?.enum?.[0];
+    if (groupId) {
+      if (!groupedElements[groupId]) {
+        groupedElements[groupId] = [];
+      }
+      groupedElements[groupId].push(child);
     }
-    groupedElements[groupId].push(child);
   });
 
-  // Process each group of elements
-  Object.values(groupedElements).forEach((group) => {
-    let element = {
+  // Convert grouped elements into final elements
+  return Object.values(groupedElements).map(group => {
+    // Find title element first
+    const titleElement = group.find(el => 
+      el.properties?.attributes?.[0]?.properties?.name?.enum?.[0] === 'data-related-id'
+    );
+
+    // Find main element (non-title element)
+    const mainElement = group.find(el => 
+      el.properties?.attributes?.[0]?.properties?.name?.enum?.[0] === 'id'
+    );
+
+    if (!mainElement) return null;
+
+    const element = {
       id: uuidv4(),
-      type: '',
-      content: '',
+      type: mainElement.properties.tag.enum[0],
+      content: titleElement?.properties?.content?.enum?.[0] || '',
       contentItems: [],
       childContent: '',
       childDescription: '',
       description: '',
       isDynamic: false,
       dynamicListDescription: '',
-      hasDescription: false,
+      hasDescription: false
     };
 
-    // Find the title element (with data-related-id) and main element
-    const titleElement = group.find(el => 
-      el.properties.attributes?.[0]?.properties?.name?.enum?.[0] === 'data-related-id'
-    );
-    const mainElement = group.find(el => 
-      el.properties.attributes?.[0]?.properties?.name?.enum?.[0] === 'id'
-    );
-
-    if (!mainElement) return;
-
-    // Set the element type
-    element.type = mainElement.properties.tag.enum[0];
-
-    // Handle title content
-    if (titleElement) {
-      element.content = titleElement.properties.content?.enum?.[0] || '';
-    }
-
-    // Handle lists
     if (['ul', 'ol'].includes(element.type)) {
-      if (mainElement.properties.children) {
-        if (mainElement.properties.children[0]?.type === 'array') {
-          // Dynamic list
-          element.isDynamic = true;
-          element.dynamicListDescription = 
-            mainElement.properties.children[0].items?.properties?.content?.description || '';
-        } else {
-          // Static list
-          element.isDynamic = false;
-          element.contentItems = mainElement.properties.children.map(child => ({
-            id: uuidv4(),
-            content: child.properties?.content?.enum?.[0] || '',
-            description: child.properties?.content?.description || ''
-          }));
-        }
+      const children = mainElement.properties.children;
+      if (children?.[0]?.type === 'array') {
+        // Dynamic list
+        element.isDynamic = true;
+        element.dynamicListDescription = children[0].items?.properties?.content?.description || '';
+      } else {
+        // Static list
+        element.isDynamic = false;
+        element.contentItems = (children || []).map(item => ({
+          id: uuidv4(),
+          content: item.properties?.content?.enum?.[0] || '',
+          description: item.properties?.content?.description || ''
+        }));
       }
-    }
-    // Handle paragraphs
-    else if (element.type === 'p') {
-      const contentElement = group.find(el => 
-        el.properties.tag?.enum?.[0] === 'div'
-      );
+    } else if (mainElement.properties.tag.enum[0] === 'div') {
+      // This is a paragraph's content
+      element.type = 'p';
+      element.childContent = mainElement.properties?.content?.enum?.[0] || '';
       const descriptionElement = group.find(el => 
-        el.properties.tag?.enum?.[0] === 'p' && 
-        el.properties.content?.description
+        el.properties?.tag?.enum?.[0] === 'p' && 
+        el.properties?.content?.description
       );
-
-      if (contentElement) {
-        element.childContent = contentElement.properties.content?.enum?.[0] || '';
-      }
       if (descriptionElement) {
-        element.childDescription = descriptionElement.properties.content?.description || '';
+        element.childDescription = descriptionElement.properties.content.description;
       }
     }
-    
-    elements.push(element);
-  });
 
-  return elements;
+    return element;
+  }).filter(Boolean);
 };
-
   const renderPreview = () => (
     <div className="bg-white shadow-md rounded-lg p-6 mb-8">
       <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Preview</h2>
