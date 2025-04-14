@@ -863,94 +863,93 @@ const JsonTemplateBuilderRevert = () => {
   };
 
   const renderPreview = () => (
-    <div className="bg-white shadow-md rounded-lg p-6 mb-8">
-      <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Preview</h2>
-      <div className="space-y-4">
-        {elements.map((element, index) => {
-          if (element.type === 'p') {
-            return (
-              <div key={index} className="mb-6">
-                {element.content && (
-                  <div className="font-semibold">
-                    {renderFormattedContent(element.content)}
-                  </div>
-                )}
-                <div className="mt-2 ml-4">
+  <div className="bg-white shadow-md rounded-lg p-6 mb-8">
+    <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Preview</h2>
+    <div className="space-y-2">
+      {elements.map((element, index) => {
+        if (element.type === 'p') {
+          return (
+            <div key={index} className="mb-4">
+              {element.content && (
+                <div className="font-semibold text-lg">
+                  {renderFormattedContent(element.content)}
+                </div>
+              )}
+              {(element.childContent || element.childDescription) && (
+                <div className="mt-1 ml-4 text-gray-700">
                   {element.childContent ? (
                     renderFormattedContent(element.childContent)
-                  ) : element.childDescription ? (
+                  ) : (
                     <span className="text-gray-600 italic">
                       Generated content for Prompt: "{element.childDescription}"
                     </span>
-                  ) : null}
-                </div>
-              </div>
-            );
-          }
-
-          if (element.type === 'br') {
-            return <br key={index} />;
-          }
-
-          if (['ul', 'ol'].includes(element.type)) {
-            const ListTag = element.type;
-            return (
-              <div key={index} className="mb-6">
-                {element.content && (
-                  <div className="font-semibold">
-                    {renderFormattedContent(element.content)}
-                  </div>
-                )}
-                <div className="mt-2">
-                  {element.isDynamic ? (
-                    <div className="ml-4 text-gray-600 italic">
-                      Generated dynamic list for Prompt: "{element.dynamicListDescription}"
-                    </div>
-                  ) : (
-                    <ListTag className={`pl-5 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
-                      {element.contentItems.map((item, itemIndex) => (
-                        <li key={itemIndex}>
-                          {item.content ? (
-                            renderFormattedContent(item.content)
-                          ) : item.description ? (
-                            <span className="text-gray-600 italic">
-                              Generated content for Prompt: "{item.description}"
-                            </span>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ListTag>
                   )}
                 </div>
-              </div>
-            );
-          }
-
-          if (element.type === 'span') {
-            return (
-              <div key={index}>
-                {element.content ? (
-                  renderFormattedContent(element.content)
-                ) : null}
-              </div>
-            );
-          }
-
-          return (
-            <div key={index}>
-              {element.content ? (
-                renderFormattedContent(element.content)
-              ) : element.description ? (
-                <span className="text-gray-600 italic">
-                  Generated content for Prompt: "{element.description}"
-                </span>
-              ) : null}
+              )}
             </div>
           );
-        })}
-      </div>
+        }
+
+        if (element.type === 'br') {
+          return <hr key={index} className="my-2 border-gray-300" />;
+        }
+
+        if (['ul', 'ol'].includes(element.type)) {
+          const ListTag = element.type;
+          return (
+            <div key={index} className="mb-4">
+              {element.content && (
+                <div className="font-semibold text-lg">
+                  {renderFormattedContent(element.content)}
+                </div>
+              )}
+              <div className="mt-1">
+                {element.isDynamic ? (
+                  <div className="ml-4 text-gray-600 italic">
+                    Generated dynamic list for Prompt: "{element.dynamicListDescription}"
+                  </div>
+                ) : (
+                  <ListTag className={`pl-6 ${element.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
+                    {element.contentItems.map((item, itemIndex) => (
+                      <li key={itemIndex} className="mb-1">
+                        {item.content ? (
+                          renderFormattedContent(item.content)
+                        ) : item.description ? (
+                          <span className="text-gray-600 italic">
+                            Generated content for Prompt: "{item.description}"
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ListTag>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        if (element.type === 'span') {
+          return (
+            <span key={index} className="inline text-gray-700 mr-2">
+              {element.content ? renderFormattedContent(element.content) : null}
+            </span>
+          );
+        }
+
+        if (['h1', 'h2', 'h3'].includes(element.type)) {
+          const Tag = element.type;
+          return (
+            <Tag key={index} className={`mb-2 ${element.type === 'h1' ? 'text-3xl' : element.type === 'h2' ? 'text-2xl' : 'text-xl'} font-bold`}>
+              {element.content ? renderFormattedContent(element.content) : null}
+            </Tag>
+          );
+        }
+
+        return null;
+      })}
     </div>
-  );
+  </div>
+);
 
   return (
     <div className="font-sans p-8 pb-32 bg-gray-100 min-h-screen">
