@@ -862,7 +862,7 @@ const JsonTemplateBuilderRevert = () => {
     }).filter(Boolean);
   };
 
-  const renderPreview = () => (
+ const renderPreview = () => (
   <div className="bg-white shadow-md rounded-lg p-6 mb-8">
     <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Preview</h2>
     <div className="space-y-2">
@@ -930,7 +930,7 @@ const JsonTemplateBuilderRevert = () => {
 
         if (element.type === 'span') {
           return (
-            <span key={index} className="inline text-gray-700 mr-2">
+            <span key={index} className="inline text-gray-700">
               {element.content ? renderFormattedContent(element.content) : null}
             </span>
           );
