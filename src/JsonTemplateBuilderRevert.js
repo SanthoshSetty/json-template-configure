@@ -487,7 +487,8 @@ const ListItem = ({ item, index, elementId, modifyListItem, onTextareaFocus }) =
 const convertToJsonSchema = (elements) => {
   const sanitizeContent = (content) => {
     if (!content) return "";
-    return content.replace(/\n/g, "").trim();
+    // Preserve commas as per user input
+    return content.trim();
   };
 
   if (!elements || elements.length === 0) {
@@ -520,24 +521,67 @@ const convertToJsonSchema = (elements) => {
             }
           }];
 
-          // Handle title as div with data-related-id
-          if (element.content) {
-            const sanitizedContent = sanitizeContent(element.content);
-            if (sanitizedContent) {
-              groupElements.push({
-                properties: {
-                  tag: { enum: ["div"] },
-                  attributes: createAttributes(true),
-                  content: { enum: [sanitizedContent] },
-                  children: null,
-                },
-              });
+          if (element.type === 'p') {
+            // Title as div with data-related-id
+            if (element.content) {
+              const sanitizedContent = sanitizeContent(element.content);
+              if (sanitizedContent) {
+                groupElements.push({
+                  properties: {
+                    tag: { enum: ["div"] },
+                    attributes: createAttributes(true),
+                    content: { enum: [sanitizedContent] },
+                    children: null,
+                  },
+                });
+              }
             }
-          }
 
-          // Handle main element
-          if (["ul", "ol"].includes(element.type)) {
-            const listElement = {
+            // Content as div with id
+            if (element.childContent) {
+              const sanitizedChildContent = sanitizeContent(element.childContent);
+              if (sanitizedChildContent) {
+                groupElements.push({
+                  properties: {
+                    tag: { enum: ["div"] },
+                    attributes: createAttributes(),
+                    content: { enum: [sanitizedChildContent] },
+                    children: null,
+                  },
+                });
+              }
+            }
+
+            // Description as div with id (for AI prompts)
+            if (element.childDescription) {
+              const sanitizedChildDesc = sanitizeContent(element.childDescription);
+              if (sanitizedChildDesc) {
+                groupElements.push({
+                  properties: {
+                    tag: { enum: ["div"] },
+                    attributes: createAttributes(),
+                    content: { description: sanitizedChildDesc },
+                    children: null,
+                  },
+                });
+              }
+            }
+          } else if (['ul', 'ol'].includes(element.type)) {
+            // Handle lists
+            if (element.content) {
+              const sanitizedContent = sanitizeContent(element.content);
+              if (sanitizedContent) {
+                groupElements.push({
+                  properties: {
+                    tag: { enum: ["div"] },
+                    attributes: createAttributes(true),
+                    content: { enum: [sanitizedContent] },
+                    children: null,
+                  },
+                });
+              }
+            }
+            groupElements.push({
               description: "Follow the instructions mentioned in List description",
               properties: {
                 tag: { enum: [element.type] },
@@ -566,35 +610,7 @@ const convertToJsonSchema = (elements) => {
                       }
                     }))
               }
-            };
-            groupElements.push(listElement);
-          } else if (element.type === 'p') {
-            if (element.childContent) {
-              const sanitizedChildContent = sanitizeContent(element.childContent);
-              if (sanitizedChildContent) {
-                groupElements.push({
-                  properties: {
-                    tag: { enum: ["div"] },
-                    attributes: createAttributes(),
-                    content: { enum: [sanitizedChildContent] },
-                    children: null,
-                  },
-                });
-              }
-            }
-            if (element.childDescription) {
-              const sanitizedChildDesc = sanitizeContent(element.childDescription);
-              if (sanitizedChildDesc) {
-                groupElements.push({
-                  properties: {
-                    tag: { enum: ["div"] },
-                    attributes: createAttributes(),
-                    content: { description: sanitizedChildDesc },
-                    children: null,
-                  },
-                });
-              }
-            }
+            });
           } else if (element.type === 'br') {
             groupElements.push({
               properties: {
@@ -605,6 +621,7 @@ const convertToJsonSchema = (elements) => {
               },
             });
           } else if (['h1', 'h2', 'h3', 'span'].includes(element.type)) {
+            // Span and headings use only content, no description
             const sanitizedContent = sanitizeContent(element.content);
             if (sanitizedContent) {
               groupElements.push({
@@ -612,23 +629,6 @@ const convertToJsonSchema = (elements) => {
                   tag: { enum: [element.type] },
                   attributes: createAttributes(),
                   content: { enum: [sanitizedContent] },
-                  children: null,
-                },
-              });
-            }
-          } else {
-            const sanitizedContent = sanitizeContent(element.content);
-            const sanitizedDesc = sanitizeContent(element.description);
-            if (sanitizedContent || sanitizedDesc) {
-              groupElements.push({
-                properties: {
-                  tag: { enum: [element.type] },
-                  attributes: createAttributes(),
-                  content: sanitizedDesc 
-                    ? { description: sanitizedDesc }
-                    : sanitizedContent 
-                      ? { enum: [sanitizedContent] }
-                      : null,
                   children: null,
                 },
               });
@@ -687,7 +687,7 @@ const JsonTemplateBuilderRevert = () => {
         content: '',
         contentItems: ['ul', 'ol'].includes(type) ? [] : undefined,
         childContent: type === 'p' ? '' : undefined,
-        childDescription: null,
+        childDescription: type === 'p' ? '' : null,
         description: ['ul', 'ol'].includes(type) ? '' : null,
         isDynamic: ['ul', 'ol'].includes(type) ? true : false,
         dynamicListDescription: '',
@@ -727,7 +727,7 @@ const JsonTemplateBuilderRevert = () => {
             newContentItems.push({ id: uuidv4(), content: '', description: '' });
           } else if (action === 'remove') {
             newContentItems = newContentItems.filter(item => item.id !== itemId);
-          } else if (action === 'content' || action === 'description') {
+          } else if (action === 'content' || action == 'description') {
             newContentItems = newContentItems.map((item) => (item.id === itemId ? { ...item, [action]: value } : item));
           }
           return { ...el, contentItems: newContentItems };
@@ -788,6 +788,9 @@ const JsonTemplateBuilderRevert = () => {
           groupedElements[groupId] = [];
         }
         groupedElements[groupId].push(child);
+      } else {
+        // Handle standalone elements like span
+        groupedElements[`standalone_${child.properties.tag.enum[0]}_${Object.keys(groupedElements).length}`] = [child];
       }
     });
 
@@ -795,10 +798,25 @@ const JsonTemplateBuilderRevert = () => {
       const titleElement = group.find(el => 
         el.properties?.attributes?.[0]?.properties?.name?.enum?.[0] === 'data-related-id'
       );
-
       const mainElement = group.find(el => 
         el.properties?.attributes?.[0]?.properties?.name?.enum?.[0] === 'id'
       );
+
+      if (!mainElement && group.length === 1 && ['span', 'h1', 'h2', 'h3'].includes(group[0].properties.tag.enum[0])) {
+        // Handle standalone span or headings
+        return {
+          id: uuidv4(),
+          type: group[0].properties.tag.enum[0],
+          content: group[0].properties?.content?.enum?.[0] || '',
+          contentItems: [],
+          childContent: null,
+          childDescription: null,
+          description: null,
+          isDynamic: false,
+          dynamicListDescription: '',
+          hasDescription: false
+        };
+      }
 
       if (!mainElement) return null;
 
@@ -838,8 +856,6 @@ const JsonTemplateBuilderRevert = () => {
         if (descriptionElement) {
           element.childDescription = descriptionElement.properties.content.description;
         }
-      } else if (['span', 'h1', 'h2', 'h3'].includes(mainElement.properties.tag.enum[0])) {
-        element.content = mainElement.properties?.content?.enum?.[0] || '';
       }
 
       return element;
@@ -915,10 +931,6 @@ const JsonTemplateBuilderRevert = () => {
               <div key={index}>
                 {element.content ? (
                   renderFormattedContent(element.content)
-                ) : element.description ? (
-                  <span className="text-gray-600 italic">
-                    Generated content for Prompt: "{element.description}"
-                  </span>
                 ) : null}
               </div>
             );
