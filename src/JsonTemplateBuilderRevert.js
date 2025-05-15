@@ -784,22 +784,35 @@ const JsonTemplateBuilderRevert = () => {
   };
 
   const parseJsonSchemaToElements = (schema) => {
+  if (!schema?.schema?.properties?.children) {
+    console.warn('Invalid schema structure, returning empty elements');
+    return [];
+  }
+
   const groupedElements = {};
-  const bodyChildren = schema?.schema?.properties?.children || [];
+  const bodyChildren = schema.schema.properties.children || [];
 
   const extractContent = (contentObj) => {
     if (!contentObj) return '';
+    if (typeof contentObj === 'string') return contentObj;
     if (contentObj.enum && contentObj.enum.length > 0) {
       return contentObj.enum[0];
     } else if (contentObj.description) {
       return contentObj.description;
+    } else if (contentObj.value) {
+      return contentObj.value;
     }
     return '';
   };
 
-  bodyChildren.forEach(child => {
-    const tag = child.properties?.tag?.enum?.[0]?.toLowerCase(); // Normalized
+  bodyChildren.forEach((child, index) => {
+    const tag = child.properties?.tag?.enum?.[0]?.toLowerCase();
     const groupId = child.properties?.attributes?.[0]?.properties?.value?.enum?.[0];
+
+    if (!tag) {
+      console.warn(`Child at index ${index} has no valid tag`);
+      return;
+    }
 
     if (groupId) {
       if (!groupedElements[groupId]) {
@@ -807,7 +820,7 @@ const JsonTemplateBuilderRevert = () => {
       }
       groupedElements[groupId].push(child);
     } else {
-      groupedElements[`standalone_${tag}_${Object.keys(groupedElements).length}`] = [child];
+      groupedElements[`standalone_${tag}_${index}`] = [child];
     }
   });
 
@@ -826,10 +839,12 @@ const JsonTemplateBuilderRevert = () => {
 
     if (!mainElement && fallbackStandalone) {
       const tag = fallbackStandalone.properties.tag.enum[0].toLowerCase();
+      const content = extractContent(fallbackStandalone.properties?.content);
+      console.log(`Processing standalone ${tag}:`, { content });
       return {
         id: uuidv4(),
         type: tag,
-        content: extractContent(fallbackStandalone.properties?.content),
+        content,
         contentItems: [],
         childContent: null,
         childDescription: null,
@@ -840,9 +855,12 @@ const JsonTemplateBuilderRevert = () => {
       };
     }
 
-    if (!mainElement) return null;
+    if (!mainElement) {
+      console.warn('No main element found for group:', group);
+      return null;
+    }
 
-    const tag = mainElement.properties.tag.enum[0].toLowerCase(); // Normalize tag
+    const tag = mainElement.properties.tag.enum[0].toLowerCase();
     const element = {
       id: uuidv4(),
       type: tag,
@@ -860,13 +878,13 @@ const JsonTemplateBuilderRevert = () => {
       const children = mainElement.properties.children;
       if (children?.[0]?.type === 'array') {
         element.isDynamic = true;
-        element.dynamicListDescription = children[0].items?.properties?.content?.description || '';
+        element.dynamicListDescription = extractContent(children[0].items?.properties?.content);
       } else {
         element.isDynamic = false;
         element.contentItems = (children || []).map(item => ({
           id: uuidv4(),
           content: extractContent(item.properties?.content),
-          description: ''
+          description: item.properties?.content?.description || ''
         }));
       }
     } else if (tag === 'div') {
@@ -877,10 +895,11 @@ const JsonTemplateBuilderRevert = () => {
         el.properties?.content?.description
       );
       if (descriptionElement) {
-        element.childDescription = descriptionElement.properties.content.description;
+        element.childDescription = extractContent(descriptionElement.properties?.content);
       }
     }
 
+    console.log(`Created element for ${tag}:`, element);
     return element;
   }).filter(Boolean);
 };
