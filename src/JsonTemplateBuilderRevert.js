@@ -784,6 +784,7 @@ const JsonTemplateBuilderRevert = () => {
   };
 
   const parseJsonSchemaToElements = (schema) => {
+  console.log('Input schema:', JSON.stringify(schema, null, 2));
   if (!schema?.schema?.properties?.children) {
     console.warn('Invalid schema structure, returning empty elements');
     return [];
@@ -795,75 +796,86 @@ const JsonTemplateBuilderRevert = () => {
   const extractContent = (contentObj) => {
     console.log('Extracting content from:', JSON.stringify(contentObj, null, 2));
     if (!contentObj) return '';
-    if (typeof contentObj === 'string') return contentObj; // Direct string
-    if (contentObj.enum && contentObj.enum.length > 0) return contentObj.enum[0]; // Enum array
-    if (contentObj.description) return contentObj.description; // Description field
-    if (contentObj.value) return contentObj.value; // Value field
-    if (typeof contentObj === 'object' && Object.keys(contentObj).length > 0) {
-      // Fallback: try to extract any string value from object
-      const firstString = Object.values(contentObj).find(val => typeof val === 'string');
-      return firstString || '';
+    if (typeof contentObj === 'string') return contentObj;
+    if (Array.isArray(contentObj)) return ''; // Handle empty or invalid arrays
+    if (contentObj.enum && Array.isArray(contentObj.enum) && contentObj.enum.length > 0) {
+      return contentObj.enum[0];
     }
+    if (contentObj.description) return contentObj.description;
+    if (contentObj.value) return contentObj.value;
+    if (contentObj.text) return contentObj.text;
+    if (contentObj.content) return contentObj.content; // Handle nested content field
+    // Fallback: extract any string from object
+    if (typeof contentObj === 'object') {
+      const stringValue = Object.values(contentObj).find(val => typeof val === 'string');
+      if (stringValue) return stringValue;
+      // Recursively search nested objects
+      for (const key in contentObj) {
+        if (typeof contentObj[key] === 'object' && contentObj[key] !== null) {
+          const nestedContent = extractContent(contentObj[key]);
+          if (nestedContent) return nestedContent;
+        }
+      }
+    }
+    console.warn('No valid content found in:', JSON.stringify(contentObj, null, 2));
     return '';
   };
 
   bodyChildren.forEach((child, index) => {
     const tag = child.properties?.tag?.enum?.[0]?.toLowerCase();
-    const groupId = child.properties?.attributes?.[0]?.properties?.value?.enum?.[0];
-
     if (!tag) {
       console.warn(`Child at index ${index} has no valid tag`, child);
       return;
     }
 
-    const groupKey = groupId ? groupId : `standalone_${tag}_${index}`;
-    if (!groupedElements[groupKey]) {
-      groupedElements[groupKey] = [];
+    const groupId = child.properties?.attributes?.[0]?.properties?.value?.enum?.[0] || `standalone_${tag}_${index}`;
+    if (!groupedElements[groupId]) {
+      groupedElements[groupId] = [];
     }
-    groupedElements[groupKey].push(child);
+    groupedElements[groupId].push(child);
   });
 
   return Object.values(groupedElements).map((group, groupIndex) => {
-    // Find standalone elements (span, h1, h2, h3)
+    // Log the entire group for debugging
+    console.log(`Processing group ${groupIndex}:`, JSON.stringify(group, null, 2));
+
+    // Handle standalone span, h1, h2, h3
     const standaloneElement = group.find(el => {
       const tag = el.properties?.tag?.enum?.[0]?.toLowerCase();
       return ['span', 'h1', 'h2', 'h3'].includes(tag);
     });
 
-    // Find main element (with id attribute)
-    const mainElement = group.find(el =>
-      el.properties?.attributes?.[0]?.properties?.name?.enum?.[0] === 'id'
-    );
-
-    // Find title element (with data-related-id)
-    const titleElement = group.find(el =>
-      el.properties?.attributes?.[0]?.properties?.name?.enum?.[0] === 'data-related-id'
-    );
-
-    // Handle standalone span, h1, h2, h3
-    if (standaloneElement && !mainElement) {
+    if (standaloneElement) {
       const tag = standaloneElement.properties.tag.enum[0].toLowerCase();
       const content = extractContent(standaloneElement.properties?.content);
       console.log(`Processing standalone ${tag} (group ${groupIndex}):`, { content });
 
-      if (!content && tag === 'span') {
-        console.warn(`No content found for ${tag} element, skipping`, standaloneElement);
-        return null; // Skip empty span elements
+      // Only create span element if content is non-empty or explicitly allowed
+      if (content || tag !== 'span') {
+        return {
+          id: uuidv4(),
+          type: tag,
+          content,
+          contentItems: [],
+          childContent: null,
+          childDescription: null,
+          description: null,
+          isDynamic: false,
+          dynamicListDescription: '',
+          hasDescription: false
+        };
       }
-
-      return {
-        id: uuidv4(),
-        type: tag,
-        content,
-        contentItems: [],
-        childContent: null,
-        childDescription: null,
-        description: null,
-        isDynamic: false,
-        dynamicListDescription: '',
-        hasDescription: false
-      };
+      console.warn(`Skipping ${tag} with no content in group ${groupIndex}`);
+      return null;
     }
+
+    // Handle grouped elements (p, ul, ol)
+    const mainElement = group.find(el =>
+      el.properties?.attributes?.[0]?.properties?.name?.enum?.[0] === 'id'
+    );
+    const titleElement = group.find(el =>
+      el.properties?.attributes?.[0]?.properties?.name?.enum?.[0] === 'data-related-id'
+    );
 
     if (!mainElement) {
       console.warn(`No main element found for group ${groupIndex}:`, group);
@@ -913,6 +925,7 @@ const JsonTemplateBuilderRevert = () => {
     return element;
   }).filter(Boolean);
 };
+
  const renderPreview = () => (
   <div className="bg-white shadow-md rounded-lg p-6 mb-8">
     <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Preview</h2>
