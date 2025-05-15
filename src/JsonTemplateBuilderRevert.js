@@ -781,15 +781,26 @@ const JsonTemplateBuilderRevert = () => {
   const groupedElements = {};
   const bodyChildren = schema?.schema?.properties?.children || [];
 
+  const extractContent = (contentObj) => {
+    if (!contentObj) return '';
+    if (contentObj.enum && contentObj.enum.length > 0) {
+      return contentObj.enum[0];
+    } else if (contentObj.description) {
+      return `{{${contentObj.description}}}`; // Wrap description so user knows it's an instruction
+    }
+    return '';
+  };
+
   bodyChildren.forEach(child => {
     const groupId = child.properties?.attributes?.[0]?.properties?.value?.enum?.[0];
+    const tag = child.properties?.tag?.enum?.[0];
+
     if (groupId) {
       if (!groupedElements[groupId]) {
         groupedElements[groupId] = [];
       }
       groupedElements[groupId].push(child);
     } else {
-      const tag = child.properties?.tag?.enum?.[0];
       groupedElements[`standalone_${tag}_${Object.keys(groupedElements).length}`] = [child];
     }
   });
@@ -810,7 +821,7 @@ const JsonTemplateBuilderRevert = () => {
       return {
         id: uuidv4(),
         type: fallbackStandalone.properties.tag.enum[0],
-        content: fallbackStandalone.properties?.content?.enum?.[0] || '',
+        content: extractContent(fallbackStandalone.properties?.content),
         contentItems: [],
         childContent: null,
         childDescription: null,
@@ -827,7 +838,7 @@ const JsonTemplateBuilderRevert = () => {
     const element = {
       id: uuidv4(),
       type,
-      content: titleElement?.properties?.content?.enum?.[0] || '',
+      content: extractContent(titleElement?.properties?.content),
       contentItems: [],
       childContent: '',
       childDescription: '',
@@ -846,13 +857,13 @@ const JsonTemplateBuilderRevert = () => {
         element.isDynamic = false;
         element.contentItems = (children || []).map(item => ({
           id: uuidv4(),
-          content: item.properties?.content?.enum?.[0] || '',
-          description: item.properties?.content?.description || ''
+          content: extractContent(item.properties?.content),
+          description: ''
         }));
       }
     } else if (type === 'div') {
       element.type = 'p';
-      element.childContent = mainElement.properties?.content?.enum?.[0] || '';
+      element.childContent = extractContent(mainElement.properties?.content);
       const descriptionElement = group.find(el => 
         el.properties?.tag?.enum?.[0] === 'div' && 
         el.properties?.content?.description
