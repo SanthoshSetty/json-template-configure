@@ -493,8 +493,7 @@ const ListItem = ({ item, index, elementId, modifyListItem, onTextareaFocus }) =
 const convertToJsonSchema = (elements) => {
   const sanitizeContent = (content) => {
     if (!content) return "";
-    // Preserve commas as per user input
-    return content.trim();
+    return content; // Return content as-is, preserving all spaces
   };
 
   if (!elements || elements.length === 0) {
