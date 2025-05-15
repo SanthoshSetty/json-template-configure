@@ -793,14 +793,16 @@ const JsonTemplateBuilderRevert = () => {
   const bodyChildren = schema.schema.properties.children || [];
 
   const extractContent = (contentObj) => {
+    console.log('Extracting content from:', JSON.stringify(contentObj, null, 2));
     if (!contentObj) return '';
-    if (typeof contentObj === 'string') return contentObj;
-    if (contentObj.enum && contentObj.enum.length > 0) {
-      return contentObj.enum[0];
-    } else if (contentObj.description) {
-      return contentObj.description;
-    } else if (contentObj.value) {
-      return contentObj.value;
+    if (typeof contentObj === 'string') return contentObj; // Direct string
+    if (contentObj.enum && contentObj.enum.length > 0) return contentObj.enum[0]; // Enum array
+    if (contentObj.description) return contentObj.description; // Description field
+    if (contentObj.value) return contentObj.value; // Value field
+    if (typeof contentObj === 'object' && Object.keys(contentObj).length > 0) {
+      // Fallback: try to extract any string value from object
+      const firstString = Object.values(contentObj).find(val => typeof val === 'string');
+      return firstString || '';
     }
     return '';
   };
@@ -810,37 +812,45 @@ const JsonTemplateBuilderRevert = () => {
     const groupId = child.properties?.attributes?.[0]?.properties?.value?.enum?.[0];
 
     if (!tag) {
-      console.warn(`Child at index ${index} has no valid tag`);
+      console.warn(`Child at index ${index} has no valid tag`, child);
       return;
     }
 
-    if (groupId) {
-      if (!groupedElements[groupId]) {
-        groupedElements[groupId] = [];
-      }
-      groupedElements[groupId].push(child);
-    } else {
-      groupedElements[`standalone_${tag}_${index}`] = [child];
+    const groupKey = groupId ? groupId : `standalone_${tag}_${index}`;
+    if (!groupedElements[groupKey]) {
+      groupedElements[groupKey] = [];
     }
+    groupedElements[groupKey].push(child);
   });
 
-  return Object.values(groupedElements).map(group => {
-    const titleElement = group.find(el =>
-      el.properties?.attributes?.[0]?.properties?.name?.enum?.[0] === 'data-related-id'
-    );
-    const mainElement = group.find(el =>
-      el.properties?.attributes?.[0]?.properties?.name?.enum?.[0] === 'id'
-    );
-
-    const fallbackStandalone = group.find(el => {
+  return Object.values(groupedElements).map((group, groupIndex) => {
+    // Find standalone elements (span, h1, h2, h3)
+    const standaloneElement = group.find(el => {
       const tag = el.properties?.tag?.enum?.[0]?.toLowerCase();
       return ['span', 'h1', 'h2', 'h3'].includes(tag);
     });
 
-    if (!mainElement && fallbackStandalone) {
-      const tag = fallbackStandalone.properties.tag.enum[0].toLowerCase();
-      const content = extractContent(fallbackStandalone.properties?.content);
-      console.log(`Processing standalone ${tag}:`, { content });
+    // Find main element (with id attribute)
+    const mainElement = group.find(el =>
+      el.properties?.attributes?.[0]?.properties?.name?.enum?.[0] === 'id'
+    );
+
+    // Find title element (with data-related-id)
+    const titleElement = group.find(el =>
+      el.properties?.attributes?.[0]?.properties?.name?.enum?.[0] === 'data-related-id'
+    );
+
+    // Handle standalone span, h1, h2, h3
+    if (standaloneElement && !mainElement) {
+      const tag = standaloneElement.properties.tag.enum[0].toLowerCase();
+      const content = extractContent(standaloneElement.properties?.content);
+      console.log(`Processing standalone ${tag} (group ${groupIndex}):`, { content });
+
+      if (!content && tag === 'span') {
+        console.warn(`No content found for ${tag} element, skipping`, standaloneElement);
+        return null; // Skip empty span elements
+      }
+
       return {
         id: uuidv4(),
         type: tag,
@@ -856,7 +866,7 @@ const JsonTemplateBuilderRevert = () => {
     }
 
     if (!mainElement) {
-      console.warn('No main element found for group:', group);
+      console.warn(`No main element found for group ${groupIndex}:`, group);
       return null;
     }
 
@@ -884,7 +894,7 @@ const JsonTemplateBuilderRevert = () => {
         element.contentItems = (children || []).map(item => ({
           id: uuidv4(),
           content: extractContent(item.properties?.content),
-          description: item.properties?.content?.description || ''
+          description: extractContent(item.properties?.content?.description || '')
         }));
       }
     } else if (tag === 'div') {
@@ -899,11 +909,10 @@ const JsonTemplateBuilderRevert = () => {
       }
     }
 
-    console.log(`Created element for ${tag}:`, element);
+    console.log(`Created element for ${tag} (group ${groupIndex}):`, element);
     return element;
   }).filter(Boolean);
 };
-
  const renderPreview = () => (
   <div className="bg-white shadow-md rounded-lg p-6 mb-8">
     <h2 className="text-xl font-semibold text-gray-800 border-b-2 border-blue-500 pb-2 mb-4">Preview</h2>
