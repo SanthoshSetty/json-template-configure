@@ -798,8 +798,8 @@ const JsonTemplateBuilderRevert = () => {
   };
 
   bodyChildren.forEach(child => {
+    const tag = child.properties?.tag?.enum?.[0]?.toLowerCase(); // Normalized
     const groupId = child.properties?.attributes?.[0]?.properties?.value?.enum?.[0];
-    const tag = child.properties?.tag?.enum?.[0];
 
     if (groupId) {
       if (!groupedElements[groupId]) {
@@ -819,14 +819,16 @@ const JsonTemplateBuilderRevert = () => {
       el.properties?.attributes?.[0]?.properties?.name?.enum?.[0] === 'id'
     );
 
-    const fallbackStandalone = group.find(el =>
-      ['span', 'h1', 'h2', 'h3'].includes(el.properties?.tag?.enum?.[0])
-    );
+    const fallbackStandalone = group.find(el => {
+      const tag = el.properties?.tag?.enum?.[0]?.toLowerCase();
+      return ['span', 'h1', 'h2', 'h3'].includes(tag);
+    });
 
     if (!mainElement && fallbackStandalone) {
+      const tag = fallbackStandalone.properties.tag.enum[0].toLowerCase();
       return {
         id: uuidv4(),
-        type: fallbackStandalone.properties.tag.enum[0],
+        type: tag,
         content: extractContent(fallbackStandalone.properties?.content),
         contentItems: [],
         childContent: null,
@@ -840,10 +842,10 @@ const JsonTemplateBuilderRevert = () => {
 
     if (!mainElement) return null;
 
-    const type = mainElement.properties.tag.enum[0];
+    const tag = mainElement.properties.tag.enum[0].toLowerCase(); // Normalize tag
     const element = {
       id: uuidv4(),
-      type,
+      type: tag,
       content: extractContent(titleElement?.properties?.content),
       contentItems: [],
       childContent: '',
@@ -854,7 +856,7 @@ const JsonTemplateBuilderRevert = () => {
       hasDescription: false
     };
 
-    if (['ul', 'ol'].includes(type)) {
+    if (['ul', 'ol'].includes(tag)) {
       const children = mainElement.properties.children;
       if (children?.[0]?.type === 'array') {
         element.isDynamic = true;
@@ -867,11 +869,11 @@ const JsonTemplateBuilderRevert = () => {
           description: ''
         }));
       }
-    } else if (type === 'div') {
+    } else if (tag === 'div') {
       element.type = 'p';
       element.childContent = extractContent(mainElement.properties?.content);
       const descriptionElement = group.find(el =>
-        el.properties?.tag?.enum?.[0] === 'div' &&
+        el.properties?.tag?.enum?.[0]?.toLowerCase() === 'div' &&
         el.properties?.content?.description
       );
       if (descriptionElement) {
