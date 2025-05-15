@@ -167,44 +167,50 @@ const getElementTypeName = (type) => {
 /**
  * Helper function to parse and render HTML content in preview
  */
+
 const renderFormattedContent = (content) => {
   if (!content) return null;
-  
+
   const temp = document.createElement('div');
   temp.innerHTML = content;
-  
+
   const convertNode = (node) => {
     if (node.nodeType === 3) {
+      // Text node
       return node.textContent.replace(/\n/g, '<br/>').replace(/ /g, '\u00A0');
     }
+
     if (node.nodeType !== 1) return null;
-    
+
+    const tag = node.tagName.toLowerCase();
     const children = Array.from(node.childNodes).map(convertNode).filter(Boolean);
-    
-    switch (node.tagName.toLowerCase()) {
+    const html = children.join('') || node.innerHTML || node.textContent;
+
+    switch (tag) {
       case 'h1':
-        return <h1 className="text-4xl font-bold" dangerouslySetInnerHTML={{ __html: children.join('') }} />;
+        return <h1 className="text-4xl font-bold" dangerouslySetInnerHTML={{ __html: html }} />;
       case 'h2':
-        return <h2 className="text-3xl font-bold" dangerouslySetInnerHTML={{ __html: children.join('') }} />;
+        return <h2 className="text-3xl font-bold" dangerouslySetInnerHTML={{ __html: html }} />;
       case 'h3':
-        return <h3 className="text-2xl font-bold" dangerouslySetInnerHTML={{ __html: children.join('') }} />;
+        return <h3 className="text-2xl font-bold" dangerouslySetInnerHTML={{ __html: html }} />;
       case 'strong':
-        return <strong dangerouslySetInnerHTML={{ __html: children.join('') }} />;
+        return <strong dangerouslySetInnerHTML={{ __html: html }} />;
       case 'em':
-        return <em dangerouslySetInnerHTML={{ __html: children.join('') }} />;
+        return <em dangerouslySetInnerHTML={{ __html: html }} />;
       case 'span':
-        return <span dangerouslySetInnerHTML={{ __html: children.join('') }} />;
+        return <span className="text-gray-800" dangerouslySetInnerHTML={{ __html: html }} />;
       case 'br':
         return <br />;
       default:
-        return <span dangerouslySetInnerHTML={{ __html: children.join('') }} />;
+        return <span dangerouslySetInnerHTML={{ __html: html }} />;
     }
   };
-  
+
   return Array.from(temp.childNodes).map((node, index) => (
     <React.Fragment key={index}>{convertNode(node)}</React.Fragment>
   ));
 };
+
 
 /**
  * Sidebar component to add new elements to the template.
@@ -786,7 +792,7 @@ const JsonTemplateBuilderRevert = () => {
     if (contentObj.enum && contentObj.enum.length > 0) {
       return contentObj.enum[0];
     } else if (contentObj.description) {
-      return `{{${contentObj.description}}}`; // Wrap description so user knows it's an instruction
+      return contentObj.description;
     }
     return '';
   };
@@ -806,10 +812,10 @@ const JsonTemplateBuilderRevert = () => {
   });
 
   return Object.values(groupedElements).map(group => {
-    const titleElement = group.find(el => 
+    const titleElement = group.find(el =>
       el.properties?.attributes?.[0]?.properties?.name?.enum?.[0] === 'data-related-id'
     );
-    const mainElement = group.find(el => 
+    const mainElement = group.find(el =>
       el.properties?.attributes?.[0]?.properties?.name?.enum?.[0] === 'id'
     );
 
@@ -864,8 +870,8 @@ const JsonTemplateBuilderRevert = () => {
     } else if (type === 'div') {
       element.type = 'p';
       element.childContent = extractContent(mainElement.properties?.content);
-      const descriptionElement = group.find(el => 
-        el.properties?.tag?.enum?.[0] === 'div' && 
+      const descriptionElement = group.find(el =>
+        el.properties?.tag?.enum?.[0] === 'div' &&
         el.properties?.content?.description
       );
       if (descriptionElement) {
